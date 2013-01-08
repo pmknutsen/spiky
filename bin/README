@@ -1,0 +1,15 @@
+MAPFILE.EXE
+This is a Windows tool for converting MAP to MAT files. It is copyright of Alpha Omega
+Engineering (Nazareth, Israel) and is re-distributed here without any explicit permission.
+
+SON32.DLL
+This file includes the SON library built as a DLL. This DLL is a pre-requisite for
+running Mapfile.exe from Alpha Omega on your system. The SON32.DLL file was obtained
+from the The SON library distribution disk and is the copyright of Cambridge
+Electronic Design Limited (CED). It is re-distributed here without any explicit
+permission. Please contact CED at http://www.ced.co.uk for more information.
+
+
+
+
+

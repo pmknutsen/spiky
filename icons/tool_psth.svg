@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="16px"
+   height="16px"
+   id="svg2393"
+   sodipodi:version="0.32"
+   inkscape:version="0.46"
+   sodipodi:docname="tool_psth.svg"
+   inkscape:output_extension="org.inkscape.output.svg.inkscape"
+   inkscape:export-filename="/home/home/Analysis/Rodent_Physiology_Toolbox/spiky/tool_psth.png"
+   inkscape:export-xdpi="94.807686"
+   inkscape:export-ydpi="94.807686">
+  <defs
+     id="defs2395">
+    <inkscape:perspective
+       sodipodi:type="inkscape:persp3d"
+       inkscape:vp_x="0 : 8 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_z="16 : 8 : 1"
+       inkscape:persp3d-origin="8 : 5.3333333 : 1"
+       id="perspective2401" />
+    <inkscape:perspective
+       id="perspective4630"
+       inkscape:persp3d-origin="372.04724 : 350.78739 : 1"
+       inkscape:vp_z="744.09448 : 526.18109 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_x="0 : 526.18109 : 1"
+       sodipodi:type="inkscape:persp3d" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="22.197802"
+     inkscape:cx="10.217909"
+     inkscape:cy="9.8902751"
+     inkscape:current-layer="layer1"
+     showgrid="true"
+     inkscape:grid-bbox="true"
+     inkscape:document-units="px"
+     inkscape:window-width="1440"
+     inkscape:window-height="825"
+     inkscape:window-x="0"
+     inkscape:window-y="25" />
+  <metadata
+     id="metadata2398">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     id="layer1"
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer">
+    <rect
+       style="fill:#ffffff;stroke:#969696;stroke-width:1.29600000000000004;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="rect4636"
+       width="13.043631"
+       height="13.266615"
+       x="1.9202634"
+       y="1.7747191"
+       inkscape:export-filename="/home/home/Analysis/Rodent_Physiology_Toolbox/spiky/icons/tool_psth.png"
+       inkscape:export-xdpi="98.199997"
+       inkscape:export-ydpi="98.199997" />
+    <rect
+       style="fill:#ffffff;stroke:#000000;stroke-width:0.38170728;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="rect2403"
+       width="13.652522"
+       height="13.534309"
+       x="0.96721613"
+       y="0.89868653" />
+    <path
+       style="fill:#961414;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.09874708;stroke-linecap:round;stroke-linejoin:round;marker-mid:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="M 0.82790601,14.307262 L 2.1920399,14.262293 L 3.2041389,14.262293 L 3.5121692,11.474084 L 3.9962158,8.6409065 L 4.5682728,5.6278435 L 5.2723416,2.8846075 L 5.7123847,5.5828725 L 6.460458,8.9107329 L 7.0765185,11.069344 L 7.692578,11.608998 L 9.1007165,12.193623 L 10.112815,12.14865 L 10.816884,11.294199 L 11.300932,10.349808 L 11.69697,11.474084 L 12.313031,13.048073 L 13.237121,14.262293 L 14.733268,14.262293"
+       id="path4646" />
+  </g>
+</svg>

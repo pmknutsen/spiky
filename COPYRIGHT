@@ -1,0 +1,63 @@
+COPYRIGHT
+
+The following copyright notices apply to the software included with
+the distribution of Spiky!
+
+Please note that not all components of this software is free software and
+may not be re-distributed without the expressed permission of the respective
+authors. See below for details.
+
+If you wish to distribute this code, it is recommended that all additional
+copies are downloaded at http://code.google.com/p/spiky/
+
+------------------------------------------------------------------------
+
+Spiky! Spike sorting and analysis software for Matlab(R)*
+Copyright (C) 2010  Spiky! Developers (http://code.google.com/p/spiky/)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+------------------------------------------------------------------------
+
+THIRD PARTY SOFTWARE
+
+MapFile.exe
+Copyright (C) 1996-2010 Alpha Omega Engineering LTD**
+
+MapFile.exe is distributed with Spiky! in its unmodified form by permission
+of Alpha Omega Engineering LTD, Nazareth Illit, Israel. This software or
+parts thereof may not be reproduced in any form, by any method, for any
+purpose without written permission from Alpha Omega Engineering LTD. Alpha
+Omega Engineering LTD does not warrant, expressly or implied, including but
+not limited to, any implied warranties of merchantability or fitness for a
+particular purpose, regarding these materials and makes such materials
+available solely on an "as-is" basis. In no event shall Alpha Omega
+Engineering LTD be liable to anyone for special, collateral, incidental or
+consequential damages in connections with or arising out of purchase or use
+of these materials. The sole and exclusive liability to Alpha Omega
+Engineering LTD, regardless of form of actions, shall not exceed the
+purchase price of the materials described herein.
+
+Please contact info@alphaomega-eng.com for more information.
+
+------------------------------------------------------------------------
+
+*  MATLAB(R) is a registered trademark of The MathWorks, Inc.
+   http://www.mathworks.com
+
+** The authors of Spiky! are not affiliated with Alpha Omega Engineering
+   LTD in any way. Their software is included with this distribution for the
+   sole benefit of Alpha Omega Engineering hardware users. The authors make
+   no guarantees for the compatibility of Mapfile.exe with Spiky!
+
