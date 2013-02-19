@@ -1,18 +1,36 @@
 function varargout = spiky(varargin)
-% SPIKY! AlphaMap .map/.mat browser and spike-sorter
+% Spiky AlphaMap .map/.mat browser and spike-sorter
 %
 % Usage:
 %   < spiky >
-%   Runs the Spiky! GUI
+%   Runs the Spiky GUI
 %
 %   < spiky(FUN) >
-%   Runs the internal function FUN in Spiky!. Ex:
+%   Runs the internal function FUN in Spiky. Ex:
 %     spiky, e.g. spiky('LoadTrial(''A1807004.mat'')')
 %
 %   < spiky(FUN) >
-%   Runs the internal function FUN in Spiky!. Ex:
+%   Runs the internal function FUN in Spiky. Ex:
 %     spiky, e.g. spiky('LoadTrial(''A1807004.mat'')')
 %
+
+% Spiky - Spike sorting GUI for Matlab
+% Copyright (C) 2012 Per M Knutsen <pmknutsen@gmail.com>
+% 
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+% 
+
 
 % Set path to spike-sorting software
 sPath = which('spiky');
@@ -21,7 +39,7 @@ addpath(genpath(sPath), '-end');
 
 % Run local function if called from outside
 if nargin > 0
-    if strcmp(varargin{1}, 'GetBuildNumber')
+    if strcmp(varargin{1}, 'GetGitHash')
         varargout{1} = eval(varargin{1});
     else
         %eval(varargin{1}); % changed 07/11/11
@@ -37,9 +55,9 @@ end
 % Set FV default settings
 FV = SetFVDefaults();
 
-% Check if Spiky! is already running
+% Check if Spiky is already running
 hPlot = findobj('Tag', 'Spiky');
-if ~isempty(hPlot) % activate existing Spiky! window
+if ~isempty(hPlot) % activate existing Spiky window
     figure(hPlot)
     return
 end
@@ -47,7 +65,7 @@ end
 global g_hSpike_Viewer
 g_hSpike_Viewer = figure;
 vPos = get(g_hSpike_Viewer, 'position');
-set(g_hSpike_Viewer, 'NumberTitle','off', 'Name', ['Spiky! Build# ' GetBuildNumber], 'MenuBar','none', 'UserData', FV, ...
+set(g_hSpike_Viewer, 'NumberTitle','off', 'Name', ['Spiky'], 'MenuBar','none', 'UserData', FV, ...
     'Tag', 'Spiky', 'Color', [.2 .2 .2], 'PaperOrientation', 'landscape', 'PaperUnits', 'normalized', ...
     'PaperPosition', [.05 .05 .9 .9], 'InvertHardcopy', 'off', 'position', [vPos(1)-200 vPos(2)-50 vPos(3)+350 vPos(4)+100], ...
     'closeRequestFcn', @ExitSpiky, 'visible', 'off')
@@ -90,7 +108,7 @@ uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_PSTH
 mCData = im2double(imread([sPath 'tool_pc.png'])); mCData(mCData == 0) = NaN; % principal components
 uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_PC', 'TooltipString', 'Show principal components', 'ClickedCallback', @ViewWaveformPCs);
 
-% Set Spiky! to by default NOT be in MERGE MODE
+% Set Spiky to by default NOT be in MERGE MODE
 global g_bMergeMode g_bBatchMode
 g_bMergeMode = 0;
 g_bBatchMode = false;
@@ -113,7 +131,7 @@ uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Print Pre&view...', 'Callback
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Print...', 'Callback', 'printdlg(gcbf)', 'Accelerator', 'P');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Invert Colors', 'Callback', @InvertColors, 'Checked', 'off');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Export &Figure...', 'Callback', @FigureExport);
-uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'E&xit Spiky!', 'Callback', @ExitSpiky, 'separator', 'on', 'Accelerator', 'Q');
+uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'E&xit Spiky', 'Callback', @ExitSpiky, 'separator', 'on', 'Accelerator', 'Q');
 
 %  - Edit menu
 hEdit  = uimenu(g_hSpike_Viewer, 'Label', '&Edit');
@@ -181,7 +199,7 @@ uimenu(g_hSpike_Viewer, 'Parent', hSorting, 'Label', 'Delete sorting data...', '
 hAnalysis = uimenu(g_hSpike_Viewer, 'Label', '&Analysis');
 hContinuous = uimenu(g_hSpike_Viewer, 'Parent', hAnalysis, 'Label', '&Continuous');
 uimenu(g_hSpike_Viewer, 'Parent', hContinuous, 'Label', 'P&ower Spectral Densities', 'Callback', @ShowSpectralDensity);
-uimenu(g_hSpike_Viewer, 'Parent', hContinuous, 'Label', '&Event Triggered Average', 'Callback', @ShowEventTriggeredAverage);
+uimenu(g_hSpike_Viewer, 'Parent', hContinuous, 'Label', '&Event Triggered Average (B)', 'Callback', @ShowEventTriggeredAverage);
 uimenu(g_hSpike_Viewer, 'Parent', hContinuous, 'Label', '&Cross Correlations', 'Callback', @PlotCrossCorrelationsContinuous);
 uimenu(g_hSpike_Viewer, 'Parent', hContinuous, 'Label', '&Histogram', 'Callback', @PlotHistogramContinuous);
 
@@ -235,9 +253,18 @@ uimenu(g_hSpike_Viewer, 'Parent', hWindow, 'Label', 'Figures', 'Callback', @Brin
 
 %  - Help menu
 hHelp  = uimenu(g_hSpike_Viewer, 'Label', '&Help');
-uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&Spiky Website', 'Callback', 'web(''http://code.google.com/p/spiky/'', ''-browser'')');
-uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&Online Documentation', 'Callback', 'web(''http://code.google.com/p/spiky/wiki/'', ''-browser'')', 'Accelerator', 'H');
-uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&About Spiky!', 'Callback', @AboutSpiky, 'separator', 'on');
+hWebResSub = uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', 'Web &Resources');
+uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&Version', 'Callback', @ShowVersion, 'Separator', 'on');
+uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&Licence', 'Callback', @ShowLicense);
+uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&About Spiky', 'Callback', @AboutSpiky);
+
+% - Web Resources menu
+uimenu(g_hSpike_Viewer, 'Parent', hWebResSub , 'Label', '&GitHub Repository', 'Callback', 'web(''https://github.com/pmknutsen/spiky'', ''-browser'')');
+uimenu(g_hSpike_Viewer, 'Parent', hWebResSub , 'Label', '&Wiki', 'Callback', 'web(''https://github.com/pmknutsen/spiky/wiki'', ''-browser'')');
+uimenu(g_hSpike_Viewer, 'Parent', hWebResSub , 'Label', '&Bug Tracker', 'Callback', 'web(''https://github.com/pmknutsen/spiky/issues'', ''-browser'')');
+
+
+
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -376,7 +403,7 @@ if ~g_bBatchMode
         if ~isempty(nIndx)
             if FV.tExperimentVariables(nIndx).sValue
                 switch questdlg('This file has already been PCA cleaned. If it is necessary to redo the cleaning it is recommended you first re-load the original files from disk.', ...
-                        'Spiky!', 'Continue', 'Abort', 'Abort')
+                        'Spiky', 'Continue', 'Abort', 'Abort')
                     case 'Abort', return
                 end
             end
@@ -422,7 +449,7 @@ sp_disp('Done PCA cleaning!')
 persistent p_bNeverPlotPCA
 if isempty(p_bNeverPlotPCA), p_bNeverPlotPCA = 0; end
 if ~p_bNeverPlotPCA && ~g_bBatchMode
-    sAns = questdlg('Do you want to plot and compare PCA cleaned traces?', 'Spiky!', 'No', 'Yes', 'Never plot', 'Yes');
+    sAns = questdlg('Do you want to plot and compare PCA cleaned traces?', 'Spiky', 'No', 'Yes', 'Never plot', 'Yes');
 else
     sAns = 'No';
 end
@@ -430,7 +457,7 @@ if strcmpi(sAns, 'Never plot'), p_bNeverPlotPCA = 1; end
 
 if strcmpi(sAns, 'Yes') && ~p_bNeverPlotPCA && ~g_bBatchMode
     hFig = figure;
-    set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky! PCA Cleaning', 'NumberTitle', 'off')
+    set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky PCA Cleaning', 'NumberTitle', 'off')
     
     for c = 1:size(mRaw,2)
         hAx = axes('position', [.05 (1/size(mRaw,2))*(c-1) .95 1/size(mRaw,2)]);
@@ -447,7 +474,7 @@ end
 if g_bBatchMode
     sAns = 'Yes';
 else
-    sAns = questdlg('Keep cleaned data? Keeping will overwrite the data vectors in this .spb file. Original, raw data is not over-written.', 'Spiky!', 'Yes', 'No', 'Cancel', 'Yes');
+    sAns = questdlg('Keep cleaned data? Keeping will overwrite the data vectors in this .spb file. Original, raw data is not over-written.', 'Spiky', 'Yes', 'No', 'Cancel', 'Yes');
 end
 switch sAns
     case 'Yes'
@@ -490,7 +517,7 @@ function ShowEvents(varargin)
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct;
 % update menu item
-global g_hSpike_Viewer % handle to Spiky! window
+global g_hSpike_Viewer % handle to Spiky window
 hMenuItem = findobj(g_hSpike_Viewer, 'Label', 'Show &Events'); % handle of 'Show Event'
 switch get(hMenuItem, 'Checked')
     case 'on' % turn off if on
@@ -516,12 +543,12 @@ if ~g_bMergeMode % remove raw data so its not duplicated on disk
 end
 %save(sPath, 'FV', '-MAT', '-V6') % no compression
 save(sPath, 'FV', '-MAT')
-% Update the title of the Spiky! window to reflect that settings were saved
+% Update the title of the Spiky window to reflect that settings were saved
 global g_hSpike_Viewer
 if length(FV.sLoadedTrial) > 70
     sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
 else sLoadedTrial = FV.sLoadedTrial; end
-set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky! - %s', sLoadedTrial)))
+set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky - %s', sLoadedTrial)))
 set(g_hSpike_Viewer,'Pointer',sPointer)
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -583,7 +610,7 @@ if isfield(FV, 'tData') % is there saved data?
                 else
                     if isempty(sAns) % ask whether to keep or replace
                         % Ask only once
-                        sAns = questdlg('A duplicate of the raw data exists in an existing Spiky! generated file. Do you wish to use this data, or reload all raw data from the .daq file? Note that reloading raw data will erase imported fields.', ...
+                        sAns = questdlg('A duplicate of the raw data exists in an existing Spiky generated file. Do you wish to use this data, or reload all raw data from the .daq file? Note that reloading raw data will erase imported fields.', ...
                             'Duplicate data warning', 'Use duplicate', 'Always use duplicate', 'Reload data', 'Use duplicate');
                     end
                 end
@@ -619,7 +646,7 @@ return
 function AutoloadNewFiles(varargin)
 [FV, hWin] = GetStruct;
 if ~isfield(FV, 'sDirectory')
-    warndlg('You must first select the directory that should be monitored in File->Open Directory', 'Spiky!')
+    warndlg('You must first select the directory that should be monitored in File->Open Directory', 'Spiky')
 else
     map_autoload(CheckFilename([FV.sDirectory '\']))
 end
@@ -738,7 +765,7 @@ if sDirectory == 0, return, end
 
 % Display error if no files were found
 if isempty(cFiles)
-    warndlg('No DAQ files were found in the chosen directory.', 'Spiky!')
+    warndlg('No DAQ files were found in the chosen directory.', 'Spiky')
     return
 end
 
@@ -793,13 +820,15 @@ return
 function ViewTrialData(varargin)
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct;
-% Dont display any trial data if Spiky! is in MERGE MODE
+% Dont display any trial data if Spiky is in MERGE MODE
 global g_bMergeMode g_bBatchMode
 if ~g_bMergeMode && ~g_bBatchMode % destroy waitbar in case we are not in Merge or Batch mode
     SpikyWaitbar(1,1);
 end 
 
+% Make Spiky window current without raising it to the top
 hFig = findobj('Tag', 'Spiky');
+set(0, 'currentfigure', hFig)
 
 % Delete all current axes objects
 delete(findobj(hFig, 'type', 'axes'))
@@ -812,7 +841,7 @@ hPan = pan(hFig);
 if strcmp(get(hPan, 'Enable'), 'off')
     set(hFig, 'WindowButtonDownFcn', '');
 end
-zoom off
+zoom(hFig, 'off')
 
 % Select channels
 if isempty(g_bMergeMode), g_bMergeMode = 0; end
@@ -1353,7 +1382,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanWindow(varargin)
 [FV, hWin] = GetStruct;
-global g_hSpike_Viewer % handle to Spiky! window
+global g_hSpike_Viewer % handle to Spiky window
 if ~isfield(FV, 'tData')
     set(gcbo, 'state', 'off')
     return
@@ -1594,30 +1623,30 @@ else
     switch varargin{2}
         case -1
             if isempty(csPaths)
-                warndlg('No file list has been loaded.', 'Spiky!');
+                warndlg('No file list has been loaded.', 'Spiky');
                 return
             end
             % Get index of current file
             nNewIndx = find(strcmp(csPaths, FV.sLoadedTrial)) - 1;
             if nNewIndx < 1
-                warndlg('You are already at the first file in the current file list.', 'Spiky!')
+                warndlg('You are already at the first file in the current file list.', 'Spiky')
                 return
             end
             sNextTrial = csPaths{nNewIndx};
         case 0
             if isempty(csPaths)
-                warndlg('No file list has been loaded.', 'Spiky!');
+                warndlg('No file list has been loaded.', 'Spiky');
                 return
             end
             nNewIndx = find(strcmp(csPaths, FV.sLoadedTrial)) + 1;
             if nNewIndx > length(csPaths)
-                warndlg('You are already at the last file in the current file list.', 'Spiky!')
+                warndlg('You are already at the last file in the current file list.', 'Spiky')
                 return
             end
             sNextTrial = csPaths{nNewIndx};
         otherwise
             if length(csPaths) < varargin{2}
-                warndlg('You have reached the last file in the current file list.', 'Spiky!')
+                warndlg('You have reached the last file in the current file list.', 'Spiky')
                 return
             end
             if iscell(csPaths)
@@ -1630,7 +1659,7 @@ end
 
 % Ask first, then save
 if ~isempty(strfind(get(g_hSpike_Viewer, 'Name'), '*')) && ~isempty(FV.sLoadedTrial)
-    switch questdlg('Save changes to current file?', 'Spiky!', 'Yes', 'No', 'Cancel', 'Yes')
+    switch questdlg('Save changes to current file?', 'Spiky', 'Yes', 'No', 'Cancel', 'Yes')
         case 'Yes', SaveResults
         case 'Cancel', return
     end
@@ -1663,7 +1692,7 @@ if isempty(FV.sLoadedTrial)
 else
     if isempty(p_bNeverApply), p_bNeverApply = 0; end
     if ~p_bNeverApply && ~g_bBatchMode
-        sAns = questdlg('Should current settings be applied to the new file?', 'Spiky!', 'Yes', 'No', 'Never apply', 'No');
+        sAns = questdlg('Should current settings be applied to the new file?', 'Spiky', 'Yes', 'No', 'Never apply', 'No');
     else
         sAns = 'No';
     end
@@ -1729,7 +1758,7 @@ if bSetSaveFlag
     if length(FV.sLoadedTrial) > 70
         sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
     else sLoadedTrial = FV.sLoadedTrial; end
-    set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky! - %s*', sLoadedTrial)))
+    set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky - %s*', sLoadedTrial)))
 end
 % set current working directory to that in active database
 if isfield(FV, 'sDirectory')
@@ -1817,7 +1846,7 @@ function SetMaxSpikeJitter(varargin)
 % Set the maximal duration (ms) that two spikes on different channels
 % should be considered to be the same same
 [FV, hWin] = GetStruct;
-FV.nMaxCrossChannelSpikeJitter = GetInputNum('Set maximal spiketime jitter across electrodes (ms)', 'Spiky!', FV.nMaxCrossChannelSpikeJitter);
+FV.nMaxCrossChannelSpikeJitter = GetInputNum('Set maximal spiketime jitter across electrodes (ms)', 'Spiky', FV.nMaxCrossChannelSpikeJitter);
 SetStruct(FV)
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1826,7 +1855,7 @@ return
 function EditPreTriggerTime(varargin)
 % Change the duration of the signal to keep before threshold-crossings triggers
 [FV, hWin] = GetStruct;
-FV.nSpikeTrigPreMs = GetInputNum('Set pre-trigger time (ms)', 'Spiky!', FV.nSpikeTrigPreMs);
+FV.nSpikeTrigPreMs = GetInputNum('Set pre-trigger time (ms)', 'Spiky', FV.nSpikeTrigPreMs);
 SetStruct(FV)
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1836,7 +1865,7 @@ function SetDeadtime(varargin)
 % Set the length of time following threshold-crossings events that new
 % spikes cannot be detected.
 [FV, hWin] = GetStruct;
-FV.nDeadTimeMs = GetInputNum(sprintf('Set post-spike deadtime (ms):\n(note that this parameter only affects visually displayed spikes)'), 'Spiky!', FV.nDeadTimeMs);
+FV.nDeadTimeMs = GetInputNum(sprintf('Set post-spike deadtime (ms):\n(note that this parameter only affects visually displayed spikes)'), 'Spiky', FV.nDeadTimeMs);
 SetStruct(FV)
 ViewTrialData
 return
@@ -1846,7 +1875,7 @@ return
 function EditPostTriggerTime(varargin)
 % Change the duration of the signal to keep after threshold-crossings triggers
 [FV, hWin] = GetStruct;
-FV.nSpikeTrigPostMs = GetInputNum('Set post-trigger time (ms)', 'Spiky!', FV.nSpikeTrigPostMs);
+FV.nSpikeTrigPostMs = GetInputNum('Set post-trigger time (ms)', 'Spiky', FV.nSpikeTrigPostMs);
 SetStruct(FV)
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2061,7 +2090,7 @@ SetStruct(FV) % update FV
 if length(sFile) > 70
     sLoadedTrial = ['...' sFile(end-69:end)];
 else sLoadedTrial = sFile; end
-set(hWin, 'Name', sprintf('Spiky! - %s', sLoadedTrial)) % update window name
+set(hWin, 'Name', sprintf('Spiky - %s', sLoadedTrial)) % update window name
 bResult = 1;
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2080,13 +2109,13 @@ cAboutText = { 'Maintainer:', ...
     ' Amir Monovitch, Weizmann Institute', ...
     ' ', ...
     'Acknowledgements:', ...
-    'Spiky! includes modified code from the open-source Chronux project (http://www.chronux.org) for all of its spike-sorting routines. Chronux is released under the GNU General Public License.', ...
+    'Spiky includes modified code from the open-source Chronux project (http://www.chronux.org) for all of its spike-sorting routines. Chronux is released under the GNU General Public License.', ...
     ' ', ...
     'Musial PG, Baker SN, Gerstein GL, King EA, Keating JG (2002) Signal-to-noise ratio improvement in multiple electrode recording. J Neurosci Methods 115:29-43', ...
     ' ', ...
     'Fee MS, Mitra PP, Kleinfeld D (1996) Automatic sorting of multiple unit neuronal signals in the presence of anisotropic and non-Gaussian variability. J Neurosci Methods 69:175-188', ...
     };
-msgbox(cAboutText, 'About Spiky!')
+msgbox(cAboutText, 'About Spiky')
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -2128,7 +2157,7 @@ elseif nY < nMed
     % Negative threshold line
     if isfield(FV.tSpikeThresholdsNeg, sTag) && isfield(FV.tSpikes, sTag)
         % Ask whether to discard currently detected spikes
-        if strcmp(questdlg('Replacing the current threshold line will discard all detected spikes. Continue?', 'Spiky!', 'Yes', 'No', 'No'), 'No')
+        if strcmp(questdlg('Replacing the current threshold line will discard all detected spikes. Continue?', 'Spiky', 'Yes', 'No', 'No'), 'No')
             return;
         else FV.tSpikes = rmfield(FV.tSpikes, sTag); end
     end
@@ -2137,7 +2166,7 @@ else
     % Positive threshold line
     if isfield(FV.tSpikeThresholdsPos, sTag) && isfield(FV.tSpikes, sTag)
         % Ask whether to discard currently detected spikes
-        if strcmp(questdlg('Replacing the current threshold line will discard all detected spikes. Continue?', 'Spiky!', 'Yes', 'No', 'No'), 'No')
+        if strcmp(questdlg('Replacing the current threshold line will discard all detected spikes. Continue?', 'Spiky', 'Yes', 'No', 'No'), 'No')
             return;
         else FV.tSpikes = rmfield(FV.tSpikes, sTag); end
     end
@@ -2156,7 +2185,7 @@ sCh = sTag(1:end-4);
 
 % Ask whether to discard currently detected spikes
 if isfield(FV.tSpikes, sCh)
-    if strcmp(questdlg('Removing this threshold line will discard all detected spikes on this channel. Continue?', 'Spiky!', 'Yes', 'No', 'No'), 'No')
+    if strcmp(questdlg('Removing this threshold line will discard all detected spikes on this channel. Continue?', 'Spiky', 'Yes', 'No', 'No'), 'No')
         return;
     else FV.tSpikes = rmfield(FV.tSpikes, sCh); end
 end
@@ -2182,7 +2211,7 @@ sCh = sTag(1:end-4);
 
 % Ask whether to discard currently detected spikes
 if isfield(FV.tSpikes, sCh)
-    if strcmp(questdlg('Adjusting the threshold manually will erase all detected spikes and sorting data on this channel. Continue?', 'Spiky!', 'Yes', 'No', 'No'), 'No')
+    if strcmp(questdlg('Adjusting the threshold manually will erase all detected spikes and sorting data on this channel. Continue?', 'Spiky', 'Yes', 'No', 'No'), 'No')
         return;
     else FV.tSpikes = rmfield(FV.tSpikes, sCh); end
 end
@@ -2190,11 +2219,11 @@ end
 % Ask for new threshold value
 switch lower(sTag(end-2:end))
     case 'neg'
-        cAns = inputdlg('New threshold value:', 'Spiky!', 1, {num2str(FV.tSpikeThresholdsNeg.(sCh))});
+        cAns = inputdlg('New threshold value:', 'Spiky', 1, {num2str(FV.tSpikeThresholdsNeg.(sCh))});
         if isempty(cAns), return, end
         FV.tSpikeThresholdsNeg.(sCh) = str2num(cAns{1});
     case 'pos'
-        cAns = inputdlg('New threshold value:', 'Spiky!', 1, {num2str(FV.tSpikeThresholdsPos.(sCh))});
+        cAns = inputdlg('New threshold value:', 'Spiky', 1, {num2str(FV.tSpikeThresholdsPos.(sCh))});
         if isempty(cAns), return, end
         FV.tSpikeThresholdsPos.(sCh) = str2num(cAns{1});
     otherwise
@@ -2460,7 +2489,7 @@ if ~CheckIfSorted, return, end
 if ~bResult, return, end
 
 hFig = figure;
-set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky! Aggregration Tree', 'NumberTitle', 'off', 'menubar', 'none')
+set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Aggregration Tree', 'NumberTitle', 'off', 'menubar', 'none')
 aggtree(FV.tSpikes.(sCh));
 
 hHeader = header(['Channel ' sCh ' - Spike Cluster Aggregation Tree'], 12);
@@ -2524,7 +2553,7 @@ for u = 1:nUnits % one row per unit
     % open new window if 4 units/rows have been reached
     if p == 10
         hMainWin = figure;
-        set(hMainWin, 'Color', [.2 .2 .2], 'name', 'Spiky! Spike Clusters', 'NumberTitle', 'off')
+        set(hMainWin, 'Color', [.2 .2 .2], 'name', 'Spiky Spike Clusters', 'NumberTitle', 'off')
         p = 1;
         % scale window width to number of columns
         vPos = get(hMainWin, 'position');
@@ -2647,7 +2676,7 @@ vUnits = unique(tSpikes.hierarchy.assigns);
 mWaveforms = tSpikes.waveforms;
 
 % Open new figure if a windows is not already open for this channel
-sFigTitle = 'Spiky! Cluster Control';
+sFigTitle = 'Spiky Cluster Control';
 sFigTag = sprintf('ClusterControlFig_%s', sCh);
 sAxTag = sprintf('ClusterControlAx_%s', sCh);
 hMainWin = findobj('Tag', sFigTag);
@@ -2778,7 +2807,7 @@ switch sSelected
             nSpikeCluster = str2num(get(hLine, 'tag')); % selected spike
             vYdata = get(hLine, 'ydata');
             nNewCluster = 0;
-            if strcmp(questdlg(sprintf('Move spike from unit %d to unit %d?', nSpikeCluster, nNewCluster), 'Spiky!', 'OK', 'Cancel', 'OK'), 'OK')
+            if strcmp(questdlg(sprintf('Move spike from unit %d to unit %d?', nSpikeCluster, nNewCluster), 'Spiky', 'OK', 'Cancel', 'OK'), 'OK')
                 vIndx = find(FV.tSpikes.(sChannel).hierarchy.assigns == nSpikeCluster);
                 mWaveforms = FV.tSpikes.(sChannel).waveforms(vIndx, :);
                 mYdata = repmat(vYdata, size(mWaveforms,1), 1);
@@ -2804,7 +2833,7 @@ switch sSelected
             waitfor(figure('visible', 'off', 'Tag', 'UIHoldFigure')) % Create an invisible figure
             hLine = findobj(gcf, 'type', 'line', 'marker', 's');
             nNewCluster = str2num(get(hLine, 'tag'));
-            if strcmp(questdlg(sprintf('Move spike from unit %d to unit %d?', nSpikeCluster, nNewCluster), 'Spiky!', 'OK', 'Cancel', 'OK'), 'OK')
+            if strcmp(questdlg(sprintf('Move spike from unit %d to unit %d?', nSpikeCluster, nNewCluster), 'Spiky', 'OK', 'Cancel', 'OK'), 'OK')
                 vIndx = find(FV.tSpikes.(sChannel).hierarchy.assigns == nSpikeCluster);
                 mWaveforms = FV.tSpikes.(sChannel).waveforms(vIndx, :);
                 mYdata = repmat(vYdata, size(mWaveforms,1), 1);
@@ -2888,7 +2917,7 @@ switch sSelected
             waitfor(figure('visible', 'off', 'Tag', 'UIHoldFigure')) % Create an invisible figure
             hLine = findobj(gcf, 'type', 'line', 'marker', 's');
             nNewCluster = str2num(get(hLine, 'tag'));
-            if strcmp(questdlg(sprintf('Reassign selected spikes from units [ %s] to unit %d?', sprintf('%d ', unique(vSpikeClusters)), nNewCluster), 'Spiky!', 'OK', 'Cancel', 'OK'), 'OK')
+            if strcmp(questdlg(sprintf('Reassign selected spikes from units [ %s] to unit %d?', sprintf('%d ', unique(vSpikeClusters)), nNewCluster), 'Spiky', 'OK', 'Cancel', 'OK'), 'OK')
                 for h = 1:length(hSelectedHandles)
                     vYdata = get(hSelectedHandles(h), 'ydata');
                     vIndx = find(FV.tSpikes.(sChannel).hierarchy.assigns == vSpikeClusters(h));
@@ -2920,14 +2949,14 @@ switch sSelected
         waitfor(figure('visible', 'off', 'Tag', 'UIHoldFigure')) % Create an invisible figure
         hLine = findobj(gcf, 'type', 'line', 'marker', 's');
         nSpikeClusterTo = str2double(get(hLine, 'tag'));
-        if nSpikeClusterFrom == nSpikeClusterTo, warndlg('You cant merge a cluster into itself.', 'Spiky!'); return, end
+        if nSpikeClusterFrom == nSpikeClusterTo, warndlg('You cant merge a cluster into itself.', 'Spiky'); return, end
 
         if nSpikeClusterTo == 0 || nSpikeClusterFrom == 0
             warndlg('You cannot merge outliers with sorted clusters. You can only reassign individual outliers to existing clusters.')
             return
         end
 
-        if strcmp(questdlg(sprintf('Merge cluster %d into %d?', nSpikeClusterFrom, nSpikeClusterTo), 'Spiky!', 'OK', 'Cancel', 'OK'), 'OK')
+        if strcmp(questdlg(sprintf('Merge cluster %d into %d?', nSpikeClusterFrom, nSpikeClusterTo), 'Spiky', 'OK', 'Cancel', 'OK'), 'OK')
             vFromIndx = find(FV.tSpikes.(sChannel).hierarchy.assigns == nSpikeClusterFrom);
             FV.tSpikes.(sChannel).hierarchy.assigns(vFromIndx) = nSpikeClusterTo;
             FV.tSpikes.(sChannel).hierarchy.tree(end+1,:) = [nSpikeClusterTo nSpikeClusterFrom .5 0];
@@ -2949,7 +2978,7 @@ switch sSelected
         vNotNaNIndx = find(~isnan(sVisibleClusters));
         nSpikeClusterTo = sVisibleClusters(vNotNaNIndx(1)); % merge into first cluster
 
-        if strcmp(questdlg(sprintf('Merge all visible clusters into cluster %d?', nSpikeClusterTo), 'Spiky!', 'OK', 'Cancel', 'OK'), 'OK')
+        if strcmp(questdlg(sprintf('Merge all visible clusters into cluster %d?', nSpikeClusterTo), 'Spiky', 'OK', 'Cancel', 'OK'), 'OK')
             for i = 2:length(sVisibleClusters)
                 nSpikeClusterFrom = sVisibleClusters(i);
                 vFromIndx = find(FV.tSpikes.(sChannel).hierarchy.assigns == nSpikeClusterFrom);
@@ -2991,7 +3020,7 @@ switch sSelected
             warndlg(sStr)
             sp_disp(sStr)
             return
-        elseif strcmp(questdlg(sprintf('Split cluster %d into its parent clusters %d and %d?', nSpikeClusterSplit, nSpikeClusterSplit, mTree(vRowIndx(end), 2)), 'Spiky!', 'OK', 'Cancel', 'OK'), 'OK')
+        elseif strcmp(questdlg(sprintf('Split cluster %d into its parent clusters %d and %d?', nSpikeClusterSplit, nSpikeClusterSplit, mTree(vRowIndx(end), 2)), 'Spiky', 'OK', 'Cancel', 'OK'), 'OK')
             nNewCluster = mTree(vRowIndx(end), 2);
             vOverclusterAssigns = FV.tSpikes.(sChannel).overcluster.assigns;
             vIndxChange = find(vOverclusterAssigns == nNewCluster);
@@ -3124,6 +3153,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [sCh, bResult] = SelectChannelNumber(varargin)
+% Inputs: (csChannels, WindowTitle, DefaultChannel)
 if ~CheckDataLoaded, return, end
 sCh = []; bResult = 0;
 [FV,hWin] = GetStruct;
@@ -3134,9 +3164,8 @@ if isempty(varargin)
     csChannels = FV.csChannels;
 else
     csChannels = varargin{1};
-    if length(varargin) > 1
-        sTit = varargin{2};
-    end
+    if length(varargin) > 1, sTit = varargin{2}; end
+    if length(varargin) == 3, sDefCh = varargin{3}; else sDefCh = ''; end
 end
 csChannelNames = csChannels;
 
@@ -3155,6 +3184,28 @@ for c = 1:length(csChannels)
     end
 end
 
+% If a default selection exists, re-order csChannels so default appears
+% first in list
+if ~isempty(sDefCh)
+    % Find match
+    nMatch = [];
+    for i = 1:length(csChannels)
+        if length(csChannels{i}) >= length(sDefCh)
+            if strcmp(csChannels{i}(1:length(sDefCh)), sDefCh)
+                nMatch = i;
+                break
+            end
+        end
+    end
+    % Re-order
+    if ~isempty(nMatch)
+        vNewOrder = [nMatch setdiff(1:length(csChannels), nMatch)];
+        csChannels = csChannels(vNewOrder);
+        csDescriptions = csDescriptions(vNewOrder);
+        csChannelNames = csChannelNames(vNewOrder);
+    end
+end
+
 bResult = 0;
 if isempty(csChannels), return, end
 global g_nCh
@@ -3167,8 +3218,10 @@ else
     g_bClosePressed = 0;
     hFig = figure;
     set(hFig, 'position', [get(0,'PointerLocation')-50 360 25], 'menu', 'none', ...
-        'Name', sTit, 'NumberTitle', 'off', 'CloseRequestFcn', 'delete(gcf); global g_bClosePressed; g_bClosePressed = 1;')
+        'Name', sTit, 'NumberTitle', 'off', 'visible', 'off', ...
+        'CloseRequestFcn', 'delete(gcf); global g_bClosePressed; g_bClosePressed = 1;')
     centerfig(hFig, hWin)
+    set(hFig, 'visible', 'on')
     uicontrol(hFig, 'Style', 'popupmenu', 'Position', [10 5 300 20], 'String', csChannels, 'Callback', 'global g_nCh; g_nCh=get(gco, ''value'');', 'value', 1);
     uicontrol(hFig, 'Style', 'pushbutton', 'Position', [315 5 40 20], 'Callback', 'delete(gcf)', 'String', 'OK'); % OK button
     uiwait % wait for user to close window or click OK button
@@ -3196,7 +3249,7 @@ if length(csFieldnames)==0
     uiwait(hWarn); return
 end
 hFig = figure; colormap(pink(256));
-set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky! Waveforms', 'NumberTitle', 'off', 'menubar', 'none')
+set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Waveforms', 'NumberTitle', 'off', 'menubar', 'none')
 p = 1;
 % Find how many channels should be shown
 nChTot = 0;
@@ -3258,7 +3311,7 @@ mColsTemp = zeros(max(FV.tSpikes.(sCh).hierarchy.assigns), 3);
 mColsTemp(unique(FV.tSpikes.(sCh).hierarchy.assigns), :) = mCols;
 FV.tSpikes.(sCh).overcluster.colors = mColsTemp(1:end,:);
 ssg_databrowse3d(FV.tSpikes.(sCh), FV.tSpikes.(sCh).hierarchy.assigns, unique(FV.tSpikes.(sCh).hierarchy.assigns))
-set(gcf, 'color', [.2 .2 .2], 'Name', 'Spiky! Principal Components', 'NumberTitle', 'off', 'ToolBar', 'figure')
+set(gcf, 'color', [.2 .2 .2], 'Name', 'Spiky Principal Components', 'NumberTitle', 'off', 'ToolBar', 'figure')
 hAx = get(gcf, 'Children');
 set(hAx(strcmp(get(hAx, 'type'), 'axes')), 'color', [.1 .1 .1])
 hHeader = header(['Channel ' sCh ' - Click in axis labels to change scale'], 10);
@@ -3490,17 +3543,17 @@ global g_hSpike_Viewer
 hFileList = findobj(g_hSpike_Viewer, 'Tag', 'MenuFileList');
 csPaths = flipud(get(get(hFileList, 'Children'), 'UserData'));
 if isempty(csPaths)
-    warndlg('No additional files have been loaded into your workspace (see File->Files). You first need to load a directory, a directory tree or a custom list of files into your workspace before distributing settings and merging results.', 'Spiky!');
+    warndlg('No additional files have been loaded into your workspace (see File->Files). You first need to load a directory, a directory tree or a custom list of files into your workspace before distributing settings and merging results.', 'Spiky');
     return
 end
 
 if ischar(csPaths)
-    uiwait(warndlg('Cannot distribute settings since there is only a single file loaded.', 'Spiky!'))
+    uiwait(warndlg('Cannot distribute settings since there is only a single file loaded.', 'Spiky'))
     return
 end
 
 % Warn that this action will overwrite data of other files
-%switch questdlg('The current settings will be distributed to all files loaded into your workspace (File->Files). This action will overwrite existing settings and sorting results of other files. Imported fields will be kept. Are you sure you want to continue?', 'Spiky!', 'Yes', 'No', 'Cancel', 'Cancel')
+%switch questdlg('The current settings will be distributed to all files loaded into your workspace (File->Files). This action will overwrite existing settings and sorting results of other files. Imported fields will be kept. Are you sure you want to continue?', 'Spiky', 'Yes', 'No', 'Cancel', 'Cancel')
 %    case 'No', return
 %    case 'Cancel', return
 %end
@@ -3622,7 +3675,7 @@ StartMergeMode(); % start merge mode
 hFileList = findobj(g_hSpike_Viewer, 'Tag', 'MenuFileList');
 csPaths = flipud(get(get(hFileList, 'Children'), 'UserData'));
 if isempty(csPaths)
-    warndlg('No additional files have been loaded into your workspace (see File->Files). You first need to load a directory, a directory tree or a custom list of files into your workspace before distributing settings and merging results.', 'Spiky!');
+    warndlg('No additional files have been loaded into your workspace (see File->Files). You first need to load a directory, a directory tree or a custom list of files into your workspace before distributing settings and merging results.', 'Spiky');
     return
 end
 bResult = SpikyWaitbar(0, length(csPaths));
@@ -3669,7 +3722,7 @@ for f = 1:length(csPaths)
                         if strcmp(sDiffSampleRateAction, 'none') % re-use last selected action
                             % Warn that sampling rates are different
                             sMsg = sprintf('Sampling rate of channel %s is not equal across all files. You can choose to either ignore more spikes from this channel, or resample waveforms to the sampling rate of the first file (%d KHz). Your selection here will be repeated for all applicable channels.', csChannels{nCh}, FV_merge.tData.([csChannels{nCh} '_KHz']));
-                            sAns = questdlg(sMsg, 'Spiky!', 'Ignore Spikes', 'Resample Spikes', 'Cancel Merging', 'Resample Spikes');
+                            sAns = questdlg(sMsg, 'Spiky', 'Ignore Spikes', 'Resample Spikes', 'Cancel Merging', 'Resample Spikes');
                             switch sAns
                                 case 'Ignore Spikes'
                                     sDiffSampleRateAction = 'ignore';
@@ -3973,7 +4026,7 @@ save(FV.sLoadedTrial, 'FV', '-MAT', '-V6') % Save merged results to disk
 if length(FV.sLoadedTrial) > 70
     sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
 else sLoadedTrial = FV.sLoadedTrial; end
-set(g_hSpike_Viewer, 'Name', sprintf('Spiky! - %s', sLoadedTrial))
+set(g_hSpike_Viewer, 'Name', sprintf('Spiky - %s', sLoadedTrial))
 ViewTrialData();
 ChannelStatistics(); % show channel statistics
 
@@ -4050,7 +4103,7 @@ if ~isempty(varargin{1}) && ischar(varargin{1}) && length(varargin) == 2
     sFile = varargin{2};
 else
     % Select merge file
-    [sFile, sPath] = uigetfile( {'*.spb','Spiky! files (*.spb)'}, 'Select merged file');
+    [sFile, sPath] = uigetfile( {'*.spb','Spiky files (*.spb)'}, 'Select merged file');
     if sFile == 0, return, end
 end
 FV.sDirectory = sPath;
@@ -4073,8 +4126,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FigureExport(varargin)
-% Export the Spiky! window to a graphics file
-global g_hSpike_Viewer % handle to Spiky! window
+% Export the Spiky window to a graphics file
+global g_hSpike_Viewer % handle to Spiky window
 % Select output path and format
 [sFile, sPath] = uiputfile( ...
     {'*.fig' , 'MATLAB Figure (*.fig)'; ...
@@ -4086,7 +4139,7 @@ global g_hSpike_Viewer % handle to Spiky! window
     '*.pdf','Portable Document Format (*.pdf)'; ...
     '*.png','Portable Network Graphics File (*.png)'; ...
     '*.tif','TIFF image (*.tif)'}, ...
-    'Export Spiky! window as');
+    'Export Spiky window as');
 if all(sFile == 0), return, end % user cancelled save dialog
 saveas(g_hSpike_Viewer, [sPath sFile])
 return
@@ -4094,10 +4147,10 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function InvertColors(varargin)
-% Toggle the InvertHardcopy parameter of the Spiky! window. This feature
+% Toggle the InvertHardcopy parameter of the Spiky window. This feature
 % decides whether the background color of the window should be included in
 % exports.
-global g_hSpike_Viewer % handle to Spiky! window
+global g_hSpike_Viewer % handle to Spiky window
 hMenuItem = findobj(g_hSpike_Viewer, 'Label', '&Invert Colors'); % handle of 'Invert Color' option in meny
 switch get(g_hSpike_Viewer, 'InvertHardcopy')
     case 'on' % turn off if on
@@ -4136,7 +4189,7 @@ function ZoomAmplitude(varargin)
 % Zoom on y-axis in selected axis
 if ~CheckDataLoaded, return, end
 [FV,hWin] = GetStruct;
-global g_hSpike_Viewer % handle to Spiky! window
+global g_hSpike_Viewer % handle to Spiky window
 sPointer = get(g_hSpike_Viewer,'Pointer');
 set(g_hSpike_Viewer,'Pointer','crosshair')
 zoom off
@@ -4166,7 +4219,7 @@ function PlotRasters(varargin)
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct;
 % update menu item
-global g_hSpike_Viewer % handle to Spiky! window
+global g_hSpike_Viewer % handle to Spiky window
 hMenuItem = findobj(g_hSpike_Viewer, 'Label', 'Plot &Rasters'); % handle of 'Plot Rasters'
 switch get(hMenuItem, 'Checked')
     case 'on' % turn off if on
@@ -4186,7 +4239,7 @@ function PlotInstSpikeRate(varargin)
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct;
 % update menu item
-global g_hSpike_Viewer % handle to Spiky! window
+global g_hSpike_Viewer % handle to Spiky window
 hMenuItem = findobj(g_hSpike_Viewer, 'Label', 'Plot &Instantaneous Rate');
 switch get(hMenuItem, 'Checked')
     case 'on' % turn off if on
@@ -4203,17 +4256,17 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ExitSpiky(varargin)
-% Quit and exit Spiky!
+% Quit and exit Spiky
 [FV,hWin] = GetStruct;
 global g_hSpike_Viewer
 % Check whether there are changes to be saved
 if ~isempty(strfind(get(g_hSpike_Viewer, 'Name'), '*'))
-    switch questdlg('Save changes to current file?', 'Spiky!', 'Yes', 'No', 'Cancel', 'Yes')
+    switch questdlg('Save changes to current file?', 'Spiky', 'Yes', 'No', 'Cancel', 'Yes')
         case 'Yes', SaveResults;
         case 'Cancel', return
     end
 end
-% Close Spiky! windows
+% Close Spiky windows
 delete(g_hSpike_Viewer)
 CloseSpikyWindows
 % Clear global variables
@@ -4236,14 +4289,14 @@ if ~isfield(FV, 'tData'), return, end % check data has been loaded
 if ~g_bMergeMode % skip spike detection if we're in Merge Mode
     DetectSpikes()
     if isempty(FV.tSpikeThresholdsNeg) % check thresholds have been set
-        uiwait(warndlg('Threshold have not been defined. QuickSort! was aborted.', 'Spiky!'))
+        uiwait(warndlg('Threshold have not been defined. QuickSort! was aborted.', 'Spiky'))
         return
     end
 end
 DejitterSpikes()
 RemoveOutlierSpikes()
 SortAllChannels()
-%catch uiwait(warndlg(sprintf('QuickSort! failed with error messsage:\n%s', lasterr), 'Spiky!')); end % if the try failed, it usually means user aborted
+%catch uiwait(warndlg(sprintf('QuickSort! failed with error messsage:\n%s', lasterr), 'Spiky')); end % if the try failed, it usually means user aborted
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -4256,7 +4309,7 @@ function ShowSpectralDensity(varargin)
 if ~CheckDataLoaded, return, end
 
 hFig = figure;
-set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky! Spectral Densities', 'NumberTitle', 'off')
+set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Spectral Densities', 'NumberTitle', 'off')
 hAx = axes('position', [.1 .1 .74 .8]);
 hold on
 sCh = FV.csDisplayChannels;
@@ -4413,7 +4466,7 @@ cd(sPath)
 
 switch sFile(end-3:end)
     case '.txt'
-        uiwait(warndlg('Import of text files not yet functional in this version of Spiky!')); return
+        uiwait(warndlg('Import of text files not yet functional in this version of Spiky')); return
     case '.daq'
         % Import data from Data Acquisition Toolbox files
         [mData, vTime, vAbsTime, tTvents, tDAQInfo] = daqread([sPath sFile]);
@@ -4705,7 +4758,7 @@ function PlotSpikeTimeDistributions(varargin)
 if ~CheckDataLoaded, return, end
 [FV,hWin] = GetStruct;
 hFig = figure; % create figure
-set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky! Spiketime Distributions', 'NumberTitle', 'off', 'menubar', 'none')
+set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Spiketime Distributions', 'NumberTitle', 'off', 'menubar', 'none')
 hAx = axes('position', [0.1 .075 .88 .9]);
 set(hAx, 'color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'fontsize', 8)
 hold on
@@ -4750,7 +4803,7 @@ function PlotCrossCorrelationsDiscrete(varargin)
 [sCh, bResult] = SelectChannelNumber(fieldnames(FV.tSpikes)');
 
 hFig = figure;
-set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky! Discrete Cross Correlations', 'NumberTitle', 'off');
+set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Discrete Cross Correlations', 'NumberTitle', 'off');
 vXLim = [-.05 .05];
 
 % Iterate over units (plot auto-corrs and cross-corrs)
@@ -4815,20 +4868,20 @@ function PlotCrossCorrelationsContinuous(varargin)
 csChannels = FV.csDisplayChannels;
 
 hFig = figure;
-set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky! Continuous Cross Correlations', 'NumberTitle', 'off')
+set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Continuous Cross Correlations', 'NumberTitle', 'off')
 
 % Iterate over channels and generate subplot
 for ch1 = 1:length(csChannels)
     vTrace1 = FV.tData.(csChannels{ch1});
     nFs1 = FV.tData.([csChannels{ch1} '_KHz']) * 1000; % sampling frequency (Hz)
     nBeginTime1 = FV.tData.([csChannels{ch1} '_TimeBegin']); % start of sampling (sec)
-    vTime1 = (nBeginTime1+1/nFs1):(1/nFs1):(nBeginTime1+length(vTrace1)/nFs1); % time vector (sec)
+    %vTime1 = (nBeginTime1+1/nFs1):(1/nFs1):(nBeginTime1+length(vTrace1)/nFs1); % time vector (sec)
 
     for ch2 = 1:length(csChannels)
         vTrace2 = FV.tData.(csChannels{ch2});
         nFs2 = FV.tData.([csChannels{ch2} '_KHz']) * 1000; % sampling frequency (Hz)
         nBeginTime2 = FV.tData.([csChannels{ch2} '_TimeBegin']); % start of sampling (sec)
-        vTime2 = (nBeginTime2+1/nFs2):(1/nFs2):(nBeginTime2+length(vTrace2)/nFs2); % time vector (sec)
+        %vTime2 = (nBeginTime2+1/nFs2):(1/nFs2):(nBeginTime2+length(vTrace2)/nFs2); % time vector (sec)
 
         % Abort if the two traces dont have same length, Fs or BeginTime
         if (length(vTrace1) ~= length(vTrace2)) ... % length
@@ -4841,12 +4894,12 @@ for ch1 = 1:length(csChannels)
         % axes
         nX = .08; nY = .1; nW = .88; nH = .85;
         nNN = length(csChannels);
-        hAx = axes('position', [nX+(ch2-1)*(nW/nNN) (1-nY)-ch1*(nH/nNN) nW/nNN nH/nNN], 'Color', [.1 .1 .1]);
+        hAx = axes('position', [nX+(ch2-1)*(nW/nNN) (1-nY)-ch1*(nH/nNN) nW/nNN nH/nNN], 'Color', [.1 .1 .1]); %#ok<*LAXES>
 
         % Cross correlate
         nMaxLagSec = .1; % sec
         nMaxLagSamp = nFs1/(1/nMaxLagSec); % samples
-        [vC, vLags] = xcorr(vTrace1, vTrace2, nMaxLagSamp, 'coeff');
+        [vC, ~] = xcorr(vTrace1, vTrace2, nMaxLagSamp, 'coeff');
 
         % X axis values
         vX = -(nMaxLagSamp/nFs1):(1/nFs1):(nMaxLagSamp/nFs1);
@@ -4893,19 +4946,26 @@ end
 linkaxes(get(hFig,'children'),'xy')
 zoom xon
 
-hHeader = header(['Channel Cross Correlations'], 12);
+hHeader = header('Channel Cross Correlations', 12);
 set(hHeader, 'color', 'w', 'interpreter', 'none')
 
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function ShowEventTriggeredAverage(varargin)
+function varargout = ShowEventTriggeredAverage(varargin)
+% Outputs: [mean, error, time]
+
 [FV,hWin] = GetStruct;
+global g_bBatchMode
+
 
 % Select trigger event
-[sEventCh, bResult] = SelectChannelNumber(FV.csDigitalChannels', 'Select trigger event');
-if ~bResult, return, end
+persistent p_sEventCh;
+if isempty(p_sEventCh) || (~g_bBatchMode && nargout == 0)
+    [p_sEventCh, bResult] = SelectChannelNumber(FV.csDigitalChannels', 'Select trigger event', p_sEventCh);
+    if ~bResult, return, end
+end
 
 % Select continuous channel
 vIndx = [];
@@ -4914,11 +4974,14 @@ for ch = 1:length(FV.csChannels)
         vIndx(end+1) = ch;
     end
 end
-[sContCh, bResult] = SelectChannelNumber(FV.csChannels(vIndx)', 'Select continuous signal');
-if ~bResult, return, end
+persistent p_sContCh;
+if isempty(p_sContCh) || (~g_bBatchMode && nargout == 0)
+    [p_sContCh, bResult] = SelectChannelNumber(FV.csChannels(vIndx)', 'Select continuous signal', p_sContCh);
+    if ~bResult, return, end
+end
 
 % Get event up times
-vEventTimes = FV.tData.([sEventCh '_Up']); % sec, abs time
+vEventTimes = FV.tData.([p_sEventCh '_Up']); % sec, abs time
 
 % Error handling
 % i) Check that we have any events
@@ -4927,51 +4990,58 @@ if isempty(vEventTimes)
     return
 end
 % ii)Check that we have data
-if ~isfield(FV.tData, [sContCh '_KHz'])
-    waitfor(warndlg(sprintf('Missing data field: %s. Analysis aborted.', [sContCh '_KHz'])));
+if ~isfield(FV.tData, [p_sContCh '_KHz'])
+    waitfor(warndlg(sprintf('Missing data field: %s. Analysis aborted.', [p_sContCh '_KHz'])));
     return
 end
 
 % Get continuous signal
-nContFs = FV.tData.([sContCh '_KHz']) * 1000; % Hz
-vCont = FV.tData.(sContCh);
-vContBegin = FV.tData.([sContCh '_TimeBegin']);
+nContFs = FV.tData.([p_sContCh '_KHz']) * 1000; % Hz
+vCont = FV.tData.(p_sContCh);
+vContBegin = FV.tData.([p_sContCh '_TimeBegin']);
 
-% Pre/post times and stimulus delay
+% Get parameters interactively (pre/post times and stimulus delay)
+% We don't collect parameters when function is called with outputs or if we
+% are in batch-mode (assuming parameters are known, which they should be).
 persistent p_nStimDel p_nPre p_nPost p_nDetrend p_nFirstPulse p_nLastPulse p_nDerivative
 persistent p_bAbsolute p_bLowPassHz p_bHiPassHz p_bHilbert
-if isempty(p_nStimDel), p_nStimDel = 0; end
-if isempty(p_nPre), p_nPre = 1; end
-if isempty(p_nPost), p_nPost = 2; end
-if isempty(p_nDetrend), p_nDetrend = 0; end
-if isempty(p_nFirstPulse), p_nFirstPulse = 1; end
-if isempty(p_nLastPulse), p_nLastPulse = length(vEventTimes); end
-if isempty(p_nDerivative), p_nDerivative = 0; end
-if isempty(p_bAbsolute), p_bAbsolute = 0; end
-if isempty(p_bHiPassHz), p_bHiPassHz = 0; end
-if isempty(p_bLowPassHz), p_bLowPassHz = 1000; end
-if isempty(p_bHilbert), p_bHilbert = 0; end
+if isempty(p_nStimDel) || (~g_bBatchMode && nargout == 0)
+    if isempty(p_nStimDel), p_nStimDel = 0; end
+    if isempty(p_nPre), p_nPre = 1; end
+    if isempty(p_nPost), p_nPost = 2; end
+    if isempty(p_nDetrend), p_nDetrend = 0; end
+    if isempty(p_nFirstPulse), p_nFirstPulse = 1; end
+    if isempty(p_nLastPulse), p_nLastPulse = length(vEventTimes); end
+    if isempty(p_nDerivative), p_nDerivative = 0; end
+    if isempty(p_bAbsolute), p_bAbsolute = 0; end
+    if isempty(p_bHiPassHz), p_bHiPassHz = 0; end
+    if isempty(p_bLowPassHz), p_bLowPassHz = 1000; end
+    if isempty(p_bHilbert), p_bHilbert = 0; end
+    
+    cPrompt = {'Pre-event duration (s)','Post-event duration (s)', 'Detrend (1=yes, 0=no)', ...
+        'Stimulus delay (ms)', 'First pulse', sprintf('Last pulse (max %d)', length(vEventTimes)), ...
+        'Derivative', 'Use absolute values (1=yes, 0=no)', 'High pass (Hz)', 'Low pass (Hz)', 'Average Hilbert amplitude (1=yes, 0=no)'};
+    
+    cAnswer = inputdlg(cPrompt,'Averaging options', 1, ...
+        {num2str(p_nPre), num2str(p_nPost), num2str(p_nDetrend), num2str(p_nStimDel), ...
+        num2str(p_nFirstPulse), num2str(min([p_nLastPulse length(vEventTimes)])), num2str(p_nDerivative), ...
+        num2str(p_bAbsolute), num2str(p_bHiPassHz), num2str(p_bLowPassHz), num2str(p_bHilbert)});
+    if isempty(cAnswer), return, end
+    p_nPre  = str2num(cAnswer{1}); % sec
+    p_nPost  = str2num(cAnswer{2}); % sec
+    p_nDetrend  = str2num(cAnswer{3});
+    p_nStimDel = str2num(cAnswer{4}); % ms
+    p_nFirstPulse = str2num(cAnswer{5});
+    p_nLastPulse = str2num(cAnswer{6}); %#ok<*ST2NM>
+    p_nDerivative = str2num(cAnswer{7});
+    p_bAbsolute = str2num(cAnswer{8});
+    p_bHiPassHz = str2num(cAnswer{9});
+    p_bLowPassHz = str2num(cAnswer{10});
+    p_bHilbert = str2num(cAnswer{11});
+end
 
-cPrompt = {'Pre-event duration (s)','Post-event duration (s)', 'Detrend (1=yes, 0=no)', ...
-    'Stimulus delay (ms)', 'First pulse', sprintf('Last pulse (max %d)', length(vEventTimes)), ...
-    'Derivative', 'Use absolute values (1=yes, 0=no)', 'High pass (Hz)', 'Low pass (Hz)', 'Average Hilbert amplitude (1=yes, 0=no)'};
-
-cAnswer = inputdlg(cPrompt,'Averaging options', 1, ...
-    {num2str(p_nPre), num2str(p_nPost), num2str(p_nDetrend), num2str(p_nStimDel), ...
-    num2str(p_nFirstPulse), num2str(min([p_nLastPulse length(vEventTimes)])), num2str(p_nDerivative), ...
-    num2str(p_bAbsolute), num2str(p_bHiPassHz), num2str(p_bLowPassHz), num2str(p_bHilbert)});
-if isempty(cAnswer), return, end
-p_nPre  = str2num(cAnswer{1}); % sec
-p_nPost  = str2num(cAnswer{2}); % sec
-p_nDetrend  = str2num(cAnswer{3});
-p_nStimDel = str2num(cAnswer{4}); % ms
-p_nFirstPulse = str2num(cAnswer{5});
-p_nLastPulse = str2num(cAnswer{6});
-p_nDerivative = str2num(cAnswer{7});
-p_bAbsolute = str2num(cAnswer{8});
-p_bHiPassHz = str2num(cAnswer{9});
-p_bLowPassHz = str2num(cAnswer{10});
-p_bHilbert = str2num(cAnswer{11});
+% Limit last pulse to max number of events
+nLastPulse = min([p_nLastPulse length(vEventTimes)]);
 
 % Adjust event times for stimulus delay
 vEventTimes = vEventTimes + (p_nStimDel/1000); % sec
@@ -4989,7 +5059,7 @@ end
 
 % Low/Hi pass and rectify
 vTime = linspace(0, (1/nContFs)*length(vCont), length(vCont));
-[vCont, vTime2, nContFs] = FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'none');
+[vCont, ~, nContFs] = FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'none');
 
 % Convert unit to Intensity/s^-d
 vCont = vCont * (nContFs^p_nDerivative);
@@ -4998,7 +5068,7 @@ vCont = vCont * (nContFs^p_nDerivative);
 SpikyWaitbar(0, 20);
 nLen = length(vCont);
 mAll = [];
-for o = p_nFirstPulse:p_nLastPulse
+for o = p_nFirstPulse:nLastPulse
     SpikyWaitbar((o/length(vOnsets))*20, 20);
 
     %nStimStart = (nLen - vOnsets(o));
@@ -5019,7 +5089,7 @@ for o = p_nFirstPulse:p_nLastPulse
         vThis = vThis - vSetPoint';
         
         % Replace NaNs with 0
-        vNaNIndx = find(isnan(vThis));
+        vNaNIndx = isnan(vThis);
         vThis(vNaNIndx) = 0;
         
         % Hilbert transform
@@ -5037,14 +5107,14 @@ SpikyWaitbar(20, 20);
 vMean = nanmean(mAll);
 vMedian = nanmedian(mAll);
 vErrMean = nanstd(mAll) ./ sqrt(size(mAll, 1));
+vStdMean = nanstd(mAll);
 vErrMedian = vErrMean * 1.25;
-
 vTime = linspace(-p_nPre, p_nPost, size(mAll, 2)); % sec
 
 % Initialize figure and plot
 hFig = figure('color', [.2 .2 .2], 'units', 'pixels');
 centerfig(hFig, hWin)
-set(hFig, 'name', 'Spiky! Event Triggered Average', 'NumberTitle', 'off');
+set(hFig, 'name', 'Spiky - Event Triggered Average', 'NumberTitle', 'off');
 hAx = axes();
 [hMeanLine, hMeanErr] = mean_error_plot(vMean, vErrMean, [0 0 1], vTime);
 hold on
@@ -5057,28 +5127,70 @@ hold on
 hTrials = plot(repmat(vTime, size(mAll, 1), 1)', mAll', 'w');
 set([hTrials], 'visible', 'off', 'tag', 'AllTrials');
 
-hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [1 1 100 20], 'String', 'Mean', ...
+hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [1 1 70 20], 'String', 'Mean', ...
     'HorizontalAlignment', 'left', 'backgroundcolor', [.2 .2 .2], 'foregroundcolor', 'w', 'value', 1);
 set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''ETAMean''),''visible'',V);')
 
-hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [101 1 100 20], 'String', 'Median', ...
+hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [71 1 70 20], 'String', 'Median', ...
     'HorizontalAlignment', 'left', 'backgroundcolor', [.2 .2 .2], 'foregroundcolor', 'w', 'value', 0);
 set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''ETAMedian''),''visible'',V);')
 
-hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [201 1 100 20], 'String', 'Trials', ...
+hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [141 1 70 20], 'String', 'Trials', ...
     'HorizontalAlignment', 'left', 'backgroundcolor', [.2 .2 .2], 'foregroundcolor', 'w', 'value', 0);
 set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''AllTrials''),''visible'',V);')
+
+% Estimate latency
+vMeanPostStim = vMean(vTime >= 0);
+% baseline
+nBaseL = mean(vMean(vTime < 0));
+% find peak
+[nMax, nMaxIndx] = max(vMeanPostStim);
+% find first sample where signal > max/2
+vIndx = find(vMeanPostStim(1:nMaxIndx) >= nBaseL + (nMax - nBaseL)/2);
+if isempty(vIndx)
+    nLatS = NaN;
+else
+    nLatency = vIndx(1); % index
+    nLatS = vTime(find(vTime==0)+nLatency); %s
+end
+plot([nLatS nLatS], [min(vMean) max(vMean)], 'w--')
 
 % Axes properties
 axis tight
 set(hAx, 'Color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'xlim', [-p_nPre p_nPost])
 xlabel('Time (s)')
-ylabel(sprintf('Intensity/s^%d', p_nDerivative))
-title(sprintf('%s  N=%d events (range %d-%d)', sContCh, size(mAll,1), p_nFirstPulse, p_nLastPulse), ...
-    'interpreter', 'none', 'color', [.7 .7 .7], 'FontWeight', 'bold')
+if p_nDerivative > 0
+    ylabel(sprintf('Intensity/s^-%d', p_nDerivative))
+else
+    ylabel('Intensity')
+end
+vIndx = strfind(FV.sLoadedTrial, filesep);
+if isempty(vIndx)
+    % Figure title
+    title(sprintf('%s\nCh=%s  N=%d events  Ampl=%.3f  SD=%.3f  Lat=%.1f ms', FV.sLoadedTrial, ...
+        p_sContCh, size(mAll,1), max(vMean)-min(vMean), mean(vStdMean), nLatS*1000), ...
+        'interpreter', 'none', 'color', [.7 .7 .7], 'FontWeight', 'bold')
+else
+    sFolder = FV.sLoadedTrial(vIndx(end-1)+1:vIndx(end)-1);
+    sFile = FV.sLoadedTrial(vIndx(end)+1:end);
+    % Figure title
+    title(sprintf('%s\n%s\nCh=%s  N=%d events  Ampl=%.3f  SD=%.3f  Lat=%.1f ms', sFolder, sFile, ...
+        p_sContCh, size(mAll,1), max(vMean)-min(vMean), mean(vStdMean), nLatS*1000), ...
+        'interpreter', 'none', 'color', [.7 .7 .7], 'FontWeight', 'bold')
+end
+
+plot([vTime(1) vTime(end)], [max(vMean) max(vMean)], 'w:')
+plot([vTime(1) vTime(end)], [min(vMean) min(vMean)], 'w:')
+
 zoom on
 grid on
 set(hFig, 'ToolBar', 'figure')
+
+if nargout > 0, varargout(1) = {vMean}; end
+if nargout > 1, varargout(2) = {vErrMean}; end
+if nargout > 2, varargout(3) = {vTime}; end
+
+if ~g_bBatchMode BatchRedo([], 'ShowEventTriggeredAverage'); end
 
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5086,9 +5198,9 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PlotHistogramContinuous(varargin)
 [FV,hWin] = GetStruct;
-[sCh, bResult] = SelectChannelNumber(FV.csChannels);
+[sCh, ~] = SelectChannelNumber(FV.csChannels);
 hFig = figure('color', [.2 .2 .2]);
-set(hFig, 'name', 'Spiky! Histogram', 'NumberTitle', 'off');
+set(hFig, 'name', 'Spiky Histogram', 'NumberTitle', 'off');
 vData = FV.tData.(sCh);
 % Remove extreme outliers (0.025% off either edge)
 vData = sort(vData);
@@ -5113,7 +5225,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PlotPSTH(varargin)
 [FV,hWin] = GetStruct;
-[sCh, bResult] = SelectChannelNumber(fieldnames(FV.tSpikes)');
+[sCh, ~] = SelectChannelNumber(fieldnames(FV.tSpikes)');
 if isempty(sCh), warndlg('No channels were found that contained spiking data.'); return; end
 
 if isfield(FV.tSpikes.(sCh), 'hierarchy')
@@ -5130,7 +5242,7 @@ cFields = fieldnames(FV.tData);
 % Ignore DAQ_Start, _Stop and _Trigger fields (default fields generated by DAQ Toolbox)
 cIgnoreFields = {'DAQ_Start_Up', 'DAQ_Stop_Up', 'DAQ_Trigger_Up'};
 for e = 1:length(cFields) % iterate over fieldnames
-    if strfind(cFields{e}, '_Up') & ~ismember(cFields{e}, cIgnoreFields)
+    if strfind(cFields{e}, '_Up') && ~ismember(cFields{e}, cIgnoreFields)
         vEventIndx(end+1) = e;
     end
 end
@@ -5142,7 +5254,7 @@ end
 % Create figure
 hFig = figure('color', [.2 .2 .2]);
 drawnow
-set(hFig, 'name', 'Spiky! Peristimulus Time Histograms (PSTH)', 'NumberTitle', 'off');
+set(hFig, 'name', 'Spiky Peristimulus Time Histograms (PSTH)', 'NumberTitle', 'off');
 vXLim = [-.1 .1];
 nTrialLen = 100;
 
@@ -5187,7 +5299,7 @@ for u = 1:length(vUnits)
         
         % Skip channels that have more than 10,000 events
         if length(vUpTimes) > 10000
-            uiwait(warndlg(sprintf('Channel %s has more than 10,000 events and will be skipped.', cFields{vEventIndx(e)}), 'Spiky!'))
+            uiwait(warndlg(sprintf('Channel %s has more than 10,000 events and will be skipped.', cFields{vEventIndx(e)}), 'Spiky'))
             continue
         end
         
@@ -5253,7 +5365,7 @@ for u = 1:length(vUnits)
             ylabel('Spikes/s')
             if isnan(vUnits(u))
                 % Un-sorted unit
-                hTxt = text(0,0,[' Unit UN-SORTED']);
+                hTxt = text(0,0, ' Unit UN-SORTED');
             else
                 % Sorted unit
                 hTxt = text(0,0,sprintf(' Unit %d', vUnits(u)));
@@ -5315,7 +5427,9 @@ else nTimeBegin = NaN; end
 nIndx = find(strcmp({FV.tChannelDescriptions.sChannel}, sCh));
 if ~isempty(nIndx)
     sDescr = FV.tChannelDescriptions(nIndx).sDescription;
-else sDescr = ''; end
+else
+    sDescr = '';
+end
 
 cAboutText{1} = sprintf('Name: %s', sCh);
 cAboutText{2} = sprintf('Description: %s', sDescr);
@@ -5485,7 +5599,7 @@ csAll = [FV.csDisplayChannels FV.csChannels];
 [sCh, bResult] = SelectChannelNumber(csAll);
 %[sCh, bResult] = SelectChannelNumber(FV.csChannels);
 if isempty(sCh), return, end % no channel was selected (i.e. dialog was closed)
-sAns = questdlg(['Are you sure you want to delete channel ' sCh '?'], 'Spiky!', 'Yes', 'No', 'No');
+sAns = questdlg(['Are you sure you want to delete channel ' sCh '?'], 'Spiky', 'Yes', 'No', 'No');
 if strcmp(sAns, 'No'), return; end
 
 % Delete fields
@@ -5517,7 +5631,7 @@ if isempty(sCh), return, end % no channel was selected (i.e. dialog was closed)
 
 if ~isfield(FV.tData, sCh)
     % Check whether channel has an analog equivalent. If not, we cannot 'undigitize'it
-    warndlg(['Channel ' sCh ' cannot be un-digitized as it has no analog equivalent.'], 'Spiky!')
+    warndlg(['Channel ' sCh ' cannot be un-digitized as it has no analog equivalent.'], 'Spiky')
     return
 end
 
@@ -5640,7 +5754,7 @@ for i = 1:length(cFields)
     end
 end
 
-set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky! Channel Descriptions', 'NumberTitle', 'off', 'ToolBar', 'none', 'menuBar','none')
+set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Channel Descriptions', 'NumberTitle', 'off', 'ToolBar', 'none', 'menuBar','none')
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, 'ColumnName', ...
     cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{150, 377});
 waitfor(hFig, 'userdata') % wait for figure to be closed
@@ -5681,7 +5795,7 @@ for i = 1:length(FV.tExperimentVariables)
     cData{i, 2} = FV.tExperimentVariables(i).sValue;
 end
 
-set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky! Experiment Variables', 'NumberTitle', 'off', 'ToolBar', 'none', 'menuBar','none')
+set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Experiment Variables', 'NumberTitle', 'off', 'ToolBar', 'none', 'menuBar','none')
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, 'ColumnName', ...
     cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{150, 352});
 waitfor(hFig, 'userdata', 'closed') % wait for figure to be closed
@@ -5706,7 +5820,7 @@ function DeleteSortingData(varargin)
 if ~CheckDataLoaded, return, end
 
 sAns = questdlg('All sorting data, including assignment of spikes as outliers, will be removed. Waveforms and dejittering is not affected. Continue?', ...
-    'Spiky!', 'Yes', 'No', 'No');
+    'Spiky', 'Yes', 'No', 'No');
 if strcmp(sAns, 'No'), return; end
 
 % Iterate over channels containing spikes
@@ -5788,22 +5902,30 @@ return
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Get current SVN build number
-function sBuild = GetBuildNumber
+% Get current GIT SHA1 hash (unique identifier of currently used commit)
+function sHash = GetGitHash
 
 % Set paths
 sWT_dir = which('spiky');
-sSVNPath = CheckFilename([sWT_dir(1:findstr(sWT_dir, 'spiky.m')-1) '.svn\' 'entries']);
+sGITPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) '.git/refs/heads/master']);
+sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) 'VERSION']);
 
 % Get build number from SVN entries files
-sBuild = 'Unknown';
-if exist(sSVNPath, 'file')
-    fid = fopen(sSVNPath);
-    for i = 1:5
-        sLine = fgetl(fid);
-        if strcmp(sLine, 'dir'), sBuild = fgetl(fid); end
-    end
+sHash = 'Unknown';
+if exist(sGITPath, 'file')
+    fid = fopen(sGITPath);
+    sHash = fgetl(fid);
     fclose(fid);
+    % Copy hash into VERSION file in top directory
+    hFID = fopen(sVERSIONPath, 'w');
+    fprintf(hFID, '%s', sHash);
+    fclose(hFID);
+    sHash = sHash(1:10);
+elseif exist(sVERSIONPath, 'file')
+    % If the GIT has does not exist in .git, check if VERSION file exists
+    hFID = fopen(sVERSIONPath, 'r');
+    sHash = char(fread(hFID, 10, 'schar'))';
+    fclose(hFID);
 end
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5921,7 +6043,7 @@ if isfield(FV, 'sLoadedTrial') % a trial is loaded
         end
     end
 end
-warndlg('No DAQ file loaded or loaded file is not a DAQ (.daq) file.', 'Spiky!')
+warndlg('No DAQ file loaded or loaded file is not a DAQ (.daq) file.', 'Spiky')
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -6001,7 +6123,7 @@ for nCh = 1:length(csChannels)
         cData{nCh, 5} = FV.tChannelDescriptions(nIndx).sDescription;
     end
 end
-set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky! Event Statistics', 'NumberTitle', 'off', 'ToolBar', 'none', 'menuBar','none')
+set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Event Statistics', 'NumberTitle', 'off', 'ToolBar', 'none', 'menuBar','none')
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, 'ColumnName', ...
     cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{100, 100, 70, 70, 180});
 centerfig(hFig, hWin)
@@ -6019,7 +6141,7 @@ sCh = get(gcbo, 'tag'); % channel name
 hAx = findobj(gcf, 'type', 'axes', 'tag', sCh); % find corresponding axes
 hAx = hAx(1);
 if isempty(hAx)
-    warndlg('Cannot find corresponding axes for selected channel. Aborting...', 'Spiky!')
+    warndlg('Cannot find corresponding axes for selected channel. Aborting...', 'Spiky')
     return
 end
 axes(hAx) % make axes current
@@ -6043,7 +6165,7 @@ waitfor(gcf, 'WindowButtonMotionFcn')
 
 % Ask whether to delete
 switch questdlg('Should the selected region and channel be deleted? This action can be undone by reloading original data files from disk.', ...
-        'Spiky!', 'Delete', 'Cancel', 'Cancel')
+        'Spiky', 'Delete', 'Cancel', 'Cancel')
     case 'Delete'
         % Get line X coordinates
         vX1 = get(hLine1, 'xdata');
@@ -6198,8 +6320,8 @@ if strcmp(sAction, 'redo')
     if isempty(sLastAction) % Do nothing
         warndlg('There is no available action to run in batch mode. Note that only actions with the B suffix (e.g. in menus or buttons) can run as batch jobs. To start a batch job, you must first run one of the supported actions and then re-select Batch Redo from the menu.')
     else % Repeat last supported redo action
-        sAns = questdlg(['The last supported action was ' sLastAction '. Do you want to repeat this function on (' num2str(nFiles) ') currently loaded files?'], 'Spiky!');
-        sAns2 = questdlg('Should the batch operation be repeated on the currently loaded file?', 'Spiky!', 'Yes', 'No', 'No');
+        sAns = questdlg(['The last supported action was ' sLastAction '. Do you want to repeat this function on (' num2str(nFiles) ') currently loaded files?'], 'Spiky');
+        sAns2 = questdlg('Should the batch operation be repeated on the currently loaded file?', 'Spiky', 'Yes', 'No', 'No');
 
         switch sAns
             case 'Yes' % Load each movie, redo last action and save result
@@ -6224,7 +6346,7 @@ if strcmp(sAction, 'redo')
                     sStr = sprintf('Batch job %s cancelled after file %d/%d', sLastAction, m, nFiles+1);
                 end
                 bWaitResult = SpikyWaitbar(nFiles+1,nFiles+1);
-                uiwait(msgbox(sStr, 'Spiky! Batch Redo', 'modal'));
+                uiwait(msgbox(sStr, 'Spiky Batch Redo', 'modal'));
                 sp_disp(sStr);
             case 'No'       % Do nothing
             case 'Cancel'   % Do nothing
@@ -6291,7 +6413,7 @@ FV.ScriptError = '';
 %try
     eval(['FV = ' sFile(1:end-2) '(FV);'])
 %catch
-%    uiwait(warndlg(sprintf('Script execution failed. There appears to be a problem with the script you are attempting to run:\n\n%s', lasterr), 'Spiky!'))
+%    uiwait(warndlg(sprintf('Script execution failed. There appears to be a problem with the script you are attempting to run:\n\n%s', lasterr), 'Spiky'))
 %    return
 %end
 if ~isempty(FV.ScriptError)
@@ -6307,3 +6429,60 @@ end
 
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ShowVersion(varargin)
+
+sWT_dir = which('spiky');
+sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) 'VERSION']);
+
+hFID = fopen(sVERSIONPath, 'r');
+sHash = char(fread(hFID, 10, 'schar'))';
+fclose(hFID);
+
+inputdlg('GitHub SHA-1 Checksum:', 'Spiky Version', 1, {sHash});
+
+return
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ShowLicense(varargin)
+[FV, hWin] = GetStruct;
+
+sWT_dir = which('spiky');
+sLICENSEPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) 'LICENSE']);
+
+sLicense = textread(sLICENSEPath, '%s', 'whitespace', '', 'bufsize', 2^16);
+
+hFig = figure;
+set(hFig, 'name', 'Spiky License', 'menubar', 'none', 'numbertitle', 'off', 'color', 'w')
+uicontrol('parent', hFig, 'style', 'edit', 'backgroundcolor', 'w', 'max', 2, ...
+    'units', 'normalized', 'position', [0 0 1 1], 'string', sLicense, ...
+    'horizontalalignment', 'left')
+centerfig(hFig, hWin)
+
+return
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function y = header(x, fontsize)
+t = findobj(gcf, 'Tag', 'header');
+if length(t) == 0
+	ax = gca;
+	axes('Position', [0 0 1 1], 'Visible', 'off');
+	t = text(0.5, 0.98, x, ...
+				'Units', 'normalized', ...
+				'VerticalAlignment', 'top', ...
+				'HorizontalAlignment', 'center', ...
+				'Tag', 'header', ...
+				'FontSize', fontsize);
+	axes(ax);
+else
+	set(t, 'String', x, 'FontSize', fontsize);
+end
+if nargout > 0; y = t; end;
+return
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
