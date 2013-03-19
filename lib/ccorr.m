@@ -69,6 +69,9 @@ if flag1 ~= flag2; error(['data1 and data2 should be the ' ...
         'same data type : use sta instead']);
 else flag = flag1;end
 
+% flag == 1 means continuous data
+% otherwise data is spikes
+
 if nargin < 4; plt = 'n'; end
 if nargin < 5
     if flag; T = [min(smp) max(smp)];
