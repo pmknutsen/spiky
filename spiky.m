@@ -31,7 +31,6 @@ function varargout = spiky(varargin)
 % along with this program.  If not, see <http://www.gnu.org/licenses/>.
 % 
 
-
 % Set path to spike-sorting software
 sPath = which('spiky');
 sPath = sPath(1:end-7);
@@ -103,6 +102,8 @@ uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_Thre
 uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_ExperimentVariables', 'TooltipString', 'Edit experiment variables', 'ClickedCallback', @ExperimentDescriptions);
 mCData = im2double(imread([sPath 'tool_waveforms.png'])); mCData(mCData == 0) = NaN; % view waveforms
 uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_Waveforms', 'TooltipString', 'View sorted waveforms', 'ClickedCallback', @ShowOverlappingSpikeClusters, 'separator', 'on');
+mCData = im2double(imread([sPath 'tool_2waveforms.png'])); mCData(mCData == 0) = NaN; % view waveforms
+uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_Waveforms', 'TooltipString', 'View sorted waveforms', 'ClickedCallback', @ShowSpikeClusters);
 mCData = im2double(imread([sPath 'tool_psth.png'])); mCData(mCData == 0) = NaN; % plot psth
 uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_PSTH', 'TooltipString', 'Plot PSTH', 'ClickedCallback', @PlotPSTH);
 mCData = im2double(imread([sPath 'tool_pc.png'])); mCData(mCData == 0) = NaN; % principal components
@@ -149,21 +150,20 @@ uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Zoom &Reset', 'Callback', @Zo
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Pan', 'Callback', @PanWindow, 'Accelerator', 'L');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Range', 'Callback', @ZoomRange, 'Accelerator', 'Z');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Amplitude', 'Callback', @ZoomAmplitude, 'Accelerator', 'Y');
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Normal Time', 'Callback', @NormalTime, 'separator', 'on', 'checked', 'on', 'Tag', 'ShowNormalTime');
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Normal Time', 'Callback', @NormalTime, 'separator', 'on', 'Tag', 'ShowNormalTime');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', @ShowGrid);
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Refresh', 'Callback', @ViewTrialData, 'separator', 'on', 'Accelerator', 'R');
 
 %  - Channels menu
 hChannels = uimenu(g_hSpike_Viewer, 'Label', '&Channels');
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Channel Gains...', 'Callback', @SetGain, 'Accelerator', 'G');
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Channel Descriptions...', 'Callback', @ChannelDescriptions);
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'Digiti&ze Channel', 'Callback', @DigitizeChannel, 'separator', 'on');
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Duplicate Channel', 'Callback', @DuplicateChannel);
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'D&elete Channel', 'Callback', @DeleteChannel);
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&PCA Noise Reduction... (B)', 'Callback', @PCACleaning);
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Invert Channel...', 'Callback', @InvertChannel);
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'Experiment &Variables...', 'Callback', @ExperimentDescriptions, 'separator', 'on', 'Accelerator', 'V');
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Select Filtered Channels...', 'Callback', @SetFilterChannels, 'separator', 'on', 'Accelerator', 'F');
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Gains...', 'Callback', @SetGain, 'Accelerator', 'G');
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Descriptions...', 'Callback', @ChannelDescriptions);
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'Digiti&ze', 'Callback', @DigitizeChannel, 'separator', 'on');
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'D&uplicate', 'Callback', @DuplicateChannel);
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'D&elete', 'Callback', @DeleteChannel);
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Noise Reduction... (B)', 'Callback', @PCACleaning);
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Invert...', 'Callback', @InvertChannel);
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Filtered Channels...', 'Callback', @SetFilterChannels, 'separator', 'on', 'Accelerator', 'F');
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Filter Options...', 'Callback', @FilterOptions );
 
 %  - Spikes menu
@@ -207,6 +207,7 @@ hDiscrete = uimenu(g_hSpike_Viewer, 'Parent', hAnalysis, 'Label', '&Discrete');
 uimenu(hDiscrete, 'Parent', hDiscrete, 'Label', '&Cross Correlations', 'Callback', @PlotCrossCorrelationsDiscrete);
 uimenu(hDiscrete, 'Parent', hDiscrete, 'Label', '&Peristimulus Time Histograms (PSTH)', 'Callback', @PlotPSTH);
 uimenu(hDiscrete, 'Parent', hDiscrete, 'Label', '&Spiketime Distributions', 'Callback', @PlotSpikeTimeDistributions);
+uimenu(g_hSpike_Viewer, 'Parent', hAnalysis, 'Label', 'Experiment &Variables...', 'Callback', @ExperimentDescriptions, 'separator', 'on', 'Accelerator', 'V');
 
 %  - Merge menu
 hMerge  = uimenu(g_hSpike_Viewer, 'Label', '&Merge');
@@ -250,7 +251,7 @@ uimenu(g_hSpike_Viewer, 'Parent', hTools, 'Label', '&Clear Persistent Variables'
 hWindow  = uimenu(g_hSpike_Viewer, 'Label', '&Window');
 uimenu(g_hSpike_Viewer, 'Parent', hWindow, 'Label', 'Close All', 'Callback', @CloseSpikyWindows);
 uimenu(g_hSpike_Viewer, 'Parent', hWindow, 'Label', 'Cascade', 'Callback', @CascadeSpikyWindows);
-uimenu(g_hSpike_Viewer, 'Parent', hWindow, 'Label', 'Figures', 'Callback', @BringSpikyFiguresToFront);
+uimenu(g_hSpike_Viewer, 'Parent', hWindow, 'Label', 'All to Front', 'Callback', @BringSpikyFiguresToFront, 'Accelerator', 'F');
 
 %  - Help menu
 hHelp  = uimenu(g_hSpike_Viewer, 'Label', '&Help');
@@ -1041,7 +1042,8 @@ for i = 1:length(FV.csDisplayChannels)
             hMenu = uicontextmenu;
             set(hMenu, 'userdata', mUserData, 'Tag', [sCh '-' num2str(vUnits(nU))]);
             set(hMenu, 'Tag', [sCh '-' num2str(vUnits(nU))]);
-            hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', 'figure;mD=get(get(gcbo, ''parent''),''userdata'');plot(mD(:,1),mD(:,2),''linewidth'',1)');
+            %hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', 'figure;mD=get(get(gcbo, ''parent''),''userdata'');plot(mD(:,1),mD(:,2),''linewidth'',1)');
+            hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh);
             hItems(end+1) = uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
             hItems(end+1) = uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
             hItems(end+1) = uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
@@ -1063,7 +1065,8 @@ for i = 1:length(FV.csDisplayChannels)
             set(hMenu, 'userdata', [vTimeAllTrace(:) vContAllTrace(:)], 'Tag', sCh);
         end
         set(hMenu, 'Tag', sCh);
-        hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', 'figure;mD=get(get(gcbo, ''parent''),''userdata'');plot(mD(:,1),mD(:,2));xlabel(''Time (s)'')');
+        %hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', 'figure;mD=get(get(gcbo, ''parent''),''userdata'');plot(mD(:,1),mD(:,2));xlabel(''Time (s)'')');
+        hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
         hItems(end+1) = uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
@@ -1103,7 +1106,11 @@ for i = 1:length(FV.csDisplayChannels)
             tQuality = FV.tSpikes.(sCh).quality;
             for nu = 1:length(csUnits)
                 nIndx = [tQuality.unit] == str2num(csUnits{nu});
-                csUnits{nu} = [csUnits{nu} ' (Q' num2str(tQuality(nIndx).score) ')'];
+                if isempty(tQuality(nIndx))
+                    csUnits{nu} = [csUnits{nu} ' (Q?)'];
+                else
+                    csUnits{nu} = [csUnits{nu} ' (Q' num2str(tQuality(nIndx).score) ')'];
+                end
             end
         end
         set(hSubplots(end), 'ylim', [.5 nRow+.5], 'ytick', 1:1:nRow, 'yticklabel', csUnits);
@@ -1371,6 +1378,27 @@ end
 
 SetStruct(FV)
 PanMode()
+return
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function CopyChannelToFig(varargin)
+% Copy right-clicked channel in main window to a separate, default Figure
+[FV, hWin] = GetStruct;
+sCh = get(gcbo, 'Tag');
+if ~isfield(FV.tData, sCh) return; end
+vCont = FV.tData.(sCh);
+nBegin = FV.tData.([sCh '_TimeBegin']); % sampling start, sec
+nEnd = FV.tData.([sCh '_TimeEnd']); % sampling end, sec
+nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency Hz
+vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
+hFig = figure;
+plot(vTime, vCont, 'linewidth', 1)
+xlabel('Time (s)')
+ylabel('V (raw)')
+legend(sCh)
+legend boxoff
+axis tight
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -3440,27 +3468,30 @@ csFieldnames(vDel) = [];
 if ~CheckIfSorted, return, end
 [sCh, bResult] = SelectChannelNumber(csFieldnames);
 if ~bResult, return, end
-% assign colors
-if any(unique(FV.tSpikes.(sCh).hierarchy.assigns) == 0) % outliers exist
-    vUnique = unique(FV.tSpikes.(sCh).hierarchy.assigns);
-    vIndx = find(vUnique > 0);
-    nIndx = find(vUnique == 0);
-    mCols = [.3 .3 .3];
-    mCols(vIndx, 1:3) = FV.mColors(2:length(vIndx)+1,:);
-else % no outliers exist
-    mCols = FV.mColors(1:length(unique(FV.tSpikes.(sCh).hierarchy.assigns)),:);
-end
 
-%ssg_databrowse3d(FV.tSpikes.(sCh), mCols, FV.tSpikes.(sCh).hierarchy.assigns); % old call
-mColsTemp = zeros(max(FV.tSpikes.(sCh).hierarchy.assigns), 3);
-mColsTemp(unique(FV.tSpikes.(sCh).hierarchy.assigns), :) = mCols;
-FV.tSpikes.(sCh).overcluster.colors = mColsTemp(1:end,:);
+% assign colors
+vUnique = unique(FV.tSpikes.(sCh).hierarchy.assigns);
+vIndx = find(vUnique > 0);
+nIndx = find(vUnique == 0);
+
+mColsTemp = ones(max(FV.tSpikes.(sCh).hierarchy.assigns), 3);
+mColsTemp(vUnique(vIndx), :) = FV.mColors(vIndx, :);
+
+FV.tSpikes.(sCh).overcluster.colors = mColsTemp;
 ssg_databrowse3d(FV.tSpikes.(sCh), FV.tSpikes.(sCh).hierarchy.assigns, unique(FV.tSpikes.(sCh).hierarchy.assigns))
-set(gcf, 'color', [.2 .2 .2], 'Name', 'Spiky Principal Components', 'NumberTitle', 'off', 'ToolBar', 'figure')
-hAx = get(gcf, 'Children');
+hFig = gcf;
+set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Principal Components', 'NumberTitle', 'off', 'ToolBar', 'figure')
+hAx = get(hFig, 'Children');
 set(hAx(strcmp(get(hAx, 'type'), 'axes')), 'color', [.1 .1 .1])
-hHeader = header(['Channel ' sCh ' - Click in axis labels to change scale'], 10);
+
+sDescr = FV.tChannelDescriptions(strcmp({FV.tChannelDescriptions.sChannel},'DAQ_0')).sDescription;
+hHeader = header([sDescr '  ' sCh], 10);
 set(hHeader, 'color', 'w', 'interpreter', 'none')
+
+% set colors on legend
+hLeg = findobj(hFig, 'type', 'axes', 'Tag', 'legend');
+set(hLeg, 'color', 'none', 'textcolor', 'w', 'location', 'northeast')
+
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -3666,12 +3697,12 @@ FV.bPanOn = 0;
 FV.nMaxCrossChannelSpikeJitter = 0.5; % maximal allowed spiketimmer jitter across electrodes (ms)
 % Experiment variables
 FV.tExperimentVariables = struct([]);
-FV.tExperimentVariables(1).sVariable = 'sAnimal';
-FV.tExperimentVariables(1).sValue = '000000';
-FV.tExperimentVariables(2).sVariable = 'sDate';
-FV.tExperimentVariables(2).sValue = 'dd-mm-yyyy';
-FV.tExperimentVariables(3).sVariable = 'sExperiment';
-FV.tExperimentVariables(3).sValue = 'undefined';
+%FV.tExperimentVariables(1).sVariable = 'sAnimal';
+%FV.tExperimentVariables(1).sValue = '000000';
+%FV.tExperimentVariables(2).sVariable = 'sDate';
+%FV.tExperimentVariables(2).sValue = 'dd-mm-yyyy';
+%FV.tExperimentVariables(3).sVariable = 'sExperiment';
+%FV.tExperimentVariables(3).sValue = 'undefined';
 g_bBatchMode = false;
 FV.sBatchLock = 'off';
 return
@@ -5432,26 +5463,21 @@ if isempty(vEventIndx)
     return
 end
 
-% Create figure
-hFig = figure('color', [.2 .2 .2]);
-drawnow
-set(hFig, 'name', 'Spiky Peristimulus Time Histograms (PSTH)', 'NumberTitle', 'off');
-vXLim = [-.1 .1];
-nTrialLen = 100;
-
 % Ask for PSTH parameters
-persistent p_nStimDel p_nPreStimDur p_nPostStimDur p_nBinRes
+persistent p_nStimDel p_nPreStimDur p_nPostStimDur p_nBinRes p_nSmoothWin
 if isempty(p_nStimDel), p_nStimDel = 0; end
 if isempty(p_nPreStimDur), p_nPreStimDur = 0.05; end
 if isempty(p_nPostStimDur), p_nPostStimDur = 0.15; end
 if isempty(p_nBinRes), p_nBinRes = 0.001; end
-cAnswer = inputdlg({'Stimulus delay (ms)','Pre-stim period (s)','Post-stim period (s)','Bin resolution (ms)'},...
-    'Stimulus Delay', 1, {num2str(p_nStimDel), num2str(p_nPreStimDur), num2str(p_nPostStimDur), num2str(p_nBinRes)});
+if isempty(p_nSmoothWin), p_nSmoothWin = 1; end
+cAnswer = inputdlg({'Stimulus delay (ms)','Pre-stim period (s)','Post-stim period (s)','Bin resolution (ms)','Smooth window (ms)'},...
+    'PSTH', 1, {num2str(p_nStimDel), num2str(p_nPreStimDur), num2str(p_nPostStimDur), num2str(p_nBinRes), num2str(p_nSmoothWin)});
 if isempty(cAnswer), return, end
 p_nStimDel = str2num(cAnswer{1});
 p_nPreStimDur = str2num(cAnswer{2});
 p_nPostStimDur = str2num(cAnswer{3});
 p_nBinRes = str2num(cAnswer{4});
+p_nSmoothWin = str2num(cAnswer{5});
 
 % Check that events have enough data
 vRemIndx = [];
@@ -5466,6 +5492,13 @@ for e = 1:length(vEventIndx) % iterate over fieldnames
     end
 end
 vEventIndx(vRemIndx) = [];
+
+% Create figure
+hFig = figure('color', [.2 .2 .2]);
+drawnow
+set(hFig, 'name', 'Spiky Peristimulus Time Histograms (PSTH)', 'NumberTitle', 'off');
+vXLim = [-.1 .1];
+nTrialLen = 100;
 
 % Iterate over units
 nRow = 1;
@@ -5522,19 +5555,15 @@ for u = 1:length(vUnits)
         vC = (vC./et) * (1/p_nBinRes); % normalize to spikes/sec
 
         % Convolve with a right-angled triangular window
-        if ~isempty(vC)
-            nLen = 5; % base width 5 ms
-            vWin = [linspace(1,0,nLen)];
-            vWin = vWin/sum(vWin); % normalize to area 1
+        if ~isempty(vC) & (p_nSmoothWin > 1)
+            vWin = [linspace(1,0,p_nSmoothWin)];
+            vWin = vWin/sum(vWin); % normalize so sum is 1
             vC = conv(vC, vWin);
-        end
+        else p_nSmoothWin = 1; end
 
-        % Plot as line
-        %plot(vT, vC(1:end-(nLen-1)), 'color', vCol)
-        
         % Plot as bars
         if ~isempty(vT)
-            hBar = bar(vT, vC(1:end-(nLen-1)));
+            hBar = bar(vT, vC(1:end-(p_nSmoothWin-1)));
             set(hBar, 'facecolor', vCol, 'edgecolor', vCol)
         end
         

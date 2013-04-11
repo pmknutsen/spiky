@@ -41,7 +41,7 @@ for clu = 1:numclusts
         set(hndl, 'ButtonDownFcn', {@raise_me, hndl});
     end
 
-    if (clusters(clu) == 0),                 set(hndl, 'Color', [0 0 0], 'Marker', 'x');
+    if (clusters(clu) == 0),                 set(hndl, 'Color', [.3 .3 .3], 'Marker', 'x');
     elseif (ismember(clusters(clu), show)),  set(hndl, 'Color', cmap(clusters(clu),:));
     else                                     set(hndl, 'Color', Clgy);
     end;
