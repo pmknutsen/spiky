@@ -95,7 +95,7 @@ uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_PanR
 tZoomX = load([sPath 'zoomx.mat']); % zoom X
 uipushtool('Parent', hToolbar, 'cdata', tZoomX.cdata, 'Tag', 'Spiky_WaitbarAction_ZoomX', 'TooltipString', 'Zoom X-scale', 'ClickedCallback', @ZoomRange);
 tZoomY = load([sPath 'zoomy.mat']); % zoom Y
-uipushtool('Parent', hToolbar, 'cdata', tZoomY.cdata, 'Tag', 'Spiky_WaitbarAction_ZoomX', 'TooltipString', 'Zoom Y-scale', 'ClickedCallback', @ZoomAmplitude);
+uipushtool('Parent', hToolbar, 'cdata', tZoomY.cdata, 'Tag', 'Spiky_WaitbarAction_ZoomY', 'TooltipString', 'Zoom Y-scale', 'ClickedCallback', @ZoomAmplitude);
 mCData = im2double(imread([sPath 'tool_text.png'])); mCData(mCData == 0) = NaN; % set threshold
 uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_Threshold', 'TooltipString', 'Set threshold', 'ClickedCallback', @SetSpikeThreshold, 'separator', 'on');
 [mCData, mCM] = imread([sPath 'tools_table.gif']); mCData = ind2rgb(mCData, mCM); mCData(mCData == 1) = NaN; % experiment variables
@@ -164,7 +164,8 @@ uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'D&elete', 'Callback', @De
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Noise Reduction... (B)', 'Callback', @PCACleaning);
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Invert...', 'Callback', @InvertChannel);
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Filtered Channels...', 'Callback', @SetFilterChannels, 'separator', 'on', 'Accelerator', 'F');
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Filter Options...', 'Callback', @FilterOptions );
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Filter Options...', 'Callback', @FilterOptions);
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Channel Calculator...', 'Callback', @SetChannelCalculator);
 
 %  - Spikes menu
 hWaveforms  = uimenu(g_hSpike_Viewer, 'Label', '&Spikes');
@@ -720,13 +721,60 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function SetChannelCalculator(varargin)
+if ~CheckDataLoaded, return, end
+[FV, hWin] = GetStruct;
+[sCh, ~] = SelectChannelNumber(FV.csChannels);
+
+if ~isfield(FV, 'tChannelCalculator')
+    FV.tChannelCalculator = struct([]);
+    sEval = '';
+else
+    sEval = FV.tChannelCalculator.(sCh);
+end
+cAnswer = inputdlg('Equation to evaluate. Substitute signal vector with ''a'':', 'Channel Calculator', 3, {sEval});
+if isempty(cAnswer) return; end % cancel button pressed
+FV.tChannelCalculator(1).(sCh) = cAnswer{1};
+SetStruct(FV)
+ViewTrialData
+return
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function vCont = ChannelCalculator(vCont, sCh)
+[FV, hWin] = GetStruct;
+
+if ~isfield(FV, 'tChannelCalculator'), return; end
+if ~isfield(FV.tChannelCalculator, sCh), return; end
+
+% Re-calculate
+sEval = FV.tChannelCalculator.(sCh);
+if isempty(sEval) return; end
+a = vCont;
+try vCont = eval(sEval);
+catch
+    sErr = sprintf('An error occurred when evaluating the expression ''%s'' for channel %s', sEval, sCh);
+    waitfor(warndlg(sErr, 'Spiky'))
+    return
+end
+return
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetDirectory(varargin)
 % Set the current directory
 FV = SetFVDefaults(); % initialize FV with default settings
 global g_bBatchMode
-sDirectory = uigetdir;           % path to session directory (without last slash at end)
+
+% Path to session directory (without last slash at end)
+if isfield(FV, 'sDirectory')
+    sDirectory = uigetdir(CheckFilename([FV.sDirectory '\']));
+else
+    sDirectory = uigetdir;
+end
 if sDirectory == 0, return, end
 cd(sDirectory)
+
 % Get list of DAQ files
 sFiles = dir(CheckFilename(sprintf('%s\\*.daq', sDirectory)));
 if isempty(sFiles)
@@ -756,8 +804,14 @@ function SetDirectoryTree(varargin)
 % Load list of all DAQ files from all descending directories below a top directory
 % Set the top directory of the tree
 FV = SetFVDefaults();
-sDirectory = uigetdir;
 global g_hSpike_Viewer
+
+% Path to session directory (without last slash at end)
+if isfield(FV, 'sDirectory')
+    sDirectory = uigetdir(CheckFilename([FV.sDirectory '\']));
+else
+    sDirectory = uigetdir;
+end
 if sDirectory == 0, return, end
 
 % Iterate recursively over all sub-directories and extract all .DAQ files
@@ -784,7 +838,6 @@ FV.sDirectory = sDirectory;
 SetStruct(FV)
 OpenFile([],1); % Load first trial
 ViewTrialData   % Update GUI
-
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -824,7 +877,7 @@ if ~CheckDataLoaded, return, end
 global g_bMergeMode g_bBatchMode
 if ~g_bMergeMode && ~g_bBatchMode % destroy waitbar in case we are not in Merge or Batch mode
     SpikyWaitbar(1,1);
-end 
+end
 
 % Make Spiky window current without raising it to the top
 hFig = findobj('Tag', 'Spiky');
@@ -857,9 +910,13 @@ for i = 1:length(cFields)
             sField = cFields{i}(1:end-10);
             vMinMax = [min(FV.tData.(sField)) max(FV.tData.(sField))];
             [vMinMax, FV] = AdjustChannelGain(FV, vMinMax, sField); % mV
-            FV.tYlim(1).(FV.csChannels{end}) = vMinMax;
+            if ~isfield(FV.tYlim, FV.csChannels{end})
+                FV.tYlim(1).(FV.csChannels{end}) = vMinMax;
+            end
         else
-            FV.tYlim(1).(FV.csChannels{end}) = []; % assume its digital
+            if ~isfield(FV.tYlim, FV.csChannels{end})
+                FV.tYlim(1).(FV.csChannels{end}) = []; % assume its digital
+            end
         end
     end
 end
@@ -882,7 +939,7 @@ else nSubEventHeight = 0; end
 
 for i = 1:length(FV.csDisplayChannels)
     sCh = FV.csDisplayChannels{i};
-    vCont = FV.tData.(sCh); % continuous trace (V)
+    vCont = ChannelCalculator(FV.tData.(sCh), sCh); % continuous trace (V)
     if length(vCont) <= 1 && ~FV.bPlotRasters
         uiwait(warndlg(sprintf('Cannot display channel %s as it is not a vector.', sCh)))
         continue
@@ -896,7 +953,6 @@ for i = 1:length(FV.csDisplayChannels)
         [FV,hWin] = GetStruct; % reload FV since channel gains may have changed in previous line
         
         nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency (Hz)
-        %nFs = 1.0178*2500;
         nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
         nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
         vTime = linspace(nBeginTime, nEndTime, length(vCont));
@@ -1042,7 +1098,6 @@ for i = 1:length(FV.csDisplayChannels)
             hMenu = uicontextmenu;
             set(hMenu, 'userdata', mUserData, 'Tag', [sCh '-' num2str(vUnits(nU))]);
             set(hMenu, 'Tag', [sCh '-' num2str(vUnits(nU))]);
-            %hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', 'figure;mD=get(get(gcbo, ''parent''),''userdata'');plot(mD(:,1),mD(:,2),''linewidth'',1)');
             hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh);
             hItems(end+1) = uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
             hItems(end+1) = uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
@@ -1387,13 +1442,16 @@ function CopyChannelToFig(varargin)
 [FV, hWin] = GetStruct;
 sCh = get(gcbo, 'Tag');
 if ~isfield(FV.tData, sCh) return; end
-vCont = FV.tData.(sCh);
+vCont = ChannelCalculator(FV.tData.(sCh), sCh);
 nBegin = FV.tData.([sCh '_TimeBegin']); % sampling start, sec
 nEnd = FV.tData.([sCh '_TimeEnd']); % sampling end, sec
 nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency Hz
 vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
+if strcmp(get(findobj(hWin, 'Tag', 'ShowNormalTime'), 'checked'), 'on')
+    vTime = vTime - nBegin;
+end
 hFig = figure;
-plot(vTime, vCont, 'linewidth', 1)
+plot(vTime, vCont, 'k', 'linewidth', 1)
 xlabel('Time (s)')
 ylabel('V (raw)')
 legend(sCh)
@@ -1500,7 +1558,7 @@ switch lower(sOption)
         vCont = vCont(1:nStep:end);
     otherwise
         nNewFs = nFs;
-        vTime = [];
+        %vTime = [];
 end
 
 % High pass filter
@@ -1523,7 +1581,6 @@ if bRectify, vCont = abs(vCont); end
 
 % Return NaN's where they were removed above
 vCont(vNaNIndx) = NaN;
-
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -2326,7 +2383,7 @@ hWait = waitbar(0, 'Automatically determining spike thresholds...');
 for nCh = 1:length(csSelected)
     hWait = waitbar(nCh/length(csSelected), hWait);
     sCh = csSelected{nCh};
-    vCont = FV.tData.(sCh);
+    vCont = ChannelCalculator(FV.tData.(sCh), sCh);
     [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % Adjust gain (mV)
 
     % Filter and rectify EMG signals
@@ -2384,7 +2441,7 @@ for nCh = 1:length(csChUnique)
     else vThresh(2) = NaN; end
 
     % Filter continuous signal
-    vCont = FV.tData.(sCh);
+    vCont = ChannelCalculator(FV.tData.(sCh), sCh);
     [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % Adjust gain (mV)
     nFs = FV.tData.([sCh '_KHz']) * 1000; % channel sampling rate
     
@@ -2700,7 +2757,7 @@ for u = 1:nUnits % one row per unit
             'String', sprintf('Group %d', nGroup), 'callback', sCmd, ...
             'userdata', hCurrPanel )
     else p = p + 1; end
-
+    
     % Create context menu that will attach to each subplot for current unit
     hMenu(end+1) = uicontextmenu;
     tUserData = struct([]);
@@ -4063,7 +4120,7 @@ for f = 1:length(csPaths)
         end
         csChannels = unique(csChannels);
         for nCh = 1:length(csChannels) % iterate over imported channels
-            vCont = FV.tData.(csChannels{nCh});
+            vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
             [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh}); % Adjust gain (mV)
             % time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
@@ -4091,7 +4148,7 @@ for f = 1:length(csPaths)
             if ~isfield(FV.tData, csChannels{nCh}) continue, end
             % raw signal
             sCh = csChannels{nCh};
-            vCont = FV.tData.(csChannels{nCh});
+            vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
             [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % Adjust gain (mV)
             % time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
@@ -5206,7 +5263,7 @@ end
 
 % Get continuous signal
 nContFs = FV.tData.([p_sContCh '_KHz']) * 1000; % Hz
-vCont = FV.tData.(p_sContCh);
+vCont = ChannelCalculator(FV.tData.(p_sContCh), p_sContCh);
 vContBegin = FV.tData.([p_sContCh '_TimeBegin']);
 
 % Get parameters interactively (pre/post times and stimulus delay)
@@ -5402,7 +5459,7 @@ plot([vTime(1) vTime(end)], [min(vMean) min(vMean)], 'g:') % min value indicator
 if nargout > 0, varargout(1) = {vMean}; end
 if nargout > 1, varargout(2) = {vErrMean}; end
 if nargout > 2, varargout(3) = {vTime}; end
-
+set(hFig, 'toolbar', 'figure')
 if ~g_bBatchMode BatchRedo([], 'ShowEventTriggeredAverage'); end
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -6314,7 +6371,7 @@ hAx = findobj('Type', 'axes', 'Tag', sCh);
 if isempty(hAx), return
 else axes(hAx(1)), end
 
-vCont = FV.tData.(sCh); % continuous trace (V)
+vCont = ChannelCalculator(FV.tData.(sCh), sCh); % continuous trace (V)
 nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
 nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
 vTime = linspace(nBeginTime, nEndTime, length(vCont));
