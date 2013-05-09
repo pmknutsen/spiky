@@ -13,6 +13,11 @@ function varargout = spiky(varargin)
 %   Runs the internal function FUN in Spiky. Ex:
 %     spiky, e.g. spiky('LoadTrial(''A1807004.mat'')')
 %
+%   Alternative syntax for running subroutines:
+%     global Spiky
+%     Spiky.SUB(arg1, ..., argn)
+%   where SUB is the subroutine to run.
+%
 
 % Spiky - Spike sorting GUI for Matlab
 % Copyright (C) 2012 Per M Knutsen <pmknutsen@gmail.com>
@@ -31,11 +36,6 @@ function varargout = spiky(varargin)
 % along with this program.  If not, see <http://www.gnu.org/licenses/>.
 % 
 
-% Set path to spike-sorting software
-sPath = which('spiky');
-sPath = sPath(1:end-7);
-addpath(genpath(sPath), '-end');
-
 % Run local function if called from outside
 if nargin > 0
     if strcmp(varargin{1}, 'GetGitHash')
@@ -50,6 +50,36 @@ if nargin > 0
     end
     return
 end
+
+clc
+disp('Spiky - Automated spike-sorting for Matlab')
+disp('Copyright (C) 2005-2013 Per M Knutsen <pmknutsen@gmail.com>')
+disp('This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are')
+disp(sprintf('are welcome to redistribute it under certain conditions; see LICENSE for details.\n'))
+
+% Set path to spike-sorting software
+disp('Initializing paths...')
+sPath = which('spiky');
+sPath = sPath(1:end-7);
+addpath(genpath(sPath), '-end');
+
+% Get list of all internal sub-routines
+disp('Initializing function handles...')
+csStr = mlintmex('-calls', which('spiky.m'));
+[a,b,c,d,subs] = regexp(csStr, '[S]\d* \d+ \d+ (\w+)\n');
+cSubs = [subs{:}]';
+
+% Generate function handles for all sub-routines
+global Spiky;
+Spiky = struct([]);
+for i = 1:length(cSubs)
+    Spiky(1).(cSubs{i}) = eval(['@' cSubs{i}]);
+end
+disp(sprintf('Run Spiky routines with syntax Spiky.SUB() where Spiky is a global variable.\n'))
+
+% Create function handles for sub-routines we may want to access externally
+global Spiky_DigitizeChannel;
+Spiky__DigitizeChannel = @DigitizeChannel;
 
 % Set FV default settings
 FV = SetFVDefaults();
@@ -400,12 +430,14 @@ global g_bBatchMode
 % individual electrodes cannot be cleaned!)
 if ~g_bBatchMode
     if isfield(FV, 'tExperimentVariables')
-        nIndx = find(strcmp({FV.tExperimentVariables.sVariable}, 'bPCACleanedChannels'));
-        if ~isempty(nIndx)
-            if FV.tExperimentVariables(nIndx).sValue
-                switch questdlg('This file has already been PCA cleaned. If it is necessary to redo the cleaning it is recommended you first re-load the original files from disk.', ...
-                        'Spiky', 'Continue', 'Abort', 'Abort')
-                    case 'Abort', return
+        if isfield(FV, 'sVariable')
+            nIndx = find(strcmp({FV.tExperimentVariables.sVariable}, 'bPCACleanedChannels'));
+            if ~isempty(nIndx)
+                if FV.tExperimentVariables(nIndx).sValue
+                    switch questdlg('This file has already been PCA cleaned. If it is necessary to redo the cleaning it is recommended you first re-load the original files from disk.', ...
+                            'Spiky', 'Continue', 'Abort', 'Abort')
+                        case 'Abort', return
+                    end
                 end
             end
         end
@@ -486,17 +518,19 @@ switch sAns
 
         % Log this change in FV.tExperimentVariables
         if isfield(FV, 'tExperimentVariables')
-            nIndx = find(strcmp({FV.tExperimentVariables.sVariable}, 'bPCACleanedChannels'));
-            if isempty(nIndx)
-                FV.tExperimentVariables(end+1).sVariable = 'bPCACleanedChannels';
-                FV.tExperimentVariables(end).sValue = '1';
-                % Save names of channels used for PCA cleaning
-                FV.tExperimentVariables(end+1).sVariable = 'sPCACleanedChannels';
-                FV.tExperimentVariables(end).sValue = mat2str(cell2mat(csChannels'));
-            else
-                FV.tExperimentVariables(nIndx).sValue = '1';
-                nIndx = strcmp({FV.tExperimentVariables.sVariable}, 'sPCACleanedChannels');
-                FV.tExperimentVariables(nIndx).sValue = mat2str(cell2mat(csChannels'));
+            if isfield(FV, 'sVariable')
+                nIndx = find(strcmp({FV.tExperimentVariables.sVariable}, 'bPCACleanedChannels'));
+                if isempty(nIndx)
+                    FV.tExperimentVariables(end+1).sVariable = 'bPCACleanedChannels';
+                    FV.tExperimentVariables(end).sValue = '1';
+                    % Save names of channels used for PCA cleaning
+                    FV.tExperimentVariables(end+1).sVariable = 'sPCACleanedChannels';
+                    FV.tExperimentVariables(end).sValue = mat2str(cell2mat(csChannels'));
+                else
+                    FV.tExperimentVariables(nIndx).sValue = '1';
+                    nIndx = strcmp({FV.tExperimentVariables.sVariable}, 'sPCACleanedChannels');
+                    FV.tExperimentVariables(nIndx).sValue = mat2str(cell2mat(csChannels'));
+                end
             end
         else
             % TODO
@@ -928,7 +962,7 @@ for i = 1:length(FV.csDisplayChannels)
     if ~isfield(FV.tData, FV.csDisplayChannels{i}), vRemIndx = [vRemIndx i]; end
 end
 FV.csDisplayChannels(vRemIndx) = [];
-SetStruct(FV)
+SetStruct(FV, 'nosaveflag')
 
 hSubplots = [];
 bShowDigitalEvents = strcmp(get(findobj(hWin, 'Label', 'Show &Events'),'checked'), 'on');
@@ -1431,7 +1465,7 @@ try % try here because sometimes returned handles arent axes after all...
     set(hFig, 'children', [flipud(hOthers); hAxes(vOrder)])
 end
 
-SetStruct(FV)
+SetStruct(FV, 'nosaveflag')
 PanMode()
 return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1785,7 +1819,7 @@ if ~isempty(strfind(get(g_hSpike_Viewer, 'Name'), '*')) && ~isempty(FV.sLoadedTr
     end
 end
 
-SetStruct(FV); % update current path and colormap
+SetStruct(FV, 'nosaveflag'); % update current path and colormap
 
 % Exit merge mode if applicable
 global g_bMergeMode
@@ -1828,7 +1862,7 @@ switch sAns
         for fn = 1:length(csFieldnames)
             FV.(csFieldnames{fn}) = FV_old.(csFieldnames{fn});
         end
-        SetStruct(FV);
+        SetStruct(FV, 'nosaveflag');
         % run spike detection
         DetectSpikes();
         % concate spikes on multi-trodes
@@ -1840,7 +1874,7 @@ switch sAns
         FV = SetFVDefaults();
         if exist('sPath', 'var'), FV.sDirectory = sPath;
         else FV.sDirectory = pwd; end
-        SetStruct(FV);
+        SetStruct(FV, 'nosaveflag');
         % Load trial data. Note that the LoadTrial function will replace
         % the default settings with saved settings/results if they exist
         LoadTrial(sNextTrial);
@@ -2032,118 +2066,14 @@ if ~exist(sFile, 'file')
     return
 end
 
-switch lower(sFile(end-3:end))
-    case '.mat' % load .mat file
-        tData = load(sFile, '-MAT');
-    case '.daq' % load .daq file
-        try
-        [mData, vTime, vAbsTime, tEvents, tDAQInfo] = daqread(CheckFilename(sFile));
-        catch
-            sStr = sprintf('Error when reading file:\n%s\n\n%s', sFile, lasterr);
-            uiwait(warndlg(lasterr, 'Spiky::LoadTrial', 'modal'));
-            sp_disp(sStr)
-            return
-        end
-        mData = single(mData); % convert to single precision to conserve memory
-        
-        if isempty(mData)
-            sStr = 'An error occurred during loading of .DAQ file: File appears to be empty.';
-            uiwait(warndlg(sStr, 'Spiky::LoadTrial', 'modal'))
-            sp_disp(sStr)
-            return
-        end
-        tData = struct([]);
+%switch lower(sFile(end-3:end))
+%    case '.mat' % load .mat file
+%        tData = load(sFile, '-MAT');
+%    case '.daq' % load .daq file
+%end
 
-        % Import all DAQ channels
-        cDaqChannels = {tDAQInfo.ObjInfo.Channel.HwChannel};
-        cDaqChannelNames = {tDAQInfo.ObjInfo.Channel.ChannelName};
-        for c = 1:length(cDaqChannels)
-            % Channel name
-            sChName = ['DAQ_' num2str(cDaqChannels{c})]; % use channel's hardware ID
-            % Channel description (if alternative channel name exists)
-            if isempty(str2num(cDaqChannelNames{c})) % use channel name
-                sChDescr = num2str(cDaqChannelNames{c}); % use channel's hardware ID
-                if ~isfield(FV, 'tChannelDescriptions')
-                    FV.tChannelDescriptions = struct([]);
-                end
-            else sChDescr = ''; end
-            FV.tChannelDescriptions(end+1).sChannel = sChName;
-            FV.tChannelDescriptions(end).sDescription = sChDescr;
-
-            % Begin time is counted as the number of seconds elapsed since last midnight
-            vTime = tDAQInfo.ObjInfo.InitialTriggerTime;
-            vHourToSec = vTime(4)*60*60;
-            vMinToSec = vTime(5)*60;
-            vSecSinceMidnight = vHourToSec + vMinToSec + vTime(6);
-
-            % Auto-digitize bi-modal signals (putative digital inputs)
-            %  1) round
-            nMax = max(mData(:,c));
-            %  2) normalize range to 0 -> 10
-            vNorm = mData(:,c) - min(mData(:,c));
-            vNorm = (vNorm / nMax) * 10;
-            %  3) round
-            vRnd = round( vNorm );
-            %  4) get number of unique values. As a heuristic, we assume a
-            %     digital signal has less than 5
-            nLenU = length(unique(vRnd));
-            %  5) get threshold; (max-min) / 2. If signal is a TTL,
-            %  assume threshold to be > 1 V
-            nThresh = (nMax - min(mData(:,c)) ) / 2;            
-            if (nLenU < 5) && nThresh > 1
-                %  6) digitize through @DigitizeChannel
-                nFs = tDAQInfo.ObjInfo.SampleRate; % Hz
-                nTimeBegin = vSecSinceMidnight;
-                nTimeEnd = (size(mData, 1) / tDAQInfo.ObjInfo.SampleRate) + vSecSinceMidnight;
-                [vUpTimes vDownTimes] = DigitizeChannel(mData(:,c), nThresh, nFs, nTimeBegin, nTimeEnd);
-
-                tData(1).([sChName '_Up']) = vUpTimes; % sec
-                tData.([sChName '_Down']) = vDownTimes; % sec
-
-                % Save threshold value used for digitization
-                if ~isfield(FV, 'tEventThresholds')
-                    FV.tEventThresholds = struct([]);
-                    nIndx = 1;
-                else nIndx = length(FV.tEventThresholds) + 1; end
-                FV.tEventThresholds(nIndx).sChannel = sChName;
-                FV.tEventThresholds(nIndx).nThreshold = nThresh;
-                
-                tData.([sChName '_EventThreshold']) = nThresh; % keep this for backwards compatibility...
-                
-                FV.csDigitalChannels = unique([FV.csDigitalChannels sChName]);
-            end
-            
-            tData(1).(sChName) = mData(:, c)'; % save raw data
-            tData.([sChName '_KHz']) = tDAQInfo.ObjInfo.SampleRate / 1000; % kHz
-            tData.([sChName '_KHz_Orig']) = tDAQInfo.ObjInfo.SampleRate / 1000;
-            tData.([sChName '_TimeBegin']) = vSecSinceMidnight;
-            tData.([sChName '_TimeEnd']) = (size(mData, 1) / tDAQInfo.ObjInfo.SampleRate) + vSecSinceMidnight;
-        end
-
-        % Add DAQ events as digital signals
-        tEventLog = tDAQInfo.ObjInfo.EventLog;
-        for e = 1:length(tEventLog)
-            sChName = ['DAQ_' tEventLog(e).Type];
-            sChDescr = '';
-            if isfield(tData, sChName)
-                tData.([sChName '_Up']) = [tData.([sChName '_Up']) tEventLog(e).Data];
-                tData.([sChName '_Down']) = [tData.([sChName '_Down']) tEventLog(e).Data];
-            else
-                tData.([sChName '_Up']) = (tEventLog(e).Data.RelSample / tDAQInfo.ObjInfo.SampleRate) + vSecSinceMidnight; % sec
-                tData.([sChName '_Down']) = tData.([sChName '_Up']);
-                tData.([sChName '_KHz']) = tDAQInfo.ObjInfo.SampleRate / 1000;
-                tData.([sChName '_KHz_Orig']) = tDAQInfo.ObjInfo.SampleRate / 1000;
-                tData.([sChName '_TimeBegin']) = vSecSinceMidnight;
-                tData.([sChName '_TimeEnd']) = (size(mData, 1) / tDAQInfo.ObjInfo.SampleRate) + vSecSinceMidnight;
-                FV.csDigitalChannels = unique([FV.csDigitalChannels sChName]);
-            end
-            FV.tChannelDescriptions(end+1).sChannel = sChName;
-            FV.tChannelDescriptions(end).sDescription = sChDescr;
-        end
-end
-
-% Store data
-FV.tData = tData;
+% Run import filter
+eval(sprintf('FV = import_%s(sFile, FV);', lower(sFile(end-2:end))))
 FV.sLoadedTrial = sFile;
 
 % Names of all channels
@@ -4715,7 +4645,6 @@ end
 [sFile, sPath] = uigetfile( {[sFilename '*.mat'], ['Matching MAT files (' sFilename '*.mat)'];
     [sFilename '.*'],  ['Matching files (' sFilename '.*)']; ...
     '*.daq',  'Data Acquisition Toolbox files (*.daq)'; ...
-    '*.txt',  'Text files (*.txt)'; ...
     '*.*',  'All Files (*.*)'}, ...
     'Select data file', p_sDefFile);
 
@@ -4726,8 +4655,6 @@ p_sDefFile = sFile;
 cd(sPath)
 
 switch sFile(end-3:end)
-    case '.txt'
-        uiwait(warndlg('Import of text files not yet functional in this version of Spiky')); return
     case '.daq'
         % Import data from Data Acquisition Toolbox files
         [mData, vTime, vAbsTime, tTvents, tDAQInfo] = daqread([sPath sFile]);
@@ -4850,7 +4777,6 @@ switch sFile(end-3:end)
             FV.sDirectory = sPath;
             FV.tData = struct([]);
             FV.sLoadedTrial = [sPath sFile];
-            %FV.tData(1).([sDataField '_TimeBegin']) = 0;
         end
         
         % Iterate over all fields to be imported

@@ -1,31 +1,32 @@
-DESCRIPTION
-The application is essentially a GUI wrap-around for the Chronux (http://www.chronux.or) spike sorting routines. In addition, Spiky! has a number of useful features for streamlining the process of spike sorting, visualizing data and analysing spike trains and field potentials.
+##Spiky
+Spiky is a Matlab GUI wrapper for the Chronux (http://www.chronux.or) spike sorting
+library, with a number of extra features for improved sorting, visualization and analysis
+of spike trains and continuous data.
 
-REQUIREMENTS
-Basic requirements are Matlab 6.5 and higher. The software has been tested to run well on Matlab in a Windows or Linux environment (Mac not tested but should work fine as well).
+###Requirements
+Matlab: 6.5 or higher
+OS: Cross-platform (Linux, Windows and Mac)
 
+##Features
+- GUI with zoom, scroll and pan abilities
+- 1-click automatic spike sorting (via Chronux)
+- Visualization and validation tools
+- Basic channel operators
+- Post-filtering and custom math channel operators
+- Analysis tools for spike trains and continuous data
+- Merging of multiple data files
+- Batch processing
+- Command line interface
+- Extendible through scripting
+- DAQ import (Matlab Data Acquisition Toolbox files)
+- Other data formats supported
 
-FEATURES
- - 1-Click automatic spike sorting 
- - Import behavioral data 
- - PSTH, cross-correlations, power spectral densitities 
- - On-the-fly automatic sorting of directories 
- - and more...
+###Install
+Synchronize the master branch with `git`, or download a .zip archive and unpack to a local
+location. Add all sub-folders to the Matlab path. Type `spiky` to start.
 
+###Documentation
+https://github.com/pmknutsen/spiky/wiki
 
-INSTALLATION
-Download and unzip the current distribution (.zip) file featured at:
-http://code.google.com/p/spiky/
-
-Copy the unpacked folder to a location on your system. In Matlab, add the folder with all sub-folders to the path. Type spiky to start the application.
-
-
-MORE INFORMATION
-For more information, help, questions, bug reports and feature requests, please visit the Spiky! homepage at:
- http://code.google.com/p/spiky/
-
-Read the documentation at:
- http://code.google.com/p/spiky/w/list
-
-Join the discussion group at:
- http://groups.google.com/group/spiky-discuss
+###Issue Tracker
+https://github.com/pmknutsen/spiky/issues
