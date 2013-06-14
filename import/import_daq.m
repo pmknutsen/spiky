@@ -1,11 +1,13 @@
 function FV = import_daq(sFile, FV)
+%Data Acquisition Toolbox files
+
 % Open .daq files in Spiky
 
 % Internal Spiky sub-rutines can be called with the syntax:
 %  Spiky.SUB(var)
 %
 
-global Spiky;
+global Spiky
 
 try
     [mData, vTime, vAbsTime, tEvents, tDAQInfo] = daqread(spiky(sprintf('CheckFilename(''%s'')', sFile)));

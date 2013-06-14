@@ -31,9 +31,6 @@ csStr = {'_ScanPath_' '_ScanPathContAir_'};
 global g_bMergeMode g_bPlotS1MapQuiet
 if isempty(g_bPlotS1MapQuiet), g_bPlotS1MapQuiet = 0; end
 
-if g_bPlotS1MapQuiet
-    disp('Plot_S1_Input_Map is in Quiet mode. To disable: global g_bPlotS1MapQuiet; g_bPlotS1MapQuiet = 0;')
-end
 bDebug = 0;
 
 % Default parameters
@@ -387,8 +384,7 @@ for u = 1:length(vUnits)
             vInternalInt = [];
             vBoundaryInt = [];
             for b = 1:length(FV.tData.BarrelOutlines)
-                %axes(hImAx);
-                hold(hImAx, 'on')
+                axes(hImAx); hold on
                 vX = FV.tData.BarrelOutlines(b).vXmm;
                 vY = FV.tData.BarrelOutlines(b).vYmm;
                 % Contour
@@ -402,12 +398,10 @@ for u = 1:length(vUnits)
                 for c = 1:length(cIDs)
                     cIDs{c} = cIDs{c}(1:2);
                 end
-                if ~g_bPlotS1MapQuiet
-                    if any(strcmpi(cIDs, FV.tData.BarrelOutlines(b).sID))
-                        plot(hImAx, vXi, vYi, 'g-', 'linewidth', 3)
-                    else
-                        plot(hImAx, vXi, vYi, 'w-', 'linewidth', 1)
-                    end
+                if any(strcmpi(cIDs, FV.tData.BarrelOutlines(b).sID))
+                    plot(vXi, vYi, 'g-', 'linewidth', 3)
+                else
+                    plot(vXi, vYi, 'w-', 'linewidth', 1)
                 end
                 
                 % For each pixel enclosed by barrel, determine its value
@@ -481,9 +475,9 @@ for u = 1:length(vUnits)
 end % end of unit loop
 
 % Create colorbar
-%axes(hImAx)
+axes(hImAx)
 try
-    hCol = colorbar('peer', hImAx);
+    hCol = colorbar;
     vPos = get(hImAx, 'position');
     set(hCol, 'Position', [.93 vPos(2) .02 vPos(4)], 'fontsize', 7, 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6]);
 end
