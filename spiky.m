@@ -1022,7 +1022,11 @@ for i = 1:length(FV.csDisplayChannels)
         nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency (Hz)
         nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
         nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
-        vTime = linspace(nBeginTime, nEndTime, length(vCont));
+        if all(size(vCont) > 1) % 2D trace (e.g. spectrogram)
+            vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
+        else % 1D trace (voltage etc)
+            vTime = linspace(nBeginTime, nEndTime, length(vCont));
+        end
 
         % Alternative way to compute vTime  - Corrected 022312
         %vTime = nBeginTime:(1/nFs):( nBeginTime + (1/nFs)*(length(vCont)-1) );
@@ -1194,7 +1198,8 @@ for i = 1:length(FV.csDisplayChannels)
             if length(vY) ~= size(vCont, 1)
                 vY = 1:size(vCont, 1);
             end
-            hIm = image(vTime, vY, vCont, 'cdataMapping', 'scaled', 'parent', hSubplots(end));
+            %hIm = image(vTime, vY, vCont, 'cdataMapping', 'scaled', 'parent', hSubplots(end));
+            hIm = imagesc(vTime, vY, vCont, 'parent', hSubplots(end));
             set(hSubplots(end), 'ydir', 'normal')
         end
         % attach context menu to line to enable additional options

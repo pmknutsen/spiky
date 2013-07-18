@@ -104,12 +104,16 @@ end
 % Decimate vAPCont and vMLCont to 2.5 KHz (i.e. 1 ms resolution)
 nNewFs = 2.5; % KHz
 nND = round(vLaserFs / (nNewFs * 1000)); % Hz
-nNewFs = (vLaserFs / nND) / 1000; % actual, new sampling rate (due to rounding)
-vAPCont = downsample(vAPCont, nND);
-vMLCont = downsample(vMLCont, nND);
+if nND > 0
+    nNewFs = (vLaserFs / nND) / 1000; % actual, new sampling rate (due to rounding)
+    vAPCont = downsample(vAPCont, nND);
+    vMLCont = downsample(vMLCont, nND);
+else
+    nNewFs = vLaserFs;
+end
 
 % Lets insert AP and ML as continuous data vectors
-FV.tData.('GalvoScanAP') = vAPCont;
+FV.tData.('GalvoScanAP') = vAPCont(:)';
 FV.tData.('GalvoScanAP_Imported') = 1;
 FV.tData.('GalvoScanAP_KHz') = nNewFs; % KHz
 FV.tData.('GalvoScanAP_KHz_Orig') = nNewFs; % KHz
@@ -117,7 +121,7 @@ FV.tData.('GalvoScanAP_TimeBegin') = nLaserTimeBegin; % sec
 FV.tData.('GalvoScanAP_TimeEnd') = nLaserTimeEnd; % sec
 FV.tGain.('GalvoScanAP') = 1;
 
-FV.tData.('GalvoScanML') = vMLCont;
+FV.tData.('GalvoScanML') = vMLCont(:)';
 FV.tData.('GalvoScanML_Imported') = 1;
 FV.tData.('GalvoScanML_KHz') = nNewFs; % KHz
 FV.tData.('GalvoScanML_KHz_Orig') = nNewFs; % KHz

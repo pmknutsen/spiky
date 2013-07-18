@@ -63,7 +63,7 @@ nFs = nFs/nR;
 % TW - time-bandwidth product (i.e. sec * Hz),
 % K  - number of tapers
 tParams.tapers = [p_nTW p_nTW*2-1]; % [NW K]
-tParams.pad    = 2;
+tParams.pad    = 1;
 tParams.Fs     = nFs;
 tParams.err    = 0; % make sure we don't compute error bars. too slow
 tParams.fpass  = [p_nMinF p_nMaxF];
@@ -71,7 +71,7 @@ tParams.fpass  = [p_nMinF p_nMaxF];
 % Compute the multitaper spectrogram
 hMsg = waitbar(0.5, 'Computing multitaper spectrogram...');
 if p_nD > 0 vCont = diff(vCont, p_nD); end
-[S, ~, f] = mtspecgramc(vCont, [p_nWinSize p_nWinStep], tParams);
+[S, t, f] = mtspecgramc(vCont, [p_nWinSize p_nWinStep], tParams);
 close(hMsg);
 
 % Create output structure
@@ -84,6 +84,8 @@ tSig.([sPreFix '_Unit']) = 'Hz';
 tSig.([sPreFix '_Scale']) = f;
 
 return
+
+
 
 
 % Some other useful processing we'll recycle later....
