@@ -1,5 +1,5 @@
 function Spike_Triggered_Average(FV)
-% Plot spike-triggered averages of all units from one selected channel.
+% Plot spike-triggered averages of all units from one selected channel
 %
 
 global Spiky g_bBatchMode;
@@ -70,45 +70,65 @@ for u = 1:length(vUnits)
     % Iterate over spiketimes
     nPreLen = round(p_nPre / (1/(nContFs*1000)));
     nPostLen = round(p_nPost / (1/(nContFs*1000)));
-    
-    mTrials = [];
-    for s = 1:length(vSpiketimes)
-        [nMin, nMinIndx] = min(abs(vContTime - vSpiketimes(s)));
-        vSpan = nMinIndx + (-nPreLen:nPostLen);
-        if any(vSpan < 1) || any(vSpan > length(vCont)) continue; end
-        mTrials = [mTrials; vCont(vSpan)];
-    end
-    
-    % Average and standard error
-    vMean = mean(mTrials);
-    vStdErr = std(mTrials) ./ sqrt(size(mTrials, 1));
-    vTime = (-nPreLen:nPostLen) .* (1/(nContFs));
-    
+
     % Plot spike triggered average
     if ~ishandle(hFig) return; end
     nW = .8/length(vUnits);
     hAx = axes('position', [(nW+.15/length(vUnits))*(u-1)+.05 .1 nW .8] );
-    
+
+    vTime = (-nPreLen:nPostLen) .* (1/(nContFs));
+    vMean = zeros(size(vTime));
+    vStdErr = zeros(size(vTime));
+
     hold on
     vCol = FV.mColors(u, :);
     hFill = fill([vTime fliplr(vTime)], [vMean+vStdErr fliplr(vMean-vStdErr)], vCol); % error fill
-    set(hFill, 'edgeColor', 'none', 'faceAlpha', 0.5)
-    plot(vTime, vMean, 'color', vCol)
+    
+    hAvg = plot(vTime, vMean, 'color', vCol);
     set(hAx, 'Color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'fontsize', 7, ...
         'xlim', [vTime(1) vTime(end)])
     
     if u == 1 ylabel('Spikes/s'); end
     xlabel('Time (ms)')
-    box on
-    grid on
-
+    box on; grid on
+    hTit = title('');
+    Spiky.ThemeObject(hTit)
+    
+    % Compute average
+    mTrials = [];
+    i = 0;
+    for s = 1:length(vSpiketimes)
+        [~, nMinIndx] = min(abs(vContTime - vSpiketimes(s)));
+        vSpan = nMinIndx + (-nPreLen:nPostLen);
+        if any(vSpan < 1) || any(vSpan > length(vCont)) continue; end
+        mTrials = [mTrials; vCont(vSpan)];
+        i = i + 1;
+        if i > 100 % update plot every 500 spikes
+            vMean = nanmean(mTrials);
+            vStdErr = nanstd(mTrials) ./ sqrt(size(mTrials, 1));
+            i = 0;
+            if ~ishandle(hFig) return; end
+            set(hAvg, 'xdata', vTime, 'ydata', vMean)
+            delete(hFill)
+            hFill = fill([vTime fliplr(vTime)], [vMean+vStdErr fliplr(vMean-vStdErr)], vCol); % error fill
+            set(hFill, 'edgeColor', 'none', 'faceAlpha', 0.5)
+            uistack(hAvg)
+            set(hTit, 'string', sprintf('%d / %d spikes averaged', s, length(vSpiketimes)))
+            drawnow
+        end
+    end
+    vMean = nanmean(mTrials);
+    vStdErr = nanstd(mTrials) ./ sqrt(size(mTrials, 1));
+    set(hAvg, 'xdata', vTime, 'ydata', vMean)
+    delete(hFill)
+    hFill = fill([vTime fliplr(vTime)], [vMean+vStdErr fliplr(vMean-vStdErr)], vCol); % error fill
+    set(hFill, 'edgeColor', 'none', 'faceAlpha', 0.5)
+    uistack(hAvg)
+    
     % Title
     if isnan(vUnits(u)) sID = ' Unit UN-SORTED';
     else sID = sprintf(' Unit %d', vUnits(u)); end
-    hTit = title(sprintf('%s  n=%d', sID, length(vSpiketimes)));
-    set(hTit, 'color', FV.mColors(u,:), 'fontsize', 8, 'fontweight', 'bold', ...
-        'backgroundcolor', [.1 .1 .1], 'interpreter', 'none', ...
-        'HorizontalAlignment', 'center', 'backgroundcolor', [.1 .1 .1] )
+    set(hTit, 'string', sprintf('%s  n=%d', sID, length(vSpiketimes)));
     
     Spiky.SpikyWaitbar(u, length(vUnits));
     drawnow
