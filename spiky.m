@@ -3,7 +3,7 @@ function varargout = spiky(varargin)
 %
 % Usage:
 %   < spiky >
-%   Runs the Spiky GUI
+%   Runs the Spiky GUIo
 %
 %   < spiky(FUN) >
 %   Runs the internal function FUN in Spiky. Ex:
@@ -77,8 +77,13 @@ for i = 1:length(cSubs)
 end
 disp(sprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n'))
 
+global g_hSpike_Viewer
+g_hSpike_Viewer = figure;
+
 % Set FV default settings
 FV = SetFVDefaults();
+SetStruct(FV);
+ThemeObject([]); % set default line colors
 
 % Check if Spiky is already running
 hPlot = findobj('Tag', 'Spiky');
@@ -87,11 +92,10 @@ if ~isempty(hPlot) % activate existing Spiky window
     return
 end
 
-global g_hSpike_Viewer
-g_hSpike_Viewer = figure;
 vPos = get(g_hSpike_Viewer, 'position');
-set(g_hSpike_Viewer, 'NumberTitle','off', 'Name', ['Spiky'], 'MenuBar','none', 'UserData', FV, ...
-    'Tag', 'Spiky', 'Color', [.2 .2 .2], 'PaperOrientation', 'landscape', 'PaperUnits', 'normalized', ...
+ThemeObject(g_hSpike_Viewer)
+set(g_hSpike_Viewer, 'Name', ['Spiky'], 'MenuBar','none', 'UserData', FV, ...
+    'Tag', 'Spiky', 'PaperOrientation', 'landscape', 'PaperUnits', 'normalized', ...
     'PaperPosition', [.05 .05 .9 .9], 'InvertHardcopy', 'off', 'position', [vPos(1)-200 vPos(2)-50 vPos(3)+350 vPos(4)+100], ...
     'closeRequestFcn', @ExitSpiky, 'visible', 'off')
 movegui(g_hSpike_Viewer, 'center')
@@ -148,6 +152,7 @@ uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Open &Directory...', 'Callbac
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Open Directory Tree...', 'Callback', @SetDirectoryTree, 'Accelerator', 'T');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Open Settings...', 'Callback', @OpenSettings);
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Save', 'Callback', @SaveResults, 'separator', 'on', 'Accelerator', 'S');
+uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Export...', 'Callback', @ExportData);
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Publish to NEX', 'Callback', 'publish_spiky_data');
 hFileList = uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Files', 'Tag', 'MenuFileList', 'separator', 'on'); % filelist
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Previous...', 'Callback', 'spiky(''OpenFile([],-1)'');'); % previous
@@ -177,7 +182,15 @@ uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Range', 'Callback', @Zo
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Amplitude', 'Callback', @ZoomAmplitude, 'Accelerator', 'Y');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Normal Time', 'Callback', @NormalTime, 'separator', 'on', 'Tag', 'ShowNormalTime');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', @ShowGrid);
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Refresh', 'Callback', @ViewTrialData, 'separator', 'on', 'Accelerator', 'R');
+
+% List of themes
+hThemes = uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Themes', 'separator', 'on');
+sDir = CheckFilename([sSpikyPath(1:end-7) 'themes/']);
+tDir = dir(sDir);
+for th = 3:length(tDir)
+    uimenu(g_hSpike_Viewer, 'Parent', hThemes, 'Tag', 'Spiky_Menu_ShowTheme', 'Label', [tDir(th).name(1:end-2)], 'Callback', @SetTheme);
+end
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Refresh', 'Callback', @ViewTrialData, 'Accelerator', 'R');
 
 %  - Channels menu
 hChannels = uimenu(g_hSpike_Viewer, 'Label', '&Channels');
@@ -426,10 +439,10 @@ if isempty(hLine)
     hLine(2) = line(0,0);
     hLine(3) = line(0,0);
     nYPos = get(gca, 'ylim');
-    set(gca,'color', [.2 .1 .1])
-    set(hLine(1), 'Tag', 'SpikyXZoomIndicator', 'color', [.6 .6 .6], 'ydata', [nYPos(1)/2 nYPos(1)/2])
-    set(hLine(2), 'Tag', 'SpikyXZoomIndicator', 'color', [.6 .6 .6], 'ydata', [(nYPos(1)/2)-nYPos(1)/4 (nYPos(1)/2)+nYPos(1)/4], 'xdata', [pnt1(1,1) pnt1(1,1)])
-    set(hLine(3), 'Tag', 'SpikyXZoomIndicator', 'color', [.6 .6 .6], 'ydata', [(nYPos(1)/2)-nYPos(1)/4 (nYPos(1)/2)+nYPos(1)/4], 'xdata', [pnt1(1,1) pnt1(1,1)])
+    set(hLine(1), 'Tag', 'SpikyXZoomIndicator', 'ydata', [nYPos(1)/2 nYPos(1)/2])
+    set(hLine(2), 'Tag', 'SpikyXZoomIndicator', 'ydata', [(nYPos(1)/2)-nYPos(1)/4 (nYPos(1)/2)+nYPos(1)/4], 'xdata', [pnt1(1,1) pnt1(1,1)])
+    set(hLine(3), 'Tag', 'SpikyXZoomIndicator', 'ydata', [(nYPos(1)/2)-nYPos(1)/4 (nYPos(1)/2)+nYPos(1)/4], 'xdata', [pnt1(1,1) pnt1(1,1)])
+    ThemeObject(hLine)
 end
 set(hLine(1), 'xdata', [pnt1(1,1) pnt2(1,1)])
 set(hLine(3), 'xdata', [pnt2(1,1) pnt2(1,1)])
@@ -506,11 +519,13 @@ if strcmpi(sAns, 'Never plot'), p_bNeverPlotPCA = 1; end
 
 if strcmpi(sAns, 'Yes') && ~p_bNeverPlotPCA && ~g_bBatchMode
     hFig = figure;
-    set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky PCA Cleaning', 'NumberTitle', 'off')
+    ThemeObject(hFig)
+    set(hFig, 'name', 'Spiky PCA Cleaning')
     
     for c = 1:size(mRaw,2)
         hAx = axes('position', [.05 (1/size(mRaw,2))*(c-1) .95 1/size(mRaw,2)]);
-        set(hAx, 'Color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'xtick', [])
+        ThemeObject(hAx)
+        set(hAx, 'xtick', [])
         hold
         plot(mRaw(:,c), 'g')
         plot(mClean(:,c), 'r')
@@ -561,7 +576,6 @@ switch sAns
 end
 figure(hWin)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowEvents(varargin)
@@ -578,7 +592,6 @@ switch get(hMenuItem, 'Checked')
 end
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SaveResults(varargin)
@@ -602,7 +615,6 @@ else sLoadedTrial = FV.sLoadedTrial; end
 set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky - %s', sLoadedTrial)))
 set(g_hSpike_Viewer,'Pointer',sPointer)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function OpenSettings(varargin)
@@ -691,7 +703,6 @@ FV.sLoadedTrial = sLoadedTrial;
 if bRefresh, ViewTrialData(); end
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function AutoloadNewFiles(varargin)
@@ -702,7 +713,6 @@ else
     map_autoload(CheckFilename([FV.sDirectory '\']))
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetFilterChannels(varargin)
@@ -754,7 +764,6 @@ clear global g_vSelCh
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FilterOptions(varargin)
@@ -768,7 +777,6 @@ FV.nEMGRectify = str2num(cAnswer{3});
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetChannelCalculator(varargin)
@@ -796,19 +804,31 @@ function vCont = ChannelCalculator(vCont, sCh)
 
 if ~isfield(FV, 'tChannelCalculator'), return; end
 if ~isfield(FV.tChannelCalculator, sCh), return; end
-keyboard
-size(vCont)
 
 % Re-calculate
 sEval = FV.tChannelCalculator.(sCh);
 if isempty(sEval) return; end
 a = vCont;
-try vCont = eval(sEval);
+
+try
+    if ~isempty(strfind(sEval, '='))
+        sEval = [sEval ';']; % suppress output
+        eval(sEval);
+    else
+        a = eval(sEval);
+    end
 catch
     sErr = sprintf('An error occurred when evaluating the expression ''%s'' for channel %s', sEval, sCh);
     waitfor(warndlg(sErr, 'Spiky'))
     return
 end
+
+if length(a) ~= length(vCont)
+    sErr = sprintf('An error occurred when evaluating the expression ''%s'' for channel %s:\nSize of matrix after evaluation must be same as before.', sEval, sCh);
+    waitfor(warndlg(sErr, 'Spiky'))
+    return
+else vCont = a; end
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -848,7 +868,6 @@ OpenFile([],1); % Load first trial
 g_bBatchMode = false;
 ViewTrialData   % Update GUI
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetDirectoryTree(varargin)
@@ -890,8 +909,6 @@ SetStruct(FV)
 OpenFile([],1); % Load first trial
 ViewTrialData   % Update GUI
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function csExt = GetImportFilters()
@@ -905,8 +922,20 @@ for i = 3:length(tDir)
     csExt{end,2} = [sDescr(2:end-1) ' (' csExt{end,1} ')'];
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function csExt = GetExportFilters()
+% Get list of import filters
+sDir = which('spiky.m');
+tDir = dir([sDir(1:end-7) 'export']);
+csExt = {};
+for i = 3:length(tDir)
+    csExt{end+1,1} = ['*.' tDir(i).name(8:end-2)];
+    sDescr = eval(['help(''' tDir(i).name ''')']);
+    csExt{end,2} = [sDescr(2:end-1) ' (' csExt{end,1} ')'];
+end
+return
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -938,6 +967,12 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewTrialData(varargin)
+
+% Make Spiky window current without raising it to the top
+hFig = findobj('Tag', 'Spiky');
+set(0, 'currentfigure', hFig)
+ThemeObject(hFig);
+
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct;
 % Dont display any trial data if Spiky is in MERGE MODE
@@ -945,10 +980,6 @@ global g_bMergeMode g_bBatchMode
 if ~g_bMergeMode && ~g_bBatchMode % destroy waitbar in case we are not in Merge or Batch mode
     SpikyWaitbar(1,1);
 end
-
-% Make Spiky window current without raising it to the top
-hFig = findobj('Tag', 'Spiky');
-set(0, 'currentfigure', hFig)
 
 % Delete all current axes objects
 delete(findobj(hFig, 'type', 'axes'))
@@ -1023,14 +1054,13 @@ for i = 1:length(FV.csDisplayChannels)
         nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
         nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
         if all(size(vCont) > 1) % 2D trace (e.g. spectrogram)
+            %vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
+            nEndTime = nBeginTime + (size(vCont, 2))*(1/nFs);
             vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
         else % 1D trace (voltage etc)
             vTime = linspace(nBeginTime, nEndTime, length(vCont));
         end
 
-        % Alternative way to compute vTime  - Corrected 022312
-        %vTime = nBeginTime:(1/nFs):( nBeginTime + (1/nFs)*(length(vCont)-1) );
-        
         % Limit vector to FV.vXlim
         if ~isempty(FV.vXlim)
             vXlim(1) = max([1 round((FV.vXlim(1)-nBeginTime)/diff(vTime(1:2)))]);
@@ -1044,20 +1074,12 @@ for i = 1:length(FV.csDisplayChannels)
                 end
             end
         end
-        % Decimate continuous trace
-        nLen = 5000;
-        vShowIndx = unique(round(linspace(1,length(vTime),nLen)));
     end
 
+    
+    % Custom filter and decimate continuous channels
     if ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh)
-        if size(vCont, 1) == 1
-            vTimeAllTrace = vTime;
-            vTime = vTime(vShowIndx);
-            vContAllTrace = vCont;
-            vCont = vCont(vShowIndx);
-        end
-        
-        % Filter and rectify filtered channels
+        % Custom filter
         if any(strcmp(FV.csEMGChannels, sCh))
             if nFs < 2500
                 [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, FV.nEMGLoPass, FV.nEMGHiPass, FV.nEMGRectify, 'none');
@@ -1065,6 +1087,16 @@ for i = 1:length(FV.csDisplayChannels)
                 [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, FV.nEMGLoPass, FV.nEMGHiPass, FV.nEMGRectify, 'decimate');
             end
             FV.tYlim.(sCh) = [min(vCont) max(vCont)];
+        end
+        % Decimate
+        nLen = 20000;
+        vShowIndx = unique(round(linspace(1,length(vTime),nLen)));
+        
+        if size(vCont, 1) == 1
+            vTimeAllTrace = vTime;
+            vTime = vTime(vShowIndx);
+            vContAllTrace = vCont;
+            vCont = vCont(vShowIndx);
         end
     end
 
@@ -1099,8 +1131,6 @@ for i = 1:length(FV.csDisplayChannels)
             
             % Drop spikes outside of visible range (+/- 50%)
             if ~isempty(FV.vXlim)
-                %nRAdj = abs(diff(FV.vXlim)*.5); % adjust extended range by 50% for panning purposes
-                %vIndx = vSpiketimes < [min(FV.vXlim)-nRAdj] | vSpiketimes > [max(FV.vXlim)+nRAdj];
                 vIndx = vSpiketimes < [min(FV.vXlim)] | vSpiketimes > [max(FV.vXlim)];
                 vSpiketimes(vIndx) = [];
             end            
@@ -1147,25 +1177,32 @@ for i = 1:length(FV.csDisplayChannels)
                 % Set spike width
                 vIndices = [vX1' vX2' vX2' [vX1(2:1:end) NaN]'];
                 vIndices = reshape(vIndices', numel(vIndices), 1);
-                if diff(FV.vXlim) < 1 % 1 ms spikes when timescale is < 10 sec
+                if isempty(FV.vXlim)
+                    vIndices(2:2:end) = vIndices(1:2:end) + 0.03;
+                elseif diff(FV.vXlim) < 1 % 1 ms spikes when timescale is < 1 sec
                     vIndices(2:2:end) = vIndices(1:2:end) + 0.001;
-                elseif diff(FV.vXlim) < 5 % 2 ms spikes when timescale is < 10 sec
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.003;
-                elseif diff(FV.vXlim) < 10 % 5 ms spikes when timescale is < 20 sec
+                elseif diff(FV.vXlim) < 5 % 2 ms spikes when timescale is < 5 sec
+                    vIndices(2:2:end) = vIndices(1:2:end) + 0.005;
+                elseif diff(FV.vXlim) < 10 % 5 ms spikes when timescale is < 10 sec
                     vIndices(2:2:end) = vIndices(1:2:end) + 0.01;
                 elseif diff(FV.vXlim) < 20 % 5 ms spikes when timescale is < 20 sec
                     vIndices(2:2:end) = vIndices(1:2:end) + 0.02;
-                elseif diff(FV.vXlim) < 50 % 5 ms spikes when timescale is < 20 sec
+                elseif diff(FV.vXlim) < 50 % 5 ms spikes when timescale is < 50 sec
                     vIndices(2:2:end) = vIndices(1:2:end) + 0.04;
                 else
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.2;
+                    vIndices(2:2:end) = vIndices(1:2:end) + 0.1;
                 end
                 
                 % Rearrange indices
                 vYs = repmat([nRow nRow NaN NaN], 1, length(vIndices)/4);
-                % Limit each spike to 1 msec width
-                nSpikeHeight = 100; % adjust this number to change height of spikes
-                hLin = plot(vIndices, vYs, 'linewidth', nSpikeHeight/length(vUnits), 'color', mCol);
+                
+                % Get height of event markers
+                set(hSubplots(end), 'units', 'pixels')
+                vPos = get(hSubplots(end), 'position');
+                nSpikeHeight = vPos(4) / length(vUnits) / 2;
+                
+                %nSpikeHeight = 100; % adjust this number to change height of spikes
+                hLin = plot(vIndices, vYs, 'linewidth', nSpikeHeight, 'color', mCol);
                 mUserData = [vIndices vYs'];
             end
             
@@ -1177,6 +1214,7 @@ for i = 1:length(FV.csDisplayChannels)
             hItems(end+1) = uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
             hItems(end+1) = uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
             hItems(end+1) = uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
+            hItems(end+1) = uimenu(hMenu, 'Label', '&Replace Values', 'Callback', @ReplaceValues, 'Tag', sCh);
             hItems(end+1) = uimenu(hMenu, 'Label', 'Show &Markers', 'Callback', 'set( get(gcbo, ''userdata''), ''marker'', ''o'')', 'userdata', hLin, 'Separator', 'on');
             hItems(end+1) = uimenu(hMenu, 'Label', 'Meas&ure', 'Callback', @MeasureLine, 'Tag', sCh);
             hItems(end+1) = uimenu(hMenu, 'Label', 'Digiti&ze Channel (Manual)', 'Callback', @DigitizeChannel, 'Tag', sCh);
@@ -1198,8 +1236,7 @@ for i = 1:length(FV.csDisplayChannels)
             if length(vY) ~= size(vCont, 1)
                 vY = 1:size(vCont, 1);
             end
-            %hIm = image(vTime, vY, vCont, 'cdataMapping', 'scaled', 'parent', hSubplots(end));
-            hIm = imagesc(vTime, vY, vCont, 'parent', hSubplots(end));
+            hIm = imagesc(vTime, vY, real(vCont), 'parent', hSubplots(end));
             set(hSubplots(end), 'ydir', 'normal')
         end
         % attach context menu to line to enable additional options
@@ -1213,6 +1250,7 @@ for i = 1:length(FV.csDisplayChannels)
         hItems(end+1) = uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
         hItems(end+1) = uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
+        hItems(end+1) = uimenu(hMenu, 'Label', '&Replace Values', 'Callback', @ReplaceValues, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', 'Show &Markers', 'Callback', 'set( get(gcbo, ''userdata''), ''marker'', ''o'')', 'userdata', hLin, 'Separator', 'on');
         hItems(end+1) = uimenu(hMenu, 'Label', 'Meas&ure', 'Callback', @MeasureLine, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', 'Digiti&ze Channel', 'Callback', @DigitizeChannelAuto, 'Tag', sCh, 'Separator', 'on');
@@ -1234,7 +1272,8 @@ for i = 1:length(FV.csDisplayChannels)
     end
     set(hLabel, 'Interpreter', 'none')
     
-    set(hSubplots(end), 'Tag', sCh, 'color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'FontSize', 7)
+    ThemeObject(hSubplots(end))
+    set(hSubplots(end), 'Tag', sCh, 'FontSize', 7)
     if g_bMergeMode
         if isempty(FV.vXlim), axis tight
         else set(hSubplots(end), 'xlim', FV.vXlim); end
@@ -1281,14 +1320,16 @@ for i = 1:length(FV.csDisplayChannels)
     if isfield(FV.tSpikeThresholdsPos, sCh) && ~FV.bPlotRasters % positive
         nThresh = FV.tSpikeThresholdsPos.(sCh);
         hold on;
-        hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':', 'color', [.7 .7 .7]); hold off
+        hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':'); hold off
         set(hThresh, 'UIContextMenu', hCntxtMenu, 'Tag', [sCh '_pos']);
+        ThemeObject(hThresh)
     end
     if isfield(FV.tSpikeThresholdsNeg, sCh) && ~FV.bPlotRasters % negative
         nThresh = FV.tSpikeThresholdsNeg.(sCh);
         hold on;
-        hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':', 'color', [.7 .7 .7]); hold off
+        hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':'); hold off
         set(hThresh, 'UIContextMenu', hCntxtMenu, 'Tag', [sCh '_neg']);
+        ThemeObject(hThresh)
     end
 
     uimenu(hCntxtMenu, 'Label', 'Delete', 'Callback', @RemoveSpikeThreshold)
@@ -1298,12 +1339,12 @@ for i = 1:length(FV.csDisplayChannels)
     
     % Plot spikes on top of continuous trace (only if rasters are not displayed)
     if isfield(FV.tSpikes, sCh) && ~FV.bPlotRasters
-        %axes(hSubplots(end))
         vSpiketimes = FV.tSpikes.(sCh).spiketimes; % nFs resolution
         vSpiketimes = vSpiketimes ./ nFs;
         vSpiketimes(vSpiketimes < vTime(1) | vSpiketimes > vTime(end)) = [];
         vVolts = repmat(nThresh, length(vSpiketimes), 1);
-        hold on; hDot = plot(hSubplots(end), vSpiketimes', vVolts', 'w.');        
+        hold on; hDot = plot(hSubplots(end), vSpiketimes', vVolts', '.');        
+        ThemeObject(hDot);
         set(hDot, 'ButtonDownFcn', @IdentifySpike)
     end
 end
@@ -1313,6 +1354,23 @@ if bShowDigitalEvents
     % Create subplot
     hSubplots(end+1) = axes('position', [.06 .985-nSubEventHeight .91 nSubEventHeight]);
     hold on
+    
+    % Get number of events
+    nEvents = length(FV.csDigitalChannels); % number of events
+    if any(strcmp('DAQ_Start', FV.csDigitalChannels))
+        nEvents = nEvents - 1;
+    end
+    if any(strcmp('DAQ_Stop', FV.csDigitalChannels))
+        nEvents = nEvents - 1;
+    end
+    if any(strcmp('DAQ_Trigger', FV.csDigitalChannels))
+        nEvents = nEvents - 1;
+    end
+
+    % Get height of event markers
+    set(hSubplots(end), 'units', 'pixels')
+    vPos = get(hSubplots(end), 'position');
+    nEventHeight = vPos(4) / nEvents / 2;
     
     % Iterate and plot digital events
     csEvents = {};
@@ -1338,7 +1396,7 @@ if bShowDigitalEvents
 
         % Remove DOWN times that occur before UP events
         vDownTimes(vDownTimes <= vUpTimes(1)) = [];
-
+        
         % If up and down times differ in length, crop the longest
         if length(vUpTimes) > length(vDownTimes)
             vUpTimes = vUpTimes(1:length(vDownTimes));
@@ -1385,8 +1443,7 @@ if bShowDigitalEvents
         else
             vPlotIndx = 1:length(vIndices);
         end
-        plot(vIndices(vPlotIndx), vYs(vPlotIndx), 'linewidth', 5, 'color', [1 1 0])
-        
+        plot(hSubplots(end), vIndices(vPlotIndx), vYs(vPlotIndx), 'linewidth', nEventHeight, 'color', FV.mColors(1,:))
     end
 
     % Plot file start (green) and end (red) markers
@@ -1423,7 +1480,18 @@ if bShowDigitalEvents
     end
 
     % Set axis properties
-    set(hSubplots(end), 'Tag', 'Events', 'color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'FontSize', 7)
+    ThemeObject(hSubplots(end));
+    set(hSubplots(end), 'Tag', 'Events', 'FontSize', 7)
+    
+    if g_bMergeMode
+        if isempty(FV.vXlim), axis tight
+        else set(hSubplots(end), 'xlim', FV.vXlim); end
+    else
+        if isempty(FV.vXlim)
+            nX_s = vTime(1); nX_e = vTime(end);
+            set(hSubplots(end), 'xlim', [nX_s nX_e]);
+        else set(hSubplots(end), 'xlim', FV.vXlim); end
+    end
 
     % Y-tick labels
     cYTickLabels = {};
@@ -1444,14 +1512,14 @@ if bShowDigitalEvents
         end
     end
     
-    axis(hSubplots(end), 'tight')    
     if isempty(cYTickLabels)
-        set(hSubplots(end), 'ylim', [0 1], 'ytick', [], 'yticklabel', [], 'color', [.2 .1 .1])
-        text(mean(get(hSubplots(1), 'xlim')), .5, 'No digital events found', 'color', 'w', 'horizontalalignment','center')
+        set(hSubplots(end), 'ylim', [0 1], 'ytick', [], 'yticklabel', [])
+        hTxt = text(mean(get(hSubplots(1), 'xlim')), .5, 'No digital events found', 'horizontalalignment', 'center');
+        ThemeObject(hTxt);
     else
         if all(ishandle(hSubplots))
             set(hSubplots(end), 'ylim', [0.65 length(cYTickLabels)+.35], ...
-                'ytick', 1:length(cYTickLabels), 'yticklabel', cYTickLabels, 'color', [.2 .1 .1])
+                'ytick', 1:length(cYTickLabels), 'yticklabel', cYTickLabels)
         end
     end
     box on
@@ -1528,7 +1596,56 @@ end
 SetStruct(FV, 'nosaveflag')
 PanMode()
 return
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function SetTheme(hObject, varargin)
+% Select theme to use
+[FV,hWin] = GetStruct;
+switch get(hObject, 'selected')
+    case 'on'
+        set(hObject, 'Checked', 'on')
+    case 'off'
+        set(hObject, 'Checked', 'off')
+end
+set(setdiff(findobj('tag', 'Spiky_Menu_ShowTheme'), hObject), 'Checked', 'off')
+FV.CurrentTheme = get(hObject, 'Label');
+SetStruct(FV)
+ViewTrialData();
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ThemeObject(hObj)
+% Theme object hObj
+[FV,hWin] = GetStruct;
+
+% Load properties only when theme changes
+persistent p
+if ~isfield(FV, 'CurrentTheme') FV.CurrentTheme = 'spiky'; end
+if isempty(p) || ~strcmp(FV.CurrentTheme, p.theme)
+    % Load selected theme properties
+    sDir = which('spiky.m');
+    sDir = CheckFilename([sDir(1:end-7) 'themes/']);
+    tDir = dir(sDir);
+    tDir = tDir(3:end);
+    if ~isfield(FV, 'CurrentTheme') FV.CurrentTheme = 'spiky'; end
+    nIndx = strcmp([FV.CurrentTheme '.m'], {tDir.name});
+    run([sDir tDir(nIndx).name])
+    p.theme = FV.CurrentTheme;
+    % Update line colors
+    if isfield(p, 'axes')
+        FV.mColors = distinguishable_colors(100, p.axes.color);
+    end
+    SetStruct(FV)
+end
+
+% Set object properties
+for nh = 1:length(hObj)
+    sType = get(hObj(nh), 'type');
+    if isfield(p, sType) && ishandle(hObj(nh))
+        set(hObj(nh), p.(sType))
+    end
+end
+return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CopyChannelToFig(varargin)
@@ -1552,24 +1669,22 @@ legend(sCh)
 legend boxoff
 axis tight
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FileMarkerShowPath(varargin)
 hLeg = legend(gcbo);
-set(hLeg, 'interpreter', 'none', 'TextColor', 'w', 'FontSize', 8);
+ThemeObject(hLeg)
+set(hLeg, 'interpreter', 'none', 'FontSize', 8);
 legend boxoff;
 cTxt = get(hLeg,'string');
 if ~isempty(cTxt) sp_disp(cTxt{1}); end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FileMarkerOpenFile(varargin)
 sPath = get(gcbo, 'userdata');
 if exist(sPath, 'file') OpenFile([], sPath); end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function vSpiketimes = DropDeadtimeSpikes(vSpiketimes)
@@ -1582,7 +1697,6 @@ vISI = diff(vSpiketimes); % sec
 vDropIndx = find(vISI <= (FV.nDeadTimeMs / 1000)); % ms
 vSpiketimes(vDropIndx+1) = [];
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanWindow(varargin)
@@ -1605,7 +1719,6 @@ end
 SetStruct(FV)
 PanMode()
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanMode(varargin)
@@ -1619,7 +1732,6 @@ else
     set(hPan, 'enable', 'off')
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function UpdatePannedWindow(varargin)
@@ -1632,7 +1744,6 @@ vCurrLim = get(gca, 'xlim');
 FV.vXlim = vCurrLim; % pan left by 25%
 SetStruct(FV); ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, sOption)
@@ -1648,11 +1759,15 @@ switch lower(sOption)
         nNewFs = nLoPass * 2.5;
         nStep = ceil(nFs / nNewFs);
         nNewFs = nFs/nStep; % new Fs must be an integer
-        if ~isempty(vTime), vTime = vTime(1:nStep:end); end
+        if ~isempty(vTime)
+            vTimeO = vTime;
+            vTime = vTime(1:nStep:end);
+            vNaNIndx = unique(round(interp1(vTime, 1:length(vTime), vTimeO(vNaNIndx))));
+            vNaNIndx(find(vNaNIndx) > length(vTime)) = [];
+        end
         vCont = vCont(1:nStep:end);
     otherwise
         nNewFs = nFs;
-        %vTime = [];
 end
 
 % High pass filter
@@ -1674,7 +1789,9 @@ end
 if bRectify, vCont = abs(vCont); end
 
 % Return NaN's where they were removed above
-vCont(vNaNIndx) = NaN;
+if any(vNaNIndx)
+    vCont(vNaNIndx) = NaN;
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1771,6 +1888,21 @@ else % Assign channels to FV and update display
     ViewTrialData
 end
 return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ExportData(varargin)
+[FV, hWin] = GetStruct;
+
+sCurrFile = FV.sLoadedTrial;
+sCurrFile(strfind(sCurrFile, '.'):end) = [];
+[sFile, sPath] = uiputfile(GetExportFilters, 'Select file to write', CheckFilename([FV.sDirectory '\' sCurrFile]));
+
+% Run export filter
+eval(sprintf('export_%s([sPath sFile], FV);', lower(sFile(end-2:end))))
+
+return
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function OpenFile(varargin)
@@ -1930,10 +2062,8 @@ switch sAns
     otherwise
         return;
 end
-
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [FV,hWin] = GetStruct
@@ -1945,7 +2075,6 @@ else
     FV = SetFVDefaults();
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetStruct(FV, varargin)
@@ -1958,17 +2087,18 @@ if ~isempty(varargin)
     if strcmpi(varargin, 'nosaveflag'), bSetSaveFlag = 0; end
 end
 if bSetSaveFlag
-    if length(FV.sLoadedTrial) > 70
-        sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
-    else sLoadedTrial = FV.sLoadedTrial; end
-    set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky - %s*', sLoadedTrial)))
+    if isfield(FV, 'sLoadedTrial')
+        if length(FV.sLoadedTrial) > 70
+            sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
+        else sLoadedTrial = FV.sLoadedTrial; end
+        set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky - %s*', sLoadedTrial)))
+    end
 end
 % set current working directory to that in active database
 if isfield(FV, 'sDirectory')
     cd(FV.sDirectory)
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetGain(varargin)
@@ -2042,7 +2172,6 @@ if ~isempty(varargin)
     end
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetMaxSpikeJitter(varargin)
@@ -2052,7 +2181,6 @@ function SetMaxSpikeJitter(varargin)
 FV.nMaxCrossChannelSpikeJitter = GetInputNum('Set maximal spiketime jitter across electrodes (ms)', 'Spiky', FV.nMaxCrossChannelSpikeJitter);
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function EditPreTriggerTime(varargin)
@@ -2061,7 +2189,6 @@ function EditPreTriggerTime(varargin)
 FV.nSpikeTrigPreMs = GetInputNum('Set pre-trigger time (ms)', 'Spiky', FV.nSpikeTrigPreMs);
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetDeadtime(varargin)
@@ -2072,7 +2199,6 @@ FV.nDeadTimeMs = GetInputNum(sprintf('Set post-spike deadtime (ms):\n(note that 
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function EditPostTriggerTime(varargin)
@@ -2081,7 +2207,6 @@ function EditPostTriggerTime(varargin)
 FV.nSpikeTrigPostMs = GetInputNum('Set post-trigger time (ms)', 'Spiky', FV.nSpikeTrigPostMs);
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function nNum = GetInputNum(sMsg, sTitle, nDef)
@@ -2189,7 +2314,6 @@ else sLoadedTrial = sFile; end
 set(hWin, 'Name', sprintf('Spiky - %s', sLoadedTrial)) % update window name
 bResult = 1;
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function AboutSpiky(varargin)
@@ -2213,7 +2337,6 @@ cAboutText = { 'Maintainer:', ...
     };
 msgbox(cAboutText, 'About Spiky')
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function bLoaded = CheckDataLoaded(varargin)
@@ -2224,7 +2347,6 @@ if ~isfield(FV, 'tData') % check data has been loaded
     return
 else bLoaded = 1; end % data has been loaded
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetSpikeThreshold(varargin)
@@ -2258,7 +2380,6 @@ SetStruct(FV)
 DetectSpikes();
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveSpikeThreshold(sCh, sDir)
@@ -2284,7 +2405,6 @@ end
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetThresholdManually(sCh, sDir)
@@ -2309,7 +2429,6 @@ SetStruct(FV)
 DetectSpikes();
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CopyPasteThreshold(sCh, sDir)
@@ -2344,7 +2463,6 @@ switch get(gcbo, 'label')
         end
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function AutoDetectThresholds(varargin)
@@ -2380,7 +2498,6 @@ close(hWait)
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DetectSpikes(varargin)
@@ -2457,7 +2574,6 @@ ViewTrialData();
 global g_bBatchMode
 if ~g_bBatchMode, BatchRedo([], 'DetectSpikes'); end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function tSpikes = GetWaveforms(vTrace, vRawTrace, vThresh, nFS, nPreTrigMs, nPostTrigMs, nDeadTimeMs, nBeginTime)
@@ -2531,9 +2647,7 @@ tSpikes.spiketimes = vSpiketimes + nBeginTime;
 tSpikes.Fs = nFS;
 tSpikes.threshV = [vThresh(1) inf]; % thresholds [hi lo]
 tSpikes.threshT = nPreTrig + 2;
-
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DejitterSpikes(varargin)
@@ -2586,7 +2700,6 @@ SetStruct(FV)
 global g_bBatchMode
 if ~g_bBatchMode BatchRedo([], 'DejitterSpikes'); end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveOutlierSpikes(varargin)
@@ -2610,7 +2723,6 @@ SetStruct(FV)
 global g_bBatchMode
 if ~g_bBatchMode BatchRedo([], 'RemoveOutlierSpikes'); end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowAggregationTree(varargin)
@@ -2630,15 +2742,16 @@ if ~CheckIfSorted, return, end
 if ~bResult, return, end
 
 hFig = figure;
-set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Aggregration Tree', 'NumberTitle', 'off', 'menubar', 'none')
+ThemeObject(hFig)
+set(hFig, 'name', 'Spiky Aggregration Tree', 'menubar', 'none')
 aggtree(FV.tSpikes.(sCh));
 
 hHeader = header(['Channel ' sCh ' - Spike Cluster Aggregation Tree'], 12);
-set(hHeader, 'color', 'w', 'interpreter', 'none')
+ThemeObject(hHeader)
+set(hHeader, 'interpreter', 'none')
 
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function bSorted = CheckIfSorted(varargin)
@@ -2655,7 +2768,6 @@ if isempty(csFieldnames)
     bSorted = 0;
 else bSorted = 1; end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowSpikeClusters(varargin)
@@ -2690,8 +2802,8 @@ p = 10; % units per plot
 nCols = min([p nUnits]);
 hMenu = [];
 hMainWin = figure;
-
-set(hMainWin, 'Color', [.2 .2 .2], 'name', 'Spiky Spike Clusters', 'NumberTitle', 'off')
+ThemeObject(hMainWin)
+set(hMainWin, 'name', 'Spiky Spike Clusters')
 
 % Channel selection drop-down menu
 csDescriptions = cell(size(csFieldnames));
@@ -2707,7 +2819,6 @@ nGroup = 0;
 % Scale window width to number of columns
 vPos = get(hMainWin, 'position');
 if nUnits >= 10, set(hMainWin, 'position', vPos .* [1 1 2 1]), end
-%if exist('centerfig') centerfig(hMainWin); end
 
 % Calculate number of spikes to show per unit (total number should not exceed 5,000)
 nMaxSpikesTotal = 5000;
@@ -2719,11 +2830,8 @@ for u = 1:nUnits % one row per unit
     % Create new uipanel for next group of units
     if p == 10
         p = 1;
-        hCurrPanel = uipanel('Position',[0 0 1 1], 'backgroundcolor', [.2 .2 .2], ...
-            'foregroundcolor', [.2 .2 .2], ...
-            'highlightcolor', [.2 .2 .2], ...
-            'shadowcolor', [.2 .2 .2], ...
-            'parent', hMainWin);
+        hCurrPanel = uipanel('Position', [0 0 1 1], 'parent', hMainWin);
+        ThemeObject(hCurrPanel)
 
         % Panel selection button
         nGroup = nGroup + 1;
@@ -2769,10 +2877,13 @@ for u = 1:nUnits % one row per unit
     else mCol = FV.mColors(u,:); end
     plot(vXX, vYY, '-', 'color', mCol, 'linewidth', .5)
     hold on
-    plot([([1:size(vYY,1)]/nFs)*1000], median(vYY'), 'w--')
+    hLin = plot([([1:size(vYY,1)]/nFs)*1000], median(vYY'), '--');
+    ThemeObject(hLin)
     axis tight
-    set(hWaveAx, 'Color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'fontsize', 6)
-    title(['Unit# ' num2str(vUnits(u)) ' - ' num2str(length(vIndx)) ' spikes'], 'fontsize', 6, 'color', [.6 .6 .6])
+    ThemeObject(hWaveAx)
+    set(hWaveAx, 'fontsize', 6)
+    hTit = title(['Unit# ' num2str(vUnits(u)) ' - ' num2str(length(vIndx)) ' spikes'], 'fontsize', 6);
+    ThemeObject(hTit)
     if p>1, set(hWaveAx, 'xtick', [])
     else xlabel('ms'); ylabel('mV'); end
     
@@ -2784,12 +2895,12 @@ for u = 1:nUnits % one row per unit
     %   2) Plot 2D histogram of unit
     hHistAx = axes('position', [nX+(p-1)*(nW/nCols)+nSpace nY+nH/3 nW/nCols-nSpace nH/3], 'parent', hCurrPanel);
     set(hHistAx, 'uicontextmenu', hMenu(end))    
-    %hist2d(mWaveforms(vIndx,:),200);
     hist2d(detrend(mWaveforms(vIndx,:)')',200);
-    colormap(hot(256))
-    set(hHistAx, 'xtick', [], 'ytick', [], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6])
+    ThemeObject(hHistAx)
+    set(hHistAx, 'xtick', [], 'ytick', [])
     hTxt = text(0,0,'Detrended');
-    set(hTxt, 'color', 'w', 'fontsize', 6, 'units', 'normalized', 'position', [.01 .90 0])
+    ThemeObject(hTxt)
+    set(hTxt, 'fontsize', 6, 'units', 'normalized', 'position', [.01 .90 0])
     
     %   3) ISI histogram
     hAx = axes('position', [nX+(p-1)*(nW/nCols)+nSpace nY nW/nCols-nSpace nH/3], 'parent', hCurrPanel);
@@ -2804,22 +2915,20 @@ for u = 1:nUnits % one row per unit
     [vN, vX] = hist(diff(vTheseSpiketimes), [vRange vRange(end)+1]); % msec, linear scale
     vN = vN(1:end-1); % spikes/bin
     vX = vX(1:end-1);
-    bar(vX, vN, 'facecolor', [.85 .85 .85], 'edgecolor', [.85 .85 .85])
+    hBar = bar(vX, vN);
+    ThemeObject(hBar)
     hold on
     % Plot deadtime
     plot([FV.nDeadTimeMs FV.nDeadTimeMs], [0 max(vN)+10], 'r:')
-    set(hAx, 'Color', [.1 .1 .1], 'xtick', [0:10:vRange(end)], 'xlim', [0 nMaxISI/2], ...
-        'ylim', [0 max(vN)+1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'fontsize', 6 )
+    ThemeObject(hAx)
+    set(hAx, 'xtick', [0:10:vRange(end)], 'xlim', [0 nMaxISI/2], ...
+        'ylim', [0 max(vN)+1], 'fontsize', 6 )
     if p==1 ylabel('N'); end
     xlabel('ISI (ms)')
-    
-    %hHeader = header(['Clustered spikes: ' GetChannelDescription(sCh)], 12);
-    %set(hHeader, 'color', 'w', 'interpreter', 'none')
     
     drawnow
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowOverlappingSpikeClusters(varargin)
@@ -2867,19 +2976,21 @@ else
     figure(hMainWin);
     axes(hAx);
 end
-set(hMainWin, 'Color', [.2 .2 .2], 'Tag', sFigTag, 'name', sFigTitle, 'NumberTitle', 'off', 'MenuBar', 'figure')
+ThemeObject(hMainWin)
+set(hMainWin, 'Tag', sFigTag, 'name', sFigTitle, 'MenuBar', 'figure')
 hold on
-set(hAx, 'Color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'Tag', sAxTag)
+ThemeObject(hAx)
+set(hAx, 'Tag', sAxTag)
 drawnow
 % Remove all checkboxes from window
 delete(findobj(hMainWin, 'Style', 'checkbox'));
 
 sCmd = 'vH=findobj(gcf,''Style'',''checkbox'');for i=vH(1:end-1)'',set(i,''value'',~get(i,''value''));sCB=get(i,''callback'');sCB(i);end';
 
-uicontrol(hMainWin, 'Style', 'checkbox', 'units', 'normalized', 'String', 'All', ...
+hCtrl = uicontrol(hMainWin, 'Style', 'checkbox', 'units', 'normalized', 'String', 'All', ...
     'Position', [.85 .88 .15 .05], 'callback', [''], 'HorizontalAlignment', 'left', ...
-    'backgroundcolor', [.2 .2 .2], 'value', 1, 'foregroundColor', 'w', ...
-    'callback', sCmd);
+    'value', 1, 'callback', sCmd);
+ThemeObject(hCtrl)
 
 % Calculate number of spikes to show per unit
 % The total number of displayed spikes should not exceed 5,000
@@ -2920,7 +3031,9 @@ for u = 1:length(vUnits) % one row per unit
     else sUnitName = [num2str(vUnits(u))]; end
     nCheckBoxHeight = .0375;
     nMaxBoxesPerColumn = round(.88 / nCheckBoxHeight);
-    hCheckbox = uicontrol(hMainWin, 'Style', 'checkbox', 'units', 'normalized', 'String', sUnitName, 'HorizontalAlignment', 'left', 'backgroundcolor', [.2 .2 .2], 'value', 1, 'foregroundColor', mColTxt);
+    hCheckbox = uicontrol(hMainWin, 'Style', 'checkbox', 'units', 'normalized', 'String', sUnitName, 'HorizontalAlignment', 'left', 'value', 1);
+    ThemeObject(hCheckbox)
+    set(hCheckbox, 'foregroundColor', mColTxt)
     if u <= nMaxBoxesPerColumn
         set(hCheckbox, 'Position', [.85 .88-([u]*nCheckBoxHeight) .15 .05], 'Tag', num2str(vUnits(u)), 'callback', @ToggleWaveforms);
     else
@@ -2948,11 +3061,13 @@ nIndxPos = find(strcmpi(cFieldsPos, sCh));
 if ~ishandle(hAx) return; end
 if ~isempty(FV.tSpikeThresholdsNeg) && ~isempty(fieldnames(FV.tSpikeThresholdsNeg)) && ~isempty(nIndx) % negative threshold
     nT_neg = FV.tSpikeThresholdsNeg.(cFields{nIndx});
-    plot(get(hAx, 'xlim'), [nT_neg nT_neg], 'w--')
+    hLin = plot(get(hAx, 'xlim'), [nT_neg nT_neg], '--');
+    ThemeObject(hLin)
 end
 if ~isempty(FV.tSpikeThresholdsPos) && ~isempty(fieldnames(FV.tSpikeThresholdsPos))  && ~isempty(nIndxPos) % positive threshold
     nT_pos = FV.tSpikeThresholdsPos.(cFieldsPos{nIndxPos});
-    plot(get(hAx, 'xlim'), [nT_pos nT_pos], 'w--')
+    hLin = plot(get(hAx, 'xlim'), [nT_pos nT_pos], '--');
+    ThemeObject(hLin)
 end
 
 if ~ishandle(hMainWin) return, end
@@ -2966,7 +3081,8 @@ uicontrol(hMainWin, 'Style', 'text', 'units', 'normalized', ...
     'foregroundcolor', 'w', 'horizontalalignment', 'left', 'visible', 'off')
 
 hHeader = header(['Clustered spikes: ' GetChannelDescription(sCh)], 12);
-set(hHeader, 'color', 'w', 'interpreter', 'none')
+ThemeObject(hHeader)
+set(hHeader, 'interpreter', 'none')
 
 % Pop-up menu
 csDescriptions = cell(size(csFieldnames));
@@ -2984,7 +3100,6 @@ hCursor = datacursormode(hMainWin);
 datacursormode on
 set(hCursor, 'UpdateFcn', @ShowCurrentLine, 'SnapToDataVertex', 'on');
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ClusterControl(varargin)
@@ -3436,7 +3551,6 @@ else
 end
 clear global g_nCh
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewWaveforms(varargin)
@@ -3451,8 +3565,9 @@ if length(csFieldnames)==0
     hWarn = warndlg('No waveforms have been extracted on any channel. You must run spike detection before viewing waveforms.');
     uiwait(hWarn); return
 end
-hFig = figure; colormap(pink(256));
-set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Waveforms', 'NumberTitle', 'off', 'menubar', 'none')
+hFig = figure;
+ThemeObject(hFig)
+set(hFig, 'name', 'Spiky Waveforms', 'menubar', 'none')
 p = 1;
 % Find how many channels should be shown
 nChTot = 0;
@@ -3470,19 +3585,22 @@ for i = 1:length(csFieldnames) % iterate over individual channels
     subplot(2,nSubplots,p); %p = p+1;
     vXX = repmat([([1:size(FV.tSpikes.(csFieldnames{i}).waveforms,2)]/nFs)*1000]', 1, size(FV.tSpikes.(csFieldnames{i}).waveforms, 1));
     vYY = FV.tSpikes.(csFieldnames{i}).waveforms';
-    plot(vXX, vYY, ':', 'linewidth', .5, 'color', [.7 .7 .7]);
-    title([sCh ' - ' num2str(size(vXX,2)) ' spikes'], 'interpreter', 'none', 'color', 'w');
+    hLine = plot(vXX, vYY, ':', 'linewidth', .5);
+    ThemeObject(hLine)
+    hTit = title([sCh ' - ' num2str(size(vXX,2)) ' spikes'], 'interpreter', 'none');
+    ThemeObject(hTit)
     ylabel('Amplitude')
     axis tight;
-    set(gca, 'xlim', [0 max(vXX(:,1))], 'xtick', 0:.5:max(vXX(:,1)), 'xcolor', [.7 .7 .7], 'ycolor', [.7 .7 .7], 'color', [.1 .1 .1]);
+    ThemeObject(gca)
+    set(gca, 'xlim', [0 max(vXX(:,1))], 'xtick', 0:.5:max(vXX(:,1)));
     subplot(2,nSubplots,p+nSubplots); p = p + 1;
     hist2d(FV.tSpikes.(csFieldnames{i}).waveforms);
-    set(gca, 'xtick', [], 'xcolor', [.7 .7 .7], 'ycolor', [.7 .7 .7]);
+    ThemeObject(gca)
+    set(gca, 'xtick', []);
     ylabel('Amplitude (mV)')
     xlabel('ms')
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewWaveformPCs(varargin)
@@ -3510,20 +3628,20 @@ mColsTemp(vUnique(vIndx), :) = FV.mColors(vIndx, :);
 FV.tSpikes.(sCh).overcluster.colors = mColsTemp;
 ssg_databrowse3d(FV.tSpikes.(sCh), FV.tSpikes.(sCh).hierarchy.assigns, unique(FV.tSpikes.(sCh).hierarchy.assigns))
 hFig = gcf;
-set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Principal Components', 'NumberTitle', 'off', 'ToolBar', 'figure')
+ThemeObject(hFig)
+set(hFig, 'Name', 'Spiky Principal Components', 'ToolBar', 'figure')
 hAx = get(hFig, 'Children');
-set(hAx(strcmp(get(hAx, 'type'), 'axes')), 'color', [.1 .1 .1])
+ThemeObject(hAx(strcmp(get(hAx, 'type'), 'axes')))
 
 sDescr = FV.tChannelDescriptions(strcmp({FV.tChannelDescriptions.sChannel},'DAQ_0')).sDescription;
 hHeader = header([sDescr '  ' sCh], 10);
-set(hHeader, 'color', 'w', 'interpreter', 'none')
+ThemeObject(hHeader)
+set(hHeader, 'interpreter', 'none')
 
 % set colors on legend
 hLeg = findobj(hFig, 'type', 'axes', 'Tag', 'legend');
 set(hLeg, 'color', 'none', 'textcolor', 'w', 'location', 'northeast')
-
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function KeyboardMode(varargin)
@@ -3537,7 +3655,6 @@ sp_disp(sprintf('%s\n%s\n%s\n\t%s\n\t%s', ...
     'return' ) );
 keyboard
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function AddTetrode(varargin)
@@ -3669,7 +3786,6 @@ FV.tSpikes.(sNewName).threshV = vThreshV(1,1:2); % TODO: NOT VALID!
 FV.tSpikes.(sNewName).threshT = vThreshT(1);
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveTetrode(varargin)
@@ -3697,7 +3813,6 @@ FV.tSpikes = rmfield(FV.tSpikes, csFieldnames{g_nCh});
 clear global g_nCh
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FV = SetFVDefaults()
@@ -3706,7 +3821,8 @@ FV.nGain = 1;                   % default hardware gain
 FV.csDisplayChannels = {};      % channels to be displayed (analogue, continuous)
 FV.csChannels = {};             % names of all channels in datafile
 FV.csDigitalChannels = {};      % list of digital channels
-FV.mColors = distinguishable_colors(100, [.1 .1 .1]);
+FV.CurrentTheme = 'spiky';      % default theme
+FV.mColors = distinguishable_colors(100, [.2 .2 .2]);
 FV.tSpikeThresholdsNeg = struct([]);
 FV.tSpikeThresholdsPos = struct([]);
 FV.tGain = struct([]);
@@ -3725,16 +3841,9 @@ FV.bPanOn = 0;
 FV.nMaxCrossChannelSpikeJitter = 0.5; % maximal allowed spiketimmer jitter across electrodes (ms)
 % Experiment variables
 FV.tExperimentVariables = struct([]);
-%FV.tExperimentVariables(1).sVariable = 'sAnimal';
-%FV.tExperimentVariables(1).sValue = '000000';
-%FV.tExperimentVariables(2).sVariable = 'sDate';
-%FV.tExperimentVariables(2).sValue = 'dd-mm-yyyy';
-%FV.tExperimentVariables(3).sVariable = 'sExperiment';
-%FV.tExperimentVariables(3).sValue = 'undefined';
 g_bBatchMode = false;
 FV.sBatchLock = 'off';
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DistributeSettings(varargin)
@@ -3784,7 +3893,6 @@ for f = 1:length(csPaths)
 end
 sp_disp(sprintf('Done distributing current settings to %d files in current directory', length(csPaths)))
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveSettings(varargin)
@@ -4107,6 +4215,7 @@ for f = 1:length(csPaths)
             tImported.(csChannels{nCh})(nIndx).time = vTime; % store continuous time vector, sec
             tImported.(csChannels{nCh})(nIndx).fs = nFs; % sampling rate
         end
+        clear vTime vCont
     end
     
     % Merge filtered signals (EMG, LFP, ECoG etc)
@@ -4137,6 +4246,7 @@ for f = 1:length(csPaths)
             tEMG.(csChannels{nCh})(nIndx).time = vTime; % store continuous time vector, sec
             tEMG.(csChannels{nCh})(nIndx).fs = nNewFs; % new sampling rate
         end
+        clear vTime vCont
     end
     
     % Keep ALL channel descriptions (regardless of whether they were included in the merge file or not)
@@ -4172,20 +4282,14 @@ if bImported
         nD = 1/vFs(1); % duration of one sampling points
         vContAll = [];
         nAbsBeginTime = round(min(vTimeBegin) / nD - 1); % begin time of first trial, samples
-        %nAbsBeginTime = round(min(vTimeBegin) / nD); % begin time of first trial, samples
         vIndxAll = [];
         for i = 1:length(vTimeEnd)
             nBegin = tImported.(cFields{nF})(i).timebegin; % sec
-            %nBeginTime = nBegin; % NEW
             nBegin = round(nBegin / nD); % samples
-            %nRelBeginToFirst = round((nBeginTime-min(vTimeBegin)) / nD) + 1; % samples NEW
             vCont = tImported.(cFields{nF})(i).cont;
             vIndx = (nBegin:[nBegin+length(vCont)-1])-nAbsBeginTime;
-            
-            %vIndx = nRelBeginToFirst:( nRelBeginToFirst+length(vCont) - 1 );
             vIndxAll = [vIndxAll vIndx];
             vContAll(vIndx) = vCont; % samples
-            vIndxPrev = vIndx;
         end
         % Replace empty segments with NaNs
         vContAll(setdiff(1:length(vContAll), vIndxAll)) = NaN;
@@ -4267,9 +4371,7 @@ vStart = FV.tData.DAQ_Start_Up; % start time duplicates
 if length(unique(vStart)) < length(vStart)
     uiwait(warndlg(sprintf('There is a potential problem with the merged files:\nThere are duplicates of file Start times')))
 end
-
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function StartMergeMode(varargin)
@@ -4300,7 +4402,6 @@ set(hRaster, 'Enable', 'off', 'Checked', 'on')
 FV.bPlotRasters = 1;
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function StopMergeMode(varargin)
@@ -4323,7 +4424,6 @@ set(findobj(g_hSpike_Viewer, 'Label', 'Digitize Channel'), 'Enable', 'on')
 set(findobj(g_hSpike_Viewer, 'Label', 'Digitize Manually'), 'Enable', 'on')
 set(findobj(g_hSpike_Viewer, 'Label', 'Plot &Rasters'), 'Enable', 'on')
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function LoadMergeFile(varargin)
@@ -4354,7 +4454,6 @@ end
 SetStruct(FV)
 ViewTrialData()
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FigureExport(varargin)
@@ -4375,7 +4474,6 @@ global g_hSpike_Viewer % handle to Spiky window
 if all(sFile == 0), return, end % user cancelled save dialog
 saveas(g_hSpike_Viewer, [sPath sFile])
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function InvertColors(varargin)
@@ -4393,7 +4491,6 @@ switch get(g_hSpike_Viewer, 'InvertHardcopy')
         set(hMenuItem, 'Checked', 'on');
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ChannelStatistics(varargin)
@@ -4414,7 +4511,6 @@ if isempty(cAboutText)
 end
 hBox = msgbox(cAboutText, 'Channel Statistics');
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomAmplitude(varargin)
@@ -4427,7 +4523,7 @@ set(g_hSpike_Viewer,'Pointer','crosshair')
 zoom off
 waitfor(g_hSpike_Viewer, 'CurrentPoint') % wait for user to click in figure
 hAx = gca;
-set(hAx, 'color', [.2 .1 .1])
+ThemeObject(hAx)
 zoom yon % zoom axis
 try % wait for user to click in figure
     waitfor(hAx, 'ylim')
@@ -4440,11 +4536,10 @@ set(g_hSpike_Viewer,'Pointer','arrow')
 if ishandle(hAx)
     sCh = get(hAx,'Tag');
     FV.tYlim.(sCh) = get(hAx, 'ylim');
-    set(hAx, 'color', [.1 .1 .1])
+    ThemeObject(hAx)
 end
 SetStruct(FV)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PlotRasters(varargin)
@@ -4464,7 +4559,6 @@ end
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PlotInstSpikeRate(varargin)
@@ -4484,7 +4578,6 @@ end
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ExitSpiky(varargin)
@@ -4505,7 +4598,6 @@ CloseSpikyWindows
 clear g_hSpike_Viewer g_bMergeMode
 clear OpenSettings % clear persistent variables in OpenSettings()
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function QuickSort(varargin)
@@ -4517,7 +4609,6 @@ function QuickSort(varargin)
 global g_bMergeMode
 if ~CheckDataLoaded, return, end
 if ~isfield(FV, 'tData'), return, end % check data has been loaded
-%try
 if ~g_bMergeMode % skip spike detection if we're in Merge Mode
     DetectSpikes()
     if isempty(FV.tSpikeThresholdsNeg) % check thresholds have been set
@@ -4528,9 +4619,7 @@ end
 DejitterSpikes()
 RemoveOutlierSpikes()
 SortAllChannels()
-%catch uiwait(warndlg(sprintf('QuickSort! failed with error messsage:\n%s', lasterr), 'Spiky')); end % if the try failed, it usually means user aborted
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [sTxt] = ShowCurrentLine(obj, event_obj)
@@ -4541,7 +4630,7 @@ if ~strcmp(lower(sTypeOfCurrObj), 'line'), return, end
 
 % Reset color on unclicked lines
 hToggleHandles = findobj(gcf, 'Tag', get(gco,'tag'), 'Type', 'line');
-cCol = get(hToggleHandles(2:end),'color');
+cCol = get(hToggleHandles(2:end), 'color');
 mCol = reshape([cCol{:}],3,length(hToggleHandles)-1)';
 set(hToggleHandles(2:end), 'color', median(mCol,1), 'linewidth', 1, 'marker', 'none');
 
@@ -4553,9 +4642,7 @@ set(gco, 'color', median(mCol,1), 'linewidth', 2, 'marker', 's', 'markeredgecolo
 
 % If an UIHoldFigure figure is open, close it/them
 close(findobj('Tag', 'UIHoldFigure'));
-
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function IdentifySpike(varargin)
@@ -4581,7 +4668,6 @@ hDot = plot(vXY(1,1), vXY(1,2), 'o', 'markersize', 10, 'Color', vCol, 'linewidth
 sTxt = sprintf('   Spike %d\n   Unit %s', nIndx, sUnit);
 text(vXY(1,1), vXY(1,2), sTxt, 'color', vCol, 'fontsize', 7)
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CloseSpikyWindows(varargin)
@@ -4592,7 +4678,6 @@ for i = 1:length(hWin)
     end
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function BringSpikyFiguresToFront(varargin)
@@ -4603,7 +4688,6 @@ for i = 1:length(hWin)
     end
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CascadeSpikyWindows(varargin)
@@ -4626,7 +4710,6 @@ for h = 1:length(hTileWin)
     figure(hTileWin(h))
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [cSelectedFields, nManualValue, nButton] = SelectImportVariable(cFields, sTitle, ...
@@ -4715,8 +4798,6 @@ end
 
 clear global nSelectedIndx
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function varargout = ChannelProperties(varargin)
@@ -4758,16 +4839,12 @@ cAboutText{5} = sprintf('Gain: %d', nGain);
 cAboutText{6} = sprintf('Begin time: %.4f s', nTimeBegin);
 
 hBox = msgbox(cAboutText, 'Properties');
-
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function varargout = DigitizeChannelAuto(hObject, varargin)
 DigitizeChannel(hObject, 'auto')
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function varargout = DigitizeChannel(varargin)
@@ -4861,9 +4938,7 @@ else
     varargout{1} = vUpTimes;
     varargout{2} = vDownTimes;
 end
-
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DuplicateChannel(varargin)
@@ -4905,8 +4980,6 @@ FV.csChannels = unique([FV.csChannels [sCh '_Copy']]);
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DeleteChannel(varargin)
@@ -4937,7 +5010,6 @@ FV.csDigitalChannels = unique({FV.csDigitalChannels{~strcmp(FV.csDigitalChannels
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function UndigitizeChannel(varargin)
@@ -4959,7 +5031,6 @@ FV.csDigitalChannels(strcmpi(FV.csDigitalChannels, sCh)) = [];
 SetStruct(FV)
 ViewTrialData
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ModifyEventDuration(varargin)
@@ -5117,7 +5188,8 @@ for i = 1:length(cFields)
     end
 end
 
-set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Channel Descriptions', 'NumberTitle', 'off', 'ToolBar', 'none', 'menuBar','none')
+ThemeObject(hFig)
+set(hFig, 'Name', 'Spiky Channel Descriptions', 'ToolBar', 'none', 'menuBar','none')
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, 'ColumnName', ...
     cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{150, 377});
 waitfor(hFig, 'userdata') % wait for figure to be closed
@@ -5157,7 +5229,8 @@ for i = 1:length(FV.tExperimentVariables)
     cData{i, 2} = FV.tExperimentVariables(i).sValue;
 end
 
-set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Experiment Variables', 'NumberTitle', 'off', 'ToolBar', 'none', 'menuBar','none')
+ThemeObject(hFig)
+set(hFig, 'Name', 'Spiky Experiment Variables', 'ToolBar', 'none', 'menuBar','none')
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, 'ColumnName', ...
     cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{150, 352});
 waitfor(hFig, 'userdata', 'closed') % wait for figure to be closed
@@ -5371,6 +5444,40 @@ SetStruct(FV)
 ViewTrialData
 return
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Replace a particular value in selected channel
+function ReplaceValues(varargin)
+[FV, hWin] = GetStruct;
+persistent p_cAns
+if isempty(p_cAns) p_cAns = {'' ''}; end
+
+% Check that tag of handle references a known channel
+sCh = get(varargin{1}, 'Tag');
+if ~(isempty(sCh) | ~any(strcmp(fieldnames(FV.tData), sCh)))
+    % Get value to replace and new value
+    cAns = inputdlg({'Value to replace:' 'New value:'}, 'Replace value', 1, p_cAns);
+    if isempty(p_cAns) return; end
+    if isempty(p_cAns{1}) || isempty(p_cAns{2}) return; end
+    p_cAns = cAns;
+    nFrom = str2num(p_cAns{1});
+    nTo = str2num(p_cAns{2});
+    vData = FV.tData.(sCh);
+    vData(vData == nFrom) = nTo;
+    nBeginTime = FV.tData.([sCh '_TimeBegin']);
+    nEndTime = FV.tData.([sCh '_TimeEnd']);
+
+    nBeginTime = nBeginTime + (nNum / 1000); % sec
+    nEndTime = nEndTime + (nNum / 1000); % sec
+
+    FV.tData.([sCh '_TimeBegin']) = nBeginTime;
+    FV.tData.([sCh '_TimeEnd']) = nEndTime;
+end
+SetStruct(FV)
+ViewTrialData
+return
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Show info stored in DAQ file
 function ShowDAQInfo(varargin)
@@ -5476,7 +5583,8 @@ for nCh = 1:length(csChannels)
 end
 vPos = get(hFig, 'position');
 vPos([3 4]) = [800 200];
-set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Event Statistics', 'NumberTitle', 'off', ...
+ThemeObject(hFig)
+set(hFig, 'Name', 'Spiky Event Statistics', ...
     'ToolBar', 'none', 'menuBar','none', 'position', vPos)
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, 'ColumnName', ...
     cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{150, 100, 70, 70, 160, 220});
@@ -5882,6 +5990,4 @@ FV.csChannels = unique([FV.csChannels cFields{1}]);
 FV.csDisplayChannels = unique([FV.csDisplayChannels cFields{1}]);
 SetStruct(FV)
 ViewTrialData()
-
 return
-
