@@ -62,7 +62,8 @@ end
 vEventIndx(vRemIndx) = [];
 
 % Create figure
-hFig = figure('color', [.2 .2 .2]);
+hFig = figure();
+Spiky.ThemeObject(hFig)
 drawnow
 set(hFig, 'name', 'Spiky Peristimulus Time Histograms (PSTH)', 'NumberTitle', 'off');
 vXLim = [-.1 .1];
@@ -136,7 +137,8 @@ for u = 1:length(vUnits)
         end
         
         if isnan(nYMax) || nYMax < 0, nYMax = 0.1; end
-        set(hAx, 'Color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'fontsize', 7, 'xlim', [-p_nPreStimDur p_nPostStimDur])
+        Spiky.ThemeObject(hAx)
+        set(hAx, 'fontsize', 7, 'xlim', [-p_nPreStimDur p_nPostStimDur])
         box on
 
         if nCol == 1
@@ -162,7 +164,8 @@ for u = 1:length(vUnits)
             else
                 hTit = title(sprintf('%s (%s)', FV.tChannelDescriptions(nIndx).sDescription, sChName));
             end
-            set(hTit, 'FontSize', 8, 'FontWeight', 'bold', 'color', [1 1 0], 'backgroundcolor', [.1 .1 .1], 'interpreter', 'none')
+            Spiky.ThemeObject(hTit)
+            set(hTit, 'FontSize', 8, 'FontWeight', 'bold', 'interpreter', 'none')
         elseif u == length(vUnits)
             xlabel('Time (s)');
         end
