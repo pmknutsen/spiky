@@ -5,7 +5,9 @@ function tSig = Multitaper_Spectrogram(FV)
 %   S = Multitaper_Spectrogram(FV)
 %
 % Where S is a structure containing the spectrogram of a selected channel,
-% its sampling rate (kHz) and start/end times (s).
+% its sampling rate (kHz) and start/end times (s). Note that segments
+% containing NaNs are either filled with mirrors of adjacent data (first)
+% or interpolated (second). Thus, returned spectrograms are without gaps.
 %
 % Requirements:
 %   Chronux spectral analysis library (re-distributed with Spiky)
@@ -28,6 +30,10 @@ drawnow
 vCont = double(FV.tData.(p_sContCh)');
 if all(size(vCont) > 1) return; end
 nFs = FV.tData.([p_sContCh '_KHz']) * 1000;
+
+% Get channel descriptive string
+sDescr = Spiky.GetChannelDescription(p_sContCh);
+if isempty(sDescr) sDescr = p_sContCh; end
 
 % Get parameters interactively (pre/post times and stimulus delay)
 % We don't collect parameters when function is called with outputs or if we
@@ -112,20 +118,19 @@ close(hMsg);
 %end
 
 % Create output structure
-sPreFix = [p_sContCh '_MtSpc'];
+sPreFix = [sDescr '_MtSpc'];
 tSig(1).(sPreFix) = log10(S)';
-
-%tSig.([sPreFix '_KHz']) = 1/p_nWinStep/1000;
 nInt = unique(round(diff(t)*1000)/1000);
 tSig.([sPreFix '_KHz']) = (1/nInt(1)/1000);
-%tSig.([sPreFix '_TimeBegin']) = FV.tData.([p_sContCh '_TimeBegin']) + (p_nWinSize / 2);
 tSig.([sPreFix '_TimeBegin']) = FV.tData.([p_sContCh '_TimeBegin']) + t(1);
-%tSig.([sPreFix '_TimeEnd']) = FV.tData.([p_sContCh '_TimeBegin']) + (size(S, 1) * p_nWinStep);
 tSig.([sPreFix '_TimeEnd']) = FV.tData.([p_sContCh '_TimeBegin']) + ((size(S, 1)+1) * nInt(1));
 tSig.([sPreFix '_Unit']) = 'Hz';
 tSig.([sPreFix '_Scale']) = f;
 
 return
+
+
+
 
 
 % Some other useful processing we'll recycle later....
