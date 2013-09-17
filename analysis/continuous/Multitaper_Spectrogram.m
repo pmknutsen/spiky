@@ -11,7 +11,8 @@ function tSig = Multitaper_Spectrogram(FV)
 %   Chronux spectral analysis library (re-distributed with Spiky)
 %
 % To-do:
-%   Collect parameters from user:
+%   Implement code in 'recycling area' at bottom
+%   See additional TODO's below
 
 global Spiky g_bBatchMode
 tSig = struct([]);
@@ -46,17 +47,47 @@ if isempty(p_nMinF) || ~g_bBatchMode
         {num2str(p_nMinF), num2str(p_nMaxF), num2str(p_nWinSize), num2str(p_nWinStep), ...
         num2str(p_nTW), num2str(p_nD)});
     if isempty(cAnswer), return, end
-    p_nMinF = str2num(cAnswer{1}); % hz
-    p_nMaxF = str2num(cAnswer{2}); % hz
-    p_nWinSize = str2num(cAnswer{3});
-    p_nWinStep = str2num(cAnswer{4});
-    p_nTW = str2num(cAnswer{5});
-    p_nD = str2num(cAnswer{6});
+    p_nMinF = str2double(cAnswer{1}); % hz
+    p_nMaxF = str2double(cAnswer{2}); % hz
+    p_nWinSize = str2double(cAnswer{3});
+    p_nWinStep = str2double(cAnswer{4});
+    p_nTW = str2double(cAnswer{5});
+    p_nD = str2double(cAnswer{6});
+end
+
+% Derivative
+if p_nD > 0
+    vCont = diff(vCont, p_nD);
+end
+
+% Interpolate (nearest) indices that contain NaNs
+% Step 1 - NaN segments are filled with mirror images adjacent data
+% Step 2 - Remaining NaNs (e.g. lone occurences, NaNs at start/end of
+%          vector) are interpolated
+iNaN = isnan(vCont);
+iTurnsNaN = find([0;diff(iNaN)] == 1) - 1; % start indices of nan segments
+iNaNDone = find([0;diff(iNaN)] == -1); % end indices of nan segments
+iNaNDone(iNaNDone <= iTurnsNaN(1)) = [];
+iNaNDone = iNaNDone(1:length(iTurnsNaN));
+for i = 1:length(iTurnsNaN)
+    nL = ceil((iNaNDone(i)-iTurnsNaN(i)+1)/2);
+    if (iTurnsNaN(i)+nL <= length(vCont)) && (iTurnsNaN(i)-nL > 0)
+        vCont(iTurnsNaN(i):(iTurnsNaN(i)+nL)) = fliplr(vCont((iTurnsNaN(i)-nL):iTurnsNaN(i))');
+    end
+    if ((iNaNDone(i)-nL) > 0) && (iNaNDone(i)+nL <= length(vCont))
+        vCont((iNaNDone(i)-nL):iNaNDone(i)) = fliplr(vCont(iNaNDone(i):(iNaNDone(i)+nL))');
+    end
+end
+% Interpolate remaining NaNs
+iNaNb = isnan(vCont);
+if any(iNaNb)
+    vCont(iNaNb) = interp1(find(~iNaNb), vCont(~iNaNb), find(iNaNb), 'linear');
 end
 
 % Decimate signal to match user-defined frequency range (speeds up spectral analysis)
 nR = floor(nFs / (p_nMaxF*2.5));
 vCont = decimate(vCont, nR);
+nFsO = nFs;
 nFs = nFs/nR;
 
 % mtspecgramc parameters structure
@@ -70,22 +101,31 @@ tParams.fpass  = [p_nMinF p_nMaxF];
 
 % Compute the multitaper spectrogram
 hMsg = waitbar(0.5, 'Computing multitaper spectrogram...');
-if p_nD > 0 vCont = diff(vCont, p_nD); end
 [S, t, f] = mtspecgramc(vCont, [p_nWinSize p_nWinStep], tParams);
 close(hMsg);
+
+% Remove values from spectrogram where data was a NaN
+%if any(iNaN)
+%    iSNaN = interp1(t, 1:length(t), find(iNaN)./nFsO, 'linear');
+%    iSNaN = unique(round(iSNaN));
+%    S(iSNaN, :) = NaN;
+%end
 
 % Create output structure
 sPreFix = [p_sContCh '_MtSpc'];
 tSig(1).(sPreFix) = log10(S)';
-tSig.([sPreFix '_KHz']) = 1/p_nWinStep/1000; % FIX
-tSig.([sPreFix '_TimeBegin']) = FV.tData.([p_sContCh '_TimeBegin']) + p_nWinSize / 2;
-tSig.([sPreFix '_TimeEnd']) = FV.tData.([p_sContCh '_TimeBegin']) + size(S, 1) * p_nWinStep;
+
+%tSig.([sPreFix '_KHz']) = 1/p_nWinStep/1000;
+nInt = unique(round(diff(t)*1000)/1000);
+tSig.([sPreFix '_KHz']) = (1/nInt(1)/1000);
+%tSig.([sPreFix '_TimeBegin']) = FV.tData.([p_sContCh '_TimeBegin']) + (p_nWinSize / 2);
+tSig.([sPreFix '_TimeBegin']) = FV.tData.([p_sContCh '_TimeBegin']) + t(1);
+%tSig.([sPreFix '_TimeEnd']) = FV.tData.([p_sContCh '_TimeBegin']) + (size(S, 1) * p_nWinStep);
+tSig.([sPreFix '_TimeEnd']) = FV.tData.([p_sContCh '_TimeBegin']) + ((size(S, 1)+1) * nInt(1));
 tSig.([sPreFix '_Unit']) = 'Hz';
 tSig.([sPreFix '_Scale']) = f;
 
 return
-
-
 
 
 % Some other useful processing we'll recycle later....
