@@ -1045,6 +1045,7 @@ for i = 1:length(FV.csDisplayChannels)
 
     % Get channel description
     sYLabel = GetChannelDescription(sCh);
+    if isempty(sYLabel) sYLabel = sCh; end
 
     if ( ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh) ) || ~g_bMergeMode
         [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % mV
@@ -1227,7 +1228,9 @@ for i = 1:length(FV.csDisplayChannels)
         end
     else % plot continuous trace
         if size(vCont, 1) == 1
-            hLin = plot(vTime, vCont, 'color', FV.mColors(i,:));
+            if ~exist('nContTrace', 'var') nContTrace = 1; end
+            nContTrace = nContTrace + 1;
+            hLin = plot(vTime, vCont, 'color', FV.mColors(nContTrace,:));
         elseif size(vCont, 1) > 1
             vY = [];
             if isfield(FV.tData, [sCh '_Scale'])
@@ -1236,7 +1239,7 @@ for i = 1:length(FV.csDisplayChannels)
             if length(vY) ~= size(vCont, 1)
                 vY = 1:size(vCont, 1);
             end
-            hIm = imagesc(vTime, vY, real(vCont), 'parent', hSubplots(end));
+            hLin = imagesc(vTime, vY, real(vCont), 'parent', hSubplots(end));
             set(hSubplots(end), 'ydir', 'normal')
         end
         % attach context menu to line to enable additional options
@@ -1245,9 +1248,10 @@ for i = 1:length(FV.csDisplayChannels)
             set(hMenu, 'userdata', [vTimeAllTrace(:) vContAllTrace(:)], 'Tag', sCh);
         end
         set(hMenu, 'Tag', sCh);
-        %hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', 'figure;mD=get(get(gcbo, ''parent''),''userdata'');plot(mD(:,1),mD(:,2));xlabel(''Time (s)'')');
         hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
+        hItems(end+1) = uimenu(hMenu, 'Label', 'Move Up', 'Callback', {@ChangeDisplayOrder, sCh, 1});
+        hItems(end+1) = uimenu(hMenu, 'Label', 'Move Down', 'Callback', {@ChangeDisplayOrder, sCh, -1});
         hItems(end+1) = uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
         hItems(end+1) = uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', '&Replace Values', 'Callback', @ReplaceValues, 'Tag', sCh);
@@ -1256,6 +1260,7 @@ for i = 1:length(FV.csDisplayChannels)
         hItems(end+1) = uimenu(hMenu, 'Label', 'Digiti&ze Channel', 'Callback', @DigitizeChannelAuto, 'Tag', sCh, 'Separator', 'on');
         hItems(end+1) = uimenu(hMenu, 'Label', 'Digiti&ze Manually', 'Callback', @DigitizeChannel, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', '&Properties', 'Separator', 'on', 'Callback', @ChannelProperties, 'Tag', sCh);
+        hItems(end+1) = uimenu(hMenu, 'Label', 'Delete Channel', 'Callback', {@DeleteChannel, sCh}, 'Tag', sCh);
         set(hLin, 'uicontextmenu', hMenu)
     end
     
@@ -1595,6 +1600,23 @@ end
 
 SetStruct(FV, 'nosaveflag')
 PanMode()
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Change the display order of axes in main window
+function ChangeDisplayOrder(hObject, eventdata, sCh, nMove)
+[FV,hWin] = GetStruct;
+iCurr = find(strcmp(FV.csDisplayChannels, sCh));
+iMove = iCurr + nMove;
+iMove = max([iMove 1]);
+iMove = min([iMove length(FV.csDisplayChannels)]);
+csD = FV.csDisplayChannels;
+csMove = csD(iCurr);
+csD(iCurr) = [];
+csD = [csD(1:(iMove-1)) csMove csD((iMove):end)];
+FV.csDisplayChannels = csD;
+SetStruct(FV, 'nosaveflag')
+ViewTrialData();
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3633,7 +3655,7 @@ set(hFig, 'Name', 'Spiky Principal Components', 'ToolBar', 'figure')
 hAx = get(hFig, 'Children');
 ThemeObject(hAx(strcmp(get(hAx, 'type'), 'axes')))
 
-sDescr = FV.tChannelDescriptions(strcmp({FV.tChannelDescriptions.sChannel},'DAQ_0')).sDescription;
+sDescr = GetChannelDescription(sCh);
 hHeader = header([sDescr '  ' sCh], 10);
 ThemeObject(hHeader)
 set(hHeader, 'interpreter', 'none')
@@ -3641,6 +3663,23 @@ set(hHeader, 'interpreter', 'none')
 % set colors on legend
 hLeg = findobj(hFig, 'type', 'axes', 'Tag', 'legend');
 set(hLeg, 'color', 'none', 'textcolor', 'w', 'location', 'northeast')
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function sDescr = GetChannelDescription(sCh)
+% Descriptive string of channel sCh
+[FV, hWin] = GetStruct;
+sDescr = '';
+if isfield(FV, 'tChannelDescriptions')
+    if isfield(FV.tChannelDescriptions, 'sChannel') && isfield(FV.tChannelDescriptions, 'sDescription')
+        nIndx = find(strcmp({FV.tChannelDescriptions.sChannel}, sCh));
+        if ~isempty(nIndx)
+            sDescr = FV.tChannelDescriptions(nIndx).sDescription;
+        else
+            sDescr = '';
+        end
+    end
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4824,12 +4863,7 @@ if isfield(FV.tData, [sCh '_TimeBegin'])
 else nTimeBegin = NaN; end
 
 % Descriptive string
-nIndx = find(strcmp({FV.tChannelDescriptions.sChannel}, sCh));
-if ~isempty(nIndx)
-    sDescr = FV.tChannelDescriptions(nIndx).sDescription;
-else
-    sDescr = '';
-end
+sDescr = GetChannelDescription(sCh);
 
 cAboutText{1} = sprintf('Name: %s', sCh);
 cAboutText{2} = sprintf('Description: %s', sDescr);
@@ -4983,14 +5017,23 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DeleteChannel(varargin)
-% Delete a channel
+% Delete a channel. If input arguments are provided, the first string
+% encountered will be the channel to delete.
 [FV, hWin] = GetStruct;
 if ~CheckDataLoaded, return, end
 
-csAll = [FV.csDisplayChannels FV.csChannels];
-[sCh, bResult] = SelectChannelNumber(csAll);
-%[sCh, bResult] = SelectChannelNumber(FV.csChannels);
-if isempty(sCh), return, end % no channel was selected (i.e. dialog was closed)
+sCh = '';
+if nargin > 0
+    for i = 1:nargin
+        if ischar(varargin{i}) sCh = varargin{i}; end
+    end
+end
+if ~any(strcmp(sCh, [FV.csDisplayChannels FV.csChannels]))
+    csAll = [FV.csDisplayChannels FV.csChannels];
+    [sCh, bResult] = SelectChannelNumber(csAll);
+    if isempty(sCh), return, end % no channel selected
+end
+
 sAns = questdlg(['Are you sure you want to delete channel ' sCh '?'], 'Spiky', 'Yes', 'No', 'No');
 if strcmp(sAns, 'No'), return; end
 
@@ -5990,4 +6033,5 @@ FV.csChannels = unique([FV.csChannels cFields{1}]);
 FV.csDisplayChannels = unique([FV.csDisplayChannels cFields{1}]);
 SetStruct(FV)
 ViewTrialData()
+
 return
