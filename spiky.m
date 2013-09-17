@@ -1076,7 +1076,6 @@ for i = 1:length(FV.csDisplayChannels)
             end
         end
     end
-
     
     % Custom filter and decimate continuous channels
     if ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh)
@@ -1178,21 +1177,12 @@ for i = 1:length(FV.csDisplayChannels)
                 % Set spike width
                 vIndices = [vX1' vX2' vX2' [vX1(2:1:end) NaN]'];
                 vIndices = reshape(vIndices', numel(vIndices), 1);
+                vXlim = FV.vXlim;
                 if isempty(FV.vXlim)
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.03;
-                elseif diff(FV.vXlim) < 1 % 1 ms spikes when timescale is < 1 sec
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.001;
-                elseif diff(FV.vXlim) < 5 % 2 ms spikes when timescale is < 5 sec
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.005;
-                elseif diff(FV.vXlim) < 10 % 5 ms spikes when timescale is < 10 sec
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.01;
-                elseif diff(FV.vXlim) < 20 % 5 ms spikes when timescale is < 20 sec
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.02;
-                elseif diff(FV.vXlim) < 50 % 5 ms spikes when timescale is < 50 sec
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.04;
-                else
-                    vIndices(2:2:end) = vIndices(1:2:end) + 0.1;
+                    vXlim = [min(vSpiketimes) max(vSpiketimes)];
                 end
+                nSpikeWidth = GetEventWidth(vXlim);
+                vIndices(2:2:end) = vIndices(1:2:end) + nSpikeWidth;
                 
                 % Rearrange indices
                 vYs = repmat([nRow nRow NaN NaN], 1, length(vIndices)/4);
@@ -1201,6 +1191,7 @@ for i = 1:length(FV.csDisplayChannels)
                 set(hSubplots(end), 'units', 'pixels')
                 vPos = get(hSubplots(end), 'position');
                 nSpikeHeight = vPos(4) / length(vUnits) / 2;
+                set(hSubplots(end), 'units', 'normalized')
                 
                 %nSpikeHeight = 100; % adjust this number to change height of spikes
                 hLin = plot(vIndices, vYs, 'linewidth', nSpikeHeight, 'color', mCol);
@@ -1376,6 +1367,7 @@ if bShowDigitalEvents
     set(hSubplots(end), 'units', 'pixels')
     vPos = get(hSubplots(end), 'position');
     nEventHeight = vPos(4) / nEvents / 2;
+    set(hSubplots(end), 'units', 'normalized')
     
     % Iterate and plot digital events
     csEvents = {};
@@ -1443,11 +1435,20 @@ if bShowDigitalEvents
         vIndices = reshape(vIndices', numel(vIndices), 1);
         % Rearrange indices
         vYs = repmat([nY nY NaN NaN], 1, length(vIndices)/4);
+
         if length(vIndices) > 1000
             vPlotIndx = 1:round(length(vIndices)/1000):length(vIndices);
         else
             vPlotIndx = 1:length(vIndices);
         end
+        
+        % Set event width
+        vXlim = FV.vXlim;
+        if isempty(FV.vXlim)
+            vXlim = [min([vUpTimes vDownTimes]) max([vUpTimes vDownTimes])];
+        end
+        nEventWidth = GetEventWidth(vXlim);
+        vIndices(2:2:end) = vIndices(1:2:end) + nEventWidth;
         plot(hSubplots(end), vIndices(vPlotIndx), vYs(vPlotIndx), 'linewidth', nEventHeight, 'color', FV.mColors(1,:))
     end
 
@@ -1600,6 +1601,24 @@ end
 
 SetStruct(FV, 'nosaveflag')
 PanMode()
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Get display width of events and spikes (based on time displayed interval)
+function nW = GetEventWidth(vXlim)
+if diff(vXlim) < 1
+    nW = 0.001;
+elseif diff(vXlim) < 5
+    nW = 0.005;
+elseif diff(vXlim) < 10
+    nW = 0.01;
+elseif diff(vXlim) < 20
+    nW = 0.02;
+elseif diff(vXlim) < 50
+    nW = 0.04;
+else
+    nW = 0.15;
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5352,23 +5371,6 @@ vCont = vCont ./ nGain; % divide by gain
 % Multiply with 1000 so units to from V to mV
 if nGain ~= 1
     vCont = vCont .* 1000; % mV
-end
-return
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Get description of passed channel name
-function sDescr = GetChannelDescription(sCh)
-[FV,hWin] = GetStruct;
-sDescr = sCh; % default; description same as name
-if isfield(FV, 'tChannelDescriptions')
-    if isfield(FV.tChannelDescriptions, 'sChannel')
-        nIndx = find(strcmp({FV.tChannelDescriptions.sChannel}, sCh));
-        if ~isempty(FV.tChannelDescriptions(nIndx))
-            if ~isempty(FV.tChannelDescriptions(nIndx).sDescription)
-                sDescr = FV.tChannelDescriptions(nIndx).sDescription;
-            end
-        end
-    end
 end
 return
 
