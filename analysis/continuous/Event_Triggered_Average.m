@@ -1,9 +1,9 @@
-function varargout = Event_Triggered_Average(FV)
+function Event_Triggered_Average(FV)
 % Outputs: [mean, error, time]
 %
 %
 
-global Spiky g_bBatchMode;
+global Spiky g_bBatchMode
 
 % Select trigger event
 persistent p_sEventCh;
@@ -12,7 +12,7 @@ if isempty(p_sEventCh) || (~g_bBatchMode && nargout == 0)
     if ~bResult, return, end
 end
 
-% Select continuous channel
+% Select continuous channel (1D or 2D)
 vIndx = [];
 for ch = 1:length(FV.csChannels)
     if isempty(find(strcmp(FV.csChannels(ch), FV.csDigitalChannels), 1))
@@ -45,6 +45,10 @@ nContFs = FV.tData.([p_sContCh '_KHz']) * 1000; % Hz
 vCont = Spiky.ChannelCalculator(FV.tData.(p_sContCh), p_sContCh);
 vContBegin = FV.tData.([p_sContCh '_TimeBegin']);
 
+% Check if signal is 1D or 2D
+if all(size(vCont) > 1) bIs2D = true;
+else bIs2D = false; end
+
 % Get parameters interactively (pre/post times and stimulus delay)
 % We don't collect parameters when function is called with outputs or if we
 % are in batch-mode (assuming parameters are known, which they should be).
@@ -64,7 +68,7 @@ if isempty(p_nStimDel) || (~g_bBatchMode && nargout == 0)
     if isempty(p_bHilbert), p_bHilbert = 0; end
     cPrompt = {'Pre-event duration (s)','Post-event duration (s)', 'Detrend (1=yes, 0=no)', ...
         'Stimulus delay (ms)', 'First pulse', sprintf('Last pulse (max %d)', length(vEventTimes)), ...
-        'Derivative', 'Use absolute values (1=yes, 0=no)', 'High pass (Hz)', 'Low pass (Hz)', 'Average Hilbert amplitude (1=yes, 0=no)'};
+        'Derivative', 'Use absolute values (1=yes, 0=no)', 'High pass (Hz; 1D only)', 'Low pass (Hz; 1D only)', 'Average Hilbert amplitude (1=yes, 0=no; 1D only)'};
     cAnswer = inputdlg(cPrompt,'Averaging options', 1, ...
         {num2str(p_nPre), num2str(p_nPost), num2str(p_nDetrend), num2str(p_nStimDel), ...
         num2str(p_nFirstPulse), num2str(min([p_nLastPulse length(vEventTimes)])), num2str(p_nDerivative), ...
@@ -101,24 +105,33 @@ if p_nDerivative > 0
 end
 
 % Low/Hi pass and rectify
-vTime = linspace(0, (1/nContFs)*length(vCont), length(vCont));
-[vCont, ~, nContFs] = Spiky.FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'none');
+if bIs2D
+    vTime = linspace(0, (1/nContFs)*length(vCont), size(vCont, 2));
+else
+    vTime = linspace(0, (1/nContFs)*length(vCont), length(vCont));
+    [vCont, ~, nContFs] = Spiky.FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'none');
+end
 
 % Convert unit to Intensity/s^-d
 vCont = vCont * (nContFs^p_nDerivative);
 
 % Compute event triggered average
-SpikyWaitbar(0, 20);
+Spiky.SpikyWaitbar(0, 20);
 nLen = length(vCont);
 mAll = [];
 mAllBaseline = [];
 for o = p_nFirstPulse:nLastPulse
-    SpikyWaitbar((o/length(vOnsets))*20, 20);
+    Spiky.SpikyWaitbar((o/length(vOnsets))*20, 20);
     nStart = vOnsets(o) - round(p_nPre * nContFs);
     nEnd   = vOnsets(o) + round(p_nPost * nContFs);
     if nStart < 1 || nEnd > nLen, continue; end
-    vThis = vCont(nStart:nEnd);
-    vThisBaseline = vCont((vOnsets(o) - round(.1 * nContFs)):vOnsets(o)); % 100 ms before pulse
+    if bIs2D
+        vThis = vCont(:, nStart:nEnd);
+        vThisBaseline = vCont(:, (vOnsets(o) - round(.1 * nContFs)):vOnsets(o)); % 100 ms before pulse
+    else
+        vThis = vCont(nStart:nEnd);
+        vThisBaseline = vCont((vOnsets(o) - round(.1 * nContFs)):vOnsets(o)); % 100 ms before pulse
+    end
     
     % Detrend
     if p_nDetrend
@@ -127,7 +140,7 @@ for o = p_nFirstPulse:nLastPulse
     end
 
     % Hilbert transform
-    if p_bHilbert
+    if p_bHilbert && ~bIs2D
         % Subtract set-point (< 2 Hz)
         vSetPoint = filter_series(double(vThis(:)), nContFs, 2);
         vThis = vThis - vSetPoint';
@@ -143,97 +156,142 @@ for o = p_nFirstPulse:nLastPulse
         vThis = abs(vHilb);
     end
     
-    mAll(end+1, :) = vThis;
-    mAllBaseline(end+1, :) = vThisBaseline;
+    if bIs2D
+        mAll(end+1, :, :) = vThis;
+        mAllBaseline(end+1, :, :) = vThisBaseline;
+    else
+        mAll(end+1, :) = vThis;
+        mAllBaseline(end+1, :) = vThisBaseline;
+    end
 end
-SpikyWaitbar(20, 20);
+Spiky.SpikyWaitbar(20, 20);
 
 % Compute statistics
-vMean = nanmean(mAll);
-vMedian = nanmedian(mAll);
-vErrMean = nanstd(mAll) ./ sqrt(size(mAll, 1));
-vStdMean = nanstd(mAll);
+vMean = squeeze(nanmean(mAll, 1));
+vMedian = squeeze(nanmedian(mAll, 1));
+vErrMean = squeeze(nanstd(mAll, 1)) ./ sqrt(size(mAll, 1));
+vStdMean = squeeze(nanstd(mAll, 1));
 vErrMedian = vErrMean * 1.25;
-vTime = linspace(-p_nPre, p_nPost, size(mAll, 2)); % sec
+if bIs2D
+    vTime = linspace(-p_nPre, p_nPost, size(mAll, 3)); % sec
+else
+    vTime = linspace(-p_nPre, p_nPost, size(mAll, 2)); % sec
+end
 
 % Initialize figure and plot
-hFig = figure('color', [.2 .2 .2], 'units', 'pixels', 'name', 'Spiky - Event Triggered Average');
-if exist('centerfig') centerfig(hFig, hWin); end
+hFig = figure('units', 'pixels', 'name', 'Spiky - Event Triggered Average');
+Spiky.ThemeObject(hFig);
 hAx = axes();
-[hMeanLine, hMeanErr] = mean_error_plot(vMean, vErrMean, [0 0 1], vTime);
-hold on
-[hMedianLine, hMedianErr] = mean_error_plot(vMedian, vErrMedian, [0 1 0], vTime);
-set([hMedianLine, hMedianErr], 'visible', 'off', 'tag', 'ETAMedian');
-set([hMeanLine, hMeanErr], 'visible', 'on', 'tag', 'ETAMean');
+if bIs2D
+    hold on
+    vY = FV.tData.([p_sContCh '_Scale']);
+    hMedianLine = imagesc(vTime, vY, vMedian);
+    hMeanLine = imagesc(vTime, vY, vMean);
+    set(hAx, 'ydir', 'normal')
+    set(hMedianLine, 'visible', 'off', 'tag', 'ETAMedian');
+    set(hMeanLine, 'visible', 'on', 'tag', 'ETAMean');
+else
+    [hMeanLine, hMeanErr] = Spiky.mean_error_plot(vMean, vErrMean, [0 0 1], vTime);
+    hold on
+    [hMedianLine, hMedianErr] = Spiky.mean_error_plot(vMedian, vErrMedian, [0 1 0], vTime);
+    set([hMedianLine, hMedianErr], 'visible', 'off', 'tag', 'ETAMedian');
+    set([hMeanLine, hMeanErr], 'visible', 'on', 'tag', 'ETAMean');
 
-% Plot all individual traces
-hold on
-hTrials = plot(repmat(vTime, size(mAll, 1), 1)', mAll', 'w');
-set([hTrials], 'visible', 'off', 'tag', 'AllTrials');
+    % Plot all individual traces
+    hold on
+    hTrials = plot(repmat(vTime, size(mAll, 1), 1)', mAll');
+    Spiky.ThemeObject(hTrials);
+    set([hTrials], 'visible', 'off', 'tag', 'AllTrials');
+end
 
 hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [1 1 70 20], 'String', 'Mean', ...
-    'HorizontalAlignment', 'left', 'backgroundcolor', [.2 .2 .2], 'foregroundcolor', 'w', 'value', 1);
+    'HorizontalAlignment', 'left', 'value', 1);
+Spiky.ThemeObject(hCheck);
 set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''ETAMean''),''visible'',V);')
 
 hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [71 1 70 20], 'String', 'Median', ...
-    'HorizontalAlignment', 'left', 'backgroundcolor', [.2 .2 .2], 'foregroundcolor', 'w', 'value', 0);
+    'HorizontalAlignment', 'left', 'value', 0);
+Spiky.ThemeObject(hCheck);
 set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''ETAMedian''),''visible'',V);')
 
-hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [141 1 70 20], 'String', 'Trials', ...
-    'HorizontalAlignment', 'left', 'backgroundcolor', [.2 .2 .2], 'foregroundcolor', 'w', 'value', 0);
-set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''AllTrials''),''visible'',V);')
+if ~bIs2D
+    hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [141 1 70 20], 'String', 'Trials', ...
+        'HorizontalAlignment', 'left', 'value', 0);
+    Spiky.ThemeObject(hCheck);
+    set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''AllTrials''),''visible'',V);')
+end
 
 % Estimate latency
-vMeanPostStim = vMean(vTime >= 0);
-
-% baseline: If p_nPre window is negative (i.e. AFTER stimulus), estimate
-% baseline from the 0.1 s pre-stim window by default.
-if p_nPre <= 0, nBaseL = mean(mAllBaseline(:));
-else, nBaseL = mean(vMean(vTime < 0)); end
-
-% find peak
-[nMax, nMaxIndx] = max(vMeanPostStim);
-
-% find first sample where signal > max/2
-vIndx = find(vMeanPostStim(1:nMaxIndx) >= nBaseL + (nMax - nBaseL)/2);
-if isempty(vIndx), nLatS = NaN;
-else
-    nLatency = vIndx(1); % index
-    [nY, nI] = min(abs(vTime - abs(min([0 p_nPre]))));
-    %find( vTime == abs(min([0 p_nPre])) )
-    nLatS = vTime(nI + nLatency); %s
+if ~bIs2D
+    vMeanPostStim = vMean(vTime >= 0);
+    
+    % baseline: If p_nPre window is negative (i.e. AFTER stimulus), estimate
+    % baseline from the 0.1 s pre-stim window by default.
+    if p_nPre <= 0, nBaseL = mean(mAllBaseline(:));
+    else, nBaseL = mean(vMean(vTime < 0)); end
+    
+    % find peak
+    [nMax, nMaxIndx] = max(vMeanPostStim);
+    
+    % find first sample where signal > max/2
+    vIndx = find(vMeanPostStim(1:nMaxIndx) >= nBaseL + (nMax - nBaseL)/2);
+    if isempty(vIndx), nLatS = NaN;
+    else
+        nLatency = vIndx(1); % index
+        [nY, nI] = min(abs(vTime - abs(min([0 p_nPre]))));
+        %find( vTime == abs(min([0 p_nPre])) )
+        nLatS = vTime(nI + nLatency); %s
+    end
+    hH(1) = plot([nLatS nLatS], [nBaseL max(vMean)], 'r--', 'linewidth', 2);
+    hH(2) = plot([nLatS nLatS], [min(vMean) nBaseL], 'g--', 'linewidth', 2);
+    legend(flipud(hH), {num2str(max(vMean)-nBaseL) num2str(min(vMean)-nBaseL)}, 'textcolor', 'w')
+    legend boxoff
 end
-hH(1) = plot([nLatS nLatS], [nBaseL max(vMean)], 'r--', 'linewidth', 2);
-hH(2) = plot([nLatS nLatS], [min(vMean) nBaseL], 'g--', 'linewidth', 2);
-legend(flipud(hH), {num2str(max(vMean)-nBaseL) num2str(min(vMean)-nBaseL)}, 'textcolor', 'w')
-legend boxoff
 
 % Axes properties
 axis tight
-set(hAx, 'Color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'xlim', [-p_nPre p_nPost])
+Spiky.ThemeObject(hAx);
+set(hAx, 'xlim', [-p_nPre p_nPost])
 xlabel('Time (s)')
+if bIs2D sYStr = FV.tData.([p_sContCh '_Unit']);
+else sYStr = 'Intensity'; end
 if p_nDerivative > 0
-    ylabel(sprintf('Intensity/s^-%d', p_nDerivative))
+    ylabel(sprintf('%s/s^-%d', sYStr, p_nDerivative))
 else
-    ylabel('Intensity')
+    ylabel(sYStr)
 end
 vIndx = strfind(FV.sLoadedTrial, filesep);
 if isempty(vIndx)
     % Figure title
-    title(sprintf('%s\nCh=%s  N=%d events  Ampl=%.3f  SD=%.3f  Lat=%.1f ms', FV.sLoadedTrial, ...
-        p_sContCh, size(mAll,1), max(vMean)-min(vMean), mean(vStdMean), nLatS*1000), ...
-        'interpreter', 'none', 'color', [.7 .7 .7], 'FontWeight', 'bold')
+    if ~bIs2D
+        hTit = title(sprintf('%s\nCh=%s  N=%d events  Ampl=%.3f  SD=%.3f  Lat=%.1f ms', FV.sLoadedTrial, ...
+            p_sContCh, size(mAll,1), max(vMean)-min(vMean), mean(vStdMean), nLatS*1000), ...
+            'interpreter', 'none' );
+    else
+        hTit = title(sprintf('%s\nCh=%s  N=%d events', FV.sLoadedTrial, ...
+            p_sContCh, size(mAll,1)), 'interpreter', 'none' );
+    end
 else
     sFolder = FV.sLoadedTrial(vIndx(end-1)+1:vIndx(end)-1);
     sFile = FV.sLoadedTrial(vIndx(end)+1:end);
     % Figure title
-    title(sprintf('%s\n%s\nCh=%s  N=%d events  Ampl=%.3f  SD=%.3f  Lat=%.1f ms', sFolder, sFile, ...
-        p_sContCh, size(mAll,1), max(vMean)-min(vMean), mean(vStdMean), nLatS*1000), ...
-        'interpreter', 'none', 'color', [.7 .7 .7], 'FontWeight', 'bold')
+    if ~bIs2D
+        hTit = title(sprintf('%s\n%s\nCh=%s  N=%d events  Ampl=%.3f  SD=%.3f  Lat=%.1f ms', sFolder, sFile, ...
+            p_sContCh, size(mAll,1), max(vMean)-min(vMean), mean(vStdMean), nLatS*1000), ...
+            'interpreter', 'none' );
+    else
+        hTit = title(sprintf('%s\n%s\nCh=%s  N=%d events', sFolder, sFile, ...
+            p_sContCh, size(mAll,1) ), 'interpreter', 'none');
+    end
 end
+Spiky.ThemeObject(hTit);
 
-plot([vTime(1) vTime(end)], [max(vMean) max(vMean)], 'r:') % max value indicator
-plot([vTime(1) vTime(end)], [min(vMean) min(vMean)], 'g:') % min value indicator
+if ~bIs2D
+    plot([vTime(1) vTime(end)], [max(vMean) max(vMean)], 'r:') % max value indicator
+    plot([vTime(1) vTime(end)], [min(vMean) min(vMean)], 'g:') % min value indicator
+else
+    plot([0 0], [0 max(vY)], 'w--')
+end
 
 if nargout > 0, varargout(1) = {vMean}; end
 if nargout > 1, varargout(2) = {vErrMean}; end
