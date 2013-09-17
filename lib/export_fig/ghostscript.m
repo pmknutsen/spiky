@@ -35,7 +35,8 @@ function varargout = ghostscript(cmd)
 % location for gs on linux.
 
 % Call ghostscript
-[varargout{1:nargout}] = system(sprintf('"%s" %s', gs_path, cmd));
+%[varargout{1:nargout}] = system(sprintf('"%s" %s', gs_path, cmd));
+[varargout{1:nargout}] = system(sprintf('export LD_LIBRARY_PATH=""; "%s" %s', gs_path, cmd)); % Per 072513
 return
 
 function path = gs_path
