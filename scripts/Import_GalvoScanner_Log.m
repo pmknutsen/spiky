@@ -109,7 +109,7 @@ if nND > 0
     vAPCont = downsample(vAPCont, nND);
     vMLCont = downsample(vMLCont, nND);
 else
-    nNewFs = vLaserFs;
+    nNewFs = vLaserFs / 1000; % KHz
 end
 
 % Lets insert AP and ML as continuous data vectors
