@@ -8,13 +8,16 @@ function FV = import_daq(sFile, FV)
 %
 
 global Spiky
+sFile = Spiky.CheckFilename(sFile);
+[~, sFileOnly] = fileparts(sFile);
 
 try
-    [mData, vTime, vAbsTime, tEvents, tDAQInfo] = daqread(spiky(sprintf('CheckFilename(''%s'')', sFile)));
+    [mData, ~, ~, ~, tDAQInfo] = daqread(sFile);
 catch
-    sStr = sprintf('Error when reading file:\n%s\n\n%s', sFile, lasterr);
-    uiwait(warndlg(lasterr, 'Spiky::LoadTrial', 'modal'));
-    sp_disp(sStr)
+    sStr = sprintf('An error occurred when reading the file:\n%s\n\n%s\n\nThis file may be corrupted or truncated.', ...
+        sFileOnly, lasterr);
+    uiwait(warndlg(sStr, 'Spiky::LoadTrial', 'modal'));
+    Spiky.sp_disp(sStr)
     return
 end
 mData = single(mData); % convert to single precision to conserve memory
@@ -22,7 +25,7 @@ mData = single(mData); % convert to single precision to conserve memory
 if isempty(mData)
     sStr = 'An error occurred during loading of .DAQ file: File appears to be empty.';
     uiwait(warndlg(sStr, 'Spiky::LoadTrial', 'modal'))
-    sp_disp(sStr)
+    Spiky.sp_disp(sStr)
     return
 end
 tData = struct([]);

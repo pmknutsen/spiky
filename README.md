@@ -8,17 +8,16 @@ Matlab 6.5 or higher on Linux, Windows or Mac.
 
 ##Features
 - GUI with zoom, scroll and pan abilities
-- 1-click automatic spike sorting (via Chronux)
+- 1-click automatic spike sorting*
 - Visualization and validation tools
 - Basic channel operators
-- Post-filtering and custom math channel operators
-- Analysis tools for spike trains and continuous data
+- Bandpass filtering
+- Custom math operators
+- Analysis tools for spike trains and continuous data (see Plug-ins below)
 - Merging of multiple data files
 - Batch processing
 - Command line interface
 - Extendible through scripting
-- DAQ import (Matlab Data Acquisition Toolbox files)
-- Other data formats supported
 
 ###Install
 Synchronize the master branch with `git`, or download the latest '.zip' archive (see ZIP
@@ -28,6 +27,30 @@ button above) and unpack to a local location. Add all sub-folders to the Matlab 
 ###Documentation
 https://github.com/pmknutsen/spiky/wiki
 
-###Issue Tracker
+###Issue/Bug Tracker
 https://github.com/pmknutsen/spiky/issues
+
+##Data Formats
+Import:
+- Matlab Data Acquisition Toolbox (.daq)
+
+Export:
+- Matlab (.mat)
+
+##Analysis Plug-Ins
+Continuous:
+- Cross correlation
+- Event triggered average
+- Histogram
+- Spectral coherence*
+- Power spectral density*
+- Spectrogram*
+
+Discrete:
+- Cross correlations
+- Peristimulus time histogram (PSTH)
+- Spike triggered average (STA)
+- Temporal distribution
+
+* via Chronux
 

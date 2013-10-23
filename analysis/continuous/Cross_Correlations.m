@@ -1,36 +1,52 @@
 function Cross_Correlations(FV)
+% Usage:
+%   Cross_Correlations(FV)
+%
+% Plot cross correlations between all continuous channels.
+%
 % TODO
-%   Plot cross correlations between all continuous data traces; rows vs axes
+%   - Plot CCs only of channels currently displayed in GUI
+%   - Plot cross correlations between all continuous data traces; rows vs axes
+%   - See additional TODOs below
 
-global Spiky;
-
+global Spiky
 csChannels = FV.csDisplayChannels;
 
 hFig = figure;
-set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Continuous Cross Correlations', 'NumberTitle', 'off')
+set(hFig, 'name', 'Spiky Continuous Cross Correlations', 'NumberTitle', 'off')
+Spiky.ThemeObject(hFig)
 
 % Iterate over channels and generate subplot
 for ch1 = 1:length(csChannels)
     vTrace1 = FV.tData.(csChannels{ch1});
+    if isempty(vTrace1) || length(find(size(vTrace1)>1)) > 1
+        continue
+    end
     nFs1 = FV.tData.([csChannels{ch1} '_KHz']) * 1000; % sampling frequency (Hz)
     nBeginTime1 = FV.tData.([csChannels{ch1} '_TimeBegin']); % start of sampling (sec)
     %vTime1 = (nBeginTime1+1/nFs1):(1/nFs1):(nBeginTime1+length(vTrace1)/nFs1); % time vector (sec)
 
     for ch2 = 1:length(csChannels)
         vTrace2 = FV.tData.(csChannels{ch2});
+        if isempty(vTrace2) || length(find(size(vTrace2)>1)) > 1
+            continue
+        end
         nFs2 = FV.tData.([csChannels{ch2} '_KHz']) * 1000; % sampling frequency (Hz)
         nBeginTime2 = FV.tData.([csChannels{ch2} '_TimeBegin']); % start of sampling (sec)
         %vTime2 = (nBeginTime2+1/nFs2):(1/nFs2):(nBeginTime2+length(vTrace2)/nFs2); % time vector (sec)
 
         % Abort if the two traces dont have same length, Fs or BeginTime
+        % TODO: Allow this, by resampling and interpolating signals to
+        % match each other in time...
         if (length(vTrace1) ~= length(vTrace2)) ... % length
                 || (nFs1 ~= nFs2) ... % Fs
                 || (nBeginTime1 ~= nBeginTime2) % BeginTime
-            warndlg('Two traces dont start at same time or have different sampling rates. Cant cross correlate these')
+            warndlg('Two traces dont start at same time or have different sampling rates. Cannot cross correlate these.')
             continue
         end
 
         % axes
+        if ~ishandle(hFig) return; end
         nX = .08; nY = .1; nW = .88; nH = .85;
         nNN = length(csChannels);
         hAx = axes('position', [nX+(ch2-1)*(nW/nNN) (1-nY)-ch1*(nH/nNN) nW/nNN nH/nNN], 'Color', [.1 .1 .1]); %#ok<*LAXES>
@@ -38,7 +54,14 @@ for ch1 = 1:length(csChannels)
         % Cross correlate
         nMaxLagSec = .1; % sec
         nMaxLagSamp = nFs1/(1/nMaxLagSec); % samples
-        [vC, ~] = xcorr(vTrace1, vTrace2, nMaxLagSamp, 'coeff');
+        
+        % Scaled signals and insert zeros where there are NaNs
+        vTrace1Scaled = (vTrace1 - nanmean(vTrace1)) / nanstd(vTrace1);
+        vTrace1Scaled(isnan(vTrace1)) = 0;
+        vTrace2Scaled = (vTrace2 - nanmean(vTrace2)) / nanstd(vTrace2);
+        vTrace2Scaled(isnan(vTrace2)) = 0;
+
+        [vC, ~] = xcorr(vTrace1Scaled, vTrace2Scaled, nMaxLagSamp, 'coeff');
 
         % X axis values
         vX = -(nMaxLagSamp/nFs1):(1/nFs1):(nMaxLagSamp/nFs1);
@@ -49,9 +72,9 @@ for ch1 = 1:length(csChannels)
             set(hAx, 'Color', [.25 .25 .25])
         else
             plot(vX, vC, 'y')
-            set(hAx, 'Color', [.1 .1 .1])
         end
-        set(hAx, 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'fontsize', 7, 'ylim', [-.5 1] )
+        set(hAx, 'fontsize', 7, 'ylim', [-.5 1] )
+        Spiky.ThemeObject(hAx)
 
         % Labels above subplots (first row only)
         if ch1 == 1
@@ -82,8 +105,11 @@ for ch1 = 1:length(csChannels)
     end
 end
 
-linkaxes(get(hFig,'children'),'xy')
-zoom xon
+hChild = get(hFig,'children');
+if ~isempty(hChild)
+    linkaxes(hChild, 'xy')
+    zoom xon
+end
 
 hHeader = header('Channel Cross Correlations', 12);
 set(hHeader, 'color', 'w', 'interpreter', 'none')

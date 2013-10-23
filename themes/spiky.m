@@ -8,19 +8,18 @@
 % file for examples. The parent structure should be named p.
 
 % Axes properties
-p.axes.color = [.1 .1 .1];
-p.axes.xcolor = [.6 .6 .6];
-p.axes.ycolor = [.6 .6 .6];
+p.axes.color = [.15 .15 .15];
+p.axes.xcolor = [.7 .7 .7];
+p.axes.ycolor = [.7 .7 .7];
 p.axes.tickdir = 'out';
 
 % Figure properties
 p.figure.color = [.2 .2 .2];
-p.figure.name  = 'Spiky';
 p.figure.NumberTitle = 'off';
 p.figure.colormap = jet(2^12);
 
 % Text properties (e.g. figure titles)
-p.text.color = [.6 .6 .6];
+p.text.color = [.7 .7 .7];
 
 % Lines (typically requested only for high-contrast lines)
 p.line.color = [.8 .8 .8];

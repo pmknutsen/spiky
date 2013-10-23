@@ -15,7 +15,6 @@ p.axes.tickdir = 'out';
 
 % Figure properties
 p.figure.color = [1 1 1];
-p.figure.name  = 'Spiky';
 p.figure.NumberTitle = 'off';
 p.figure.colormap = jet(2^12);
 

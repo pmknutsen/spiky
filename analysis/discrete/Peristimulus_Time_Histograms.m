@@ -45,8 +45,8 @@ p_nStimDel = str2num(cAnswer{1});
 p_nPreStimDur = str2num(cAnswer{2});
 p_nPostStimDur = str2num(cAnswer{3});
 p_nBinRes = str2num(cAnswer{4});
-p_nSmoothWin = str2num(cAnswer{5});
-
+p_nSmoothWin = ceil(str2num(cAnswer{5}));
+ 
 % Check that events have enough data
 vRemIndx = [];
 for e = 1:length(vEventIndx) % iterate over fieldnames
@@ -76,7 +76,6 @@ for u = 1:length(vUnits)
     nCol = 1;
     for e = 1:length(vEventIndx) % iterate over fieldnames
         % Get event up times
-        %nFs = FV.tData.([cFields{vEventIndx(e)}(1:end-2) 'KHz']) * 1000;
         nFs = FV.tSpikes.(sCh).Fs;
         vUpTimes = FV.tData.(cFields{vEventIndx(e)}); % sec, abs time
         
@@ -124,7 +123,7 @@ for u = 1:length(vUnits)
         vC = (vC./et) * (1/p_nBinRes); % normalize to spikes/sec
 
         % Convolve with a right-angled triangular window
-        if ~isempty(vC) & (p_nSmoothWin > 1)
+        if ~isempty(vC) && (p_nSmoothWin > 1)
             vWin = [linspace(1,0,p_nSmoothWin)];
             vWin = vWin/sum(vWin); % normalize so sum is 1
             vC = conv(vC, vWin);
@@ -139,7 +138,7 @@ for u = 1:length(vUnits)
         if isnan(nYMax) || nYMax < 0, nYMax = 0.1; end
         Spiky.ThemeObject(hAx)
         set(hAx, 'fontsize', 7, 'xlim', [-p_nPreStimDur p_nPostStimDur])
-        box on
+        box on; grid on
 
         if nCol == 1
             ylabel('Spikes/s')
@@ -162,7 +161,8 @@ for u = 1:length(vUnits)
             else nIndx = []; end
             if isempty(nIndx), hTit = title(sChName);
             else
-                hTit = title(sprintf('%s (%s)', FV.tChannelDescriptions(nIndx).sDescription, sChName));
+                hTit = title(sprintf('%s (%s) n=%d', ...
+                    FV.tChannelDescriptions(nIndx).sDescription, sChName, length(vUpTimes)));
             end
             Spiky.ThemeObject(hTit)
             set(hTit, 'FontSize', 8, 'FontWeight', 'bold', 'interpreter', 'none')

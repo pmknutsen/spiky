@@ -51,6 +51,13 @@ if nargin > 0
     return
 end
 
+% Abort if Spiky is already running
+global g_hSpike_Viewer
+if ishandle(g_hSpike_Viewer)
+    disp('Spiky is already running')
+    return
+end
+
 clc
 disp('Spiky - Automated spike-sorting for Matlab')
 disp('Copyright (C) 2005-2013 Per M Knutsen <pmknutsen@gmail.com>')
@@ -77,7 +84,6 @@ for i = 1:length(cSubs)
 end
 disp(sprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n'))
 
-global g_hSpike_Viewer
 g_hSpike_Viewer = figure;
 
 % Set FV default settings
@@ -94,7 +100,7 @@ end
 
 vPos = get(g_hSpike_Viewer, 'position');
 ThemeObject(g_hSpike_Viewer)
-set(g_hSpike_Viewer, 'Name', ['Spiky'], 'MenuBar','none', 'UserData', FV, ...
+set(g_hSpike_Viewer, 'Name', 'Spiky', 'MenuBar','none', 'UserData', FV, ...
     'Tag', 'Spiky', 'PaperOrientation', 'landscape', 'PaperUnits', 'normalized', ...
     'PaperPosition', [.05 .05 .9 .9], 'InvertHardcopy', 'off', 'position', [vPos(1)-200 vPos(2)-50 vPos(3)+350 vPos(4)+100], ...
     'closeRequestFcn', @ExitSpiky, 'visible', 'off')
@@ -138,6 +144,8 @@ mCData = im2double(imread([sPath 'tool_psth.png'])); mCData(mCData == 0) = NaN; 
 uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_PSTH', 'TooltipString', 'Plot PSTH', 'ClickedCallback', @PlotPSTH);
 mCData = im2double(imread([sPath 'tool_pc.png'])); mCData(mCData == 0) = NaN; % principal components
 uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_PC', 'TooltipString', 'Show principal components', 'ClickedCallback', @ViewWaveformPCs);
+mCData = im2double(imread([sPath 'tool_batch.png'])); mCData(mCData == 1) = NaN; % run batch job
+uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_BatchRedo', 'TooltipString', 'No command available to batch', 'ClickedCallback', 'global Spiky; Spiky.BatchRedo('''',''redo'');', 'enable', 'off');
 
 % Set Spiky to by default NOT be in MERGE MODE
 global g_bMergeMode g_bBatchMode
@@ -246,7 +254,9 @@ for f = 1:length(tFiles)
         sName = strrep(tFiles(f).name(1:end-2), '_', ' ');
         vIndx = strfind(sName, ' ');
         sName([1 vIndx+1]) = upper(sName([1 vIndx+1]));
-        uimenu(g_hSpike_Viewer, 'Label', sName, 'Parent', hContinuous, 'Callback', ['global Spiky;Spiky.RunAnalysis(''' tFiles(f).name(1:end-2) ''');']);
+        uimenu(g_hSpike_Viewer, 'Label', sName, 'Parent', hContinuous, ...
+            'Callback', ...
+            {@RunAnalysis, tFiles(f).name(1:end-2), 'continuous'});
     end
 end
 
@@ -259,7 +269,9 @@ for f = 1:length(tFiles)
         sName = strrep(tFiles(f).name(1:end-2), '_', ' ');
         vIndx = strfind(sName, ' ');
         sName([1 vIndx+1]) = upper(sName([1 vIndx+1]));
-        uimenu(g_hSpike_Viewer, 'Label', sName, 'Parent', hDiscrete, 'Callback', ['global Spiky;Spiky.RunAnalysis(''' tFiles(f).name(1:end-2) ''');']);
+        uimenu(g_hSpike_Viewer, 'Label', sName, 'Parent', hDiscrete, ...
+            'Callback', ...
+            {@RunAnalysis, tFiles(f).name(1:end-2), 'discrete'});
     end
 end
 
@@ -395,7 +407,8 @@ function ZoomRange(varargin)
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct;
 if FV.bPanOn, pan off, end
-hold on; hLin = plot(NaN,NaN);
+hold on;
+hLin = plot(NaN,NaN);
 
 % If panning is currently enabled we need to turn that off in order
 % to detect mouse presses in window
@@ -408,7 +421,6 @@ pnt1 = get(gca,'CurrentPoint'); % button down detected
 
 % Callback that draws the line between points
 set(gcf, 'windowButtonMotionFcn', @ZoomRangeUpdateLine)
-
 try
     waitforbuttonpress;
 catch
@@ -429,23 +441,32 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomRangeUpdateLine(varargin)
+% Callback to update display of zoom indicator during horizontal zoom
 global pnt1
 pnt2 = get(gca, 'CurrentPoint'); % button down detected
-
 hLine = findobj('Tag', 'SpikyXZoomIndicator');
 hLine = flipud(hLine);
 if isempty(hLine)
-    hLine(1) = line(0,0);
-    hLine(2) = line(0,0);
-    hLine(3) = line(0,0);
-    nYPos = get(gca, 'ylim');
-    set(hLine(1), 'Tag', 'SpikyXZoomIndicator', 'ydata', [nYPos(1)/2 nYPos(1)/2])
-    set(hLine(2), 'Tag', 'SpikyXZoomIndicator', 'ydata', [(nYPos(1)/2)-nYPos(1)/4 (nYPos(1)/2)+nYPos(1)/4], 'xdata', [pnt1(1,1) pnt1(1,1)])
-    set(hLine(3), 'Tag', 'SpikyXZoomIndicator', 'ydata', [(nYPos(1)/2)-nYPos(1)/4 (nYPos(1)/2)+nYPos(1)/4], 'xdata', [pnt1(1,1) pnt1(1,1)])
-    ThemeObject(hLine)
+    for i = 1:6
+        hLine(i) = line(0,0);
+    end
+    vYPos = get(gca, 'ylim');
+    vXPos = get(gca, 'xlim');
+    nYPos = mean(vYPos);
+    nH = diff(vYPos) * .2;
+    % 'Shadow' line
+    set(hLine(1), 'Tag', 'SpikyXZoomIndicator', 'ydata', [nYPos nYPos])
+    set(hLine(2), 'Tag', 'SpikyXZoomIndicator', 'ydata', [nYPos-nH nYPos+nH], 'xdata', [pnt1(1,1) pnt1(1,1)])
+    set(hLine(3), 'Tag', 'SpikyXZoomIndicator', 'ydata', [nYPos-nH nYPos+nH], 'xdata', [pnt1(1,1) pnt1(1,1)])
+    % 'Highlight' line
+    set(hLine(4), 'Tag', 'SpikyXZoomIndicator', 'ydata', [nYPos nYPos])
+    set(hLine(5), 'Tag', 'SpikyXZoomIndicator', 'ydata', [nYPos-nH nYPos+nH], 'xdata', [pnt1(1,1) pnt1(1,1)])
+    set(hLine(6), 'Tag', 'SpikyXZoomIndicator', 'ydata', [nYPos-nH nYPos+nH], 'xdata', [pnt1(1,1) pnt1(1,1)])
+    set(hLine([1:3]), 'linewidth', 3, 'color', 'k')
+    set(hLine([4:6]), 'linewidth', 1, 'color', 'w')
 end
-set(hLine(1), 'xdata', [pnt1(1,1) pnt2(1,1)])
-set(hLine(3), 'xdata', [pnt2(1,1) pnt2(1,1)])
+set(hLine([1 4]), 'xdata', [pnt1(1,1) pnt2(1,1)])
+set(hLine([3 6]), 'xdata', [pnt2(1,1) pnt2(1,1)])
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -609,10 +630,7 @@ end
 save(sPath, 'FV', '-MAT')
 % Update the title of the Spiky window to reflect that settings were saved
 global g_hSpike_Viewer
-if length(FV.sLoadedTrial) > 70
-    sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
-else sLoadedTrial = FV.sLoadedTrial; end
-set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky - %s', sLoadedTrial)))
+set(g_hSpike_Viewer, 'Name', sprintf('%s - Spiky', GetCurrentFile()))
 set(g_hSpike_Viewer,'Pointer',sPointer)
 return
 
@@ -975,10 +993,18 @@ ThemeObject(hFig);
 
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct;
-% Dont display any trial data if Spiky is in MERGE MODE
+
+% Destroy waitbar unless we are in Merge or Batch mode
 global g_bMergeMode g_bBatchMode
-if ~g_bMergeMode && ~g_bBatchMode % destroy waitbar in case we are not in Merge or Batch mode
+if ~g_bMergeMode && ~g_bBatchMode
     SpikyWaitbar(1,1);
+end
+
+% Destroy waitbar if ViewTrialData was evoked from the GUI
+if ~isempty(varargin)
+    if ishandle(varargin{1})
+        SpikyWaitbar(1,1);
+    end
 end
 
 % Delete all current axes objects
@@ -1049,13 +1075,13 @@ for i = 1:length(FV.csDisplayChannels)
 
     if ( ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh) ) || ~g_bMergeMode
         [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % mV
+        nContAllMinMax = [min(vCont(:)) max(vCont(:))];
         [FV,hWin] = GetStruct; % reload FV since channel gains may have changed in previous line
         
         nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency (Hz)
         nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
         nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
         if all(size(vCont) > 1) % 2D trace (e.g. spectrogram)
-            %vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
             nEndTime = nBeginTime + (size(vCont, 2))*(1/nFs);
             vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
         else % 1D trace (voltage etc)
@@ -1068,9 +1094,9 @@ for i = 1:length(FV.csDisplayChannels)
             vXlim(2) = min([length(vTime) round((FV.vXlim(2)-nBeginTime)/diff(vTime(1:2)))]);
             if ~(vXlim(2) <= vXlim(1))
                 vTime = vTime(vXlim(1):vXlim(2));
-                if all(size(vCont) > 1)
+                if all(size(vCont) > 1) % 2D
                     vCont = vCont(:, vXlim(1):vXlim(2));
-                else
+                else % 1D
                     vCont = vCont(vXlim(1):vXlim(2));
                 end
             end
@@ -1218,11 +1244,11 @@ for i = 1:length(FV.csDisplayChannels)
             csUnits{end+1} = num2str(vUnits(nU));
         end
     else % plot continuous trace
-        if size(vCont, 1) == 1
+        if length(find(size(vCont)>1)) == 1
             if ~exist('nContTrace', 'var') nContTrace = 1; end
             nContTrace = nContTrace + 1;
             hLin = plot(vTime, vCont, 'color', FV.mColors(nContTrace,:));
-        elseif size(vCont, 1) > 1
+        else
             vY = [];
             if isfield(FV.tData, [sCh '_Scale'])
                 vY = FV.tData.([sCh '_Scale']);
@@ -1230,6 +1256,12 @@ for i = 1:length(FV.csDisplayChannels)
             if length(vY) ~= size(vCont, 1)
                 vY = 1:size(vCont, 1);
             end
+            
+            % Insert the min/max values of the entire matrix into displayed
+            % segment so that colormap is scaled identically regardless of
+            % zoom level.
+            vCont(1,1) = nContAllMinMax(1);
+            vCont(end,end) = nContAllMinMax(2);
             hLin = imagesc(vTime, vY, real(vCont), 'parent', hSubplots(end));
             set(hSubplots(end), 'ydir', 'normal')
         end
@@ -1277,7 +1309,53 @@ for i = 1:length(FV.csDisplayChannels)
         nX_s = vTime(1); nX_e = vTime(end);
         set(hSubplots(end), 'xlim', [nX_s nX_e]);
     end
+    % Plot threshold line(s)
+    hCntxtMenu  = uicontextmenu;
+    if isfield(FV.tSpikeThresholdsPos, sCh) && ~FV.bPlotRasters % positive
+        nThresh = FV.tSpikeThresholdsPos.(sCh);
+        hold on;
+        hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':'); hold off
+        set(hThresh, 'UIContextMenu', hCntxtMenu, 'Tag', [sCh '_pos']);
+        ThemeObject(hThresh)
+        if isfield(FV.tYlim, sCh)
+            if isempty(FV.tYlim.(sCh))
+                FV.tYlim.(sCh) = [-nThresh nThresh].*1.1;
+            else
+                FV.tYlim.(sCh)(2) = max([FV.tYlim.(sCh)(1) nThresh*1.1]);
+            end
+        end
+    end
+    if isfield(FV.tSpikeThresholdsNeg, sCh) && ~FV.bPlotRasters % negative
+        nThresh = FV.tSpikeThresholdsNeg.(sCh);
+        hold on;
+        hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':'); hold off
+        set(hThresh, 'UIContextMenu', hCntxtMenu, 'Tag', [sCh '_neg']);
+        ThemeObject(hThresh)
+        if isfield(FV.tYlim, sCh)
+            if isempty(FV.tYlim.(sCh))
+                FV.tYlim.(sCh) = [nThresh -nThresh].*1.1;
+            else
+                FV.tYlim.(sCh)(1) = min([FV.tYlim.(sCh)(1) nThresh*1.1]);
+            end
+        end
+    end
 
+    uimenu(hCntxtMenu, 'Label', 'Delete', 'Callback', @RemoveSpikeThreshold)
+    uimenu(hCntxtMenu, 'Label', 'Copy', 'Callback', @CopyPasteThreshold)
+    uimenu(hCntxtMenu, 'Label', 'Paste', 'Callback', @CopyPasteThreshold)
+    uimenu(hCntxtMenu, 'Label', 'Set Threshold', 'Callback', @SetThresholdManually, 'separator', 'on')
+    
+    % Plot spikes on top of continuous trace (only if rasters are not displayed)
+    if isfield(FV.tSpikes, sCh) && ~FV.bPlotRasters
+        vSpiketimes = FV.tSpikes.(sCh).spiketimes; % nFs resolution
+        vSpiketimes = vSpiketimes ./ nFs;
+        vSpiketimes(vSpiketimes < vTime(1) | vSpiketimes > vTime(end)) = [];
+        vVolts = repmat(nThresh, length(vSpiketimes), 1);
+        hold on; hDot = plot(hSubplots(end), vSpiketimes', vVolts', '.');        
+        ThemeObject(hDot);
+        set(hDot, 'ButtonDownFcn', @IdentifySpike)
+    end
+    
     % Set Y axis limits
     if ~isfield(FV, 'bPlotInstSpikeRate'), FV.bPlotInstSpikeRate = 0; end
     if FV.bPlotInstSpikeRate && isfield(FV.tSpikes, sCh)
@@ -1311,38 +1389,6 @@ for i = 1:length(FV.csDisplayChannels)
         end
     end
 
-    % Plot threshold line(s)
-    hCntxtMenu  = uicontextmenu;
-    if isfield(FV.tSpikeThresholdsPos, sCh) && ~FV.bPlotRasters % positive
-        nThresh = FV.tSpikeThresholdsPos.(sCh);
-        hold on;
-        hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':'); hold off
-        set(hThresh, 'UIContextMenu', hCntxtMenu, 'Tag', [sCh '_pos']);
-        ThemeObject(hThresh)
-    end
-    if isfield(FV.tSpikeThresholdsNeg, sCh) && ~FV.bPlotRasters % negative
-        nThresh = FV.tSpikeThresholdsNeg.(sCh);
-        hold on;
-        hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':'); hold off
-        set(hThresh, 'UIContextMenu', hCntxtMenu, 'Tag', [sCh '_neg']);
-        ThemeObject(hThresh)
-    end
-
-    uimenu(hCntxtMenu, 'Label', 'Delete', 'Callback', @RemoveSpikeThreshold)
-    uimenu(hCntxtMenu, 'Label', 'Copy', 'Callback', @CopyPasteThreshold)
-    uimenu(hCntxtMenu, 'Label', 'Paste', 'Callback', @CopyPasteThreshold)
-    uimenu(hCntxtMenu, 'Label', 'Set Threshold', 'Callback', @SetThresholdManually, 'separator', 'on')
-    
-    % Plot spikes on top of continuous trace (only if rasters are not displayed)
-    if isfield(FV.tSpikes, sCh) && ~FV.bPlotRasters
-        vSpiketimes = FV.tSpikes.(sCh).spiketimes; % nFs resolution
-        vSpiketimes = vSpiketimes ./ nFs;
-        vSpiketimes(vSpiketimes < vTime(1) | vSpiketimes > vTime(end)) = [];
-        vVolts = repmat(nThresh, length(vSpiketimes), 1);
-        hold on; hDot = plot(hSubplots(end), vSpiketimes', vVolts', '.');        
-        ThemeObject(hDot);
-        set(hDot, 'ButtonDownFcn', @IdentifySpike)
-    end
 end
 
 % Plot digital events
@@ -1443,12 +1489,15 @@ if bShowDigitalEvents
         end
         
         % Set event width
-        vXlim = FV.vXlim;
-        if isempty(FV.vXlim)
-            vXlim = [min([vUpTimes vDownTimes]) max([vUpTimes vDownTimes])];
-        end
-        nEventWidth = GetEventWidth(vXlim);
-        vIndices(2:2:end) = vIndices(1:2:end) + nEventWidth;
+        %vXlim = FV.vXlim;
+        %if isempty(FV.vXlim)
+        %    vXlim = [min([vUpTimes vDownTimes]) max([vUpTimes vDownTimes])];
+        %end
+        %nEventWidth = GetEventWidth(vXlim)/3;
+        %iEnd = 2:2:length(vIndices);
+        %iRep = [vIndices(iEnd) - vIndices(1:2:end)] < nEventWidth;
+        %vIndices(iRep) = vIndices(iEnd(iRep)-1) + nEventWidth;
+        
         plot(hSubplots(end), vIndices(vPlotIndx), vYs(vPlotIndx), 'linewidth', nEventHeight, 'color', FV.mColors(1,:))
     end
 
@@ -1494,8 +1543,11 @@ if bShowDigitalEvents
         else set(hSubplots(end), 'xlim', FV.vXlim); end
     else
         if isempty(FV.vXlim)
-            nX_s = vTime(1); nX_e = vTime(end);
-            set(hSubplots(end), 'xlim', [nX_s nX_e]);
+            if exist('vTime', 'var')
+                nX_s = vTime(1);
+                nX_e = vTime(end);
+                set(hSubplots(end), 'xlim', [nX_s nX_e]);
+            end
         else set(hSubplots(end), 'xlim', FV.vXlim); end
     end
 
@@ -1612,12 +1664,18 @@ elseif diff(vXlim) < 5
     nW = 0.005;
 elseif diff(vXlim) < 10
     nW = 0.01;
-elseif diff(vXlim) < 20
+elseif diff(vXlim) < 30
     nW = 0.02;
-elseif diff(vXlim) < 50
+elseif diff(vXlim) < 60
     nW = 0.04;
+elseif diff(vXlim) < 150
+    nW = 0.06;
+elseif diff(vXlim) < 250
+    nW = 0.12;
+elseif diff(vXlim) < 500
+    nW = 0.5;
 else
-    nW = 0.15;
+    nW = 1;
 end
 return
 
@@ -1770,7 +1828,11 @@ if FV.bPanOn
     linkaxes(findobj(get(gcf,'children'), 'type', 'axes'), 'x')
 else
     hPan = pan;
-    set(hPan, 'enable', 'off')
+    try
+        set(hPan, 'enable', 'off')
+    catch
+        set(hWin, 'WindowButtonDownFcn', '')
+    end
 end
 return
 
@@ -2119,26 +2181,42 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetStruct(FV, varargin)
-% varargin{1}    'nosaveflag'   Dont reset save flag
+% varargin{1}    'nosaveflag'   Dont reset save flag (* in figure title)
 global g_hSpike_Viewer
+
+% set current working directory to that in opened file
+if isfield(FV, 'sDirectory') && exist(FV.sDirectory, 'dir')
+    cd(FV.sDirectory)
+else return; end
+
 if isempty(g_hSpike_Viewer), g_hSpike_Viewer = findobj('Tag', 'Spiky'); end
 set(g_hSpike_Viewer, 'UserData', FV);
 bSetSaveFlag = 1;
 if ~isempty(varargin)
     if strcmpi(varargin, 'nosaveflag'), bSetSaveFlag = 0; end
 end
-if bSetSaveFlag
-    if isfield(FV, 'sLoadedTrial')
-        if length(FV.sLoadedTrial) > 70
-            sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
-        else sLoadedTrial = FV.sLoadedTrial; end
-        set(g_hSpike_Viewer, 'Name', CheckFilename(sprintf('Spiky - %s*', sLoadedTrial)))
+
+iFlag = strfind(get(g_hSpike_Viewer, 'name'), '*');
+
+if bSetSaveFlag || ~isempty(iFlag)
+    set(g_hSpike_Viewer, 'Name', sprintf('%s - Spiky*', GetCurrentFile()))
+else
+    set(g_hSpike_Viewer, 'Name', sprintf('%s - Spiky', GetCurrentFile()))
+end
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function sLoadedFile = GetCurrentFile()
+% Get the current loaded file
+FV = GetStruct();
+if isfield(FV, 'sLoadedTrial')
+    iSep = strfind(FV.sLoadedTrial, filesep);
+    if isempty(iSep)
+        sLoadedFile = '';
+    else
+        sLoadedFile = FV.sLoadedTrial(iSep(end)+1:end);
     end
-end
-% set current working directory to that in active database
-if isfield(FV, 'sDirectory')
-    cd(FV.sDirectory)
-end
+else sLoadedFile = ''; end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2692,6 +2770,9 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DejitterSpikes(varargin)
+% Dejitter all waveforms. If spikes are unsorted, attempt to dejitter in
+% bulk. TODO [[If spikes are already sorted, dejitter spikes instead on a
+% unit-by-unit basis]].
 if ~CheckDataLoaded, return, end
 [FV,hWin] = GetStruct;
 csFieldnames = fieldnames(FV.tSpikes);
@@ -2700,41 +2781,76 @@ if length(csFieldnames) > 1
 end
 for i = 1:length(csFieldnames)
     if length(csFieldnames) > 1, waitbar(i/length(csFieldnames), hWait); end
+
     % Dont try to dejitter stereo/tetrodes
     if ~isempty(strfind(csFieldnames{i},'__')), continue, end
-    %if isfield(FV.tSpikes.(csFieldnames{i}), 'dejittered')
-    %    if FV.tSpikes.(csFieldnames{i}).dejittered, continue, end
-    %end
     if isempty(FV.tSpikes.(csFieldnames{i}).waveforms), continue, end
-    tSpikes = FV.tSpikes.(csFieldnames{i});
-    % in case several thresholds are given (eg. for merged files) check
-    % they are all the same; if not, dejittering cannot be made
-    if length(unique(tSpikes.threshV(:,1))) > 1
-        sStr = ['Channel ' csFieldnames{i} ' contains more than one threshold value. Therefore, the channel cannot be dejittered.'];
-        uiwait(warndlg(sStr))
-        continue
+    tSpikesCh = FV.tSpikes.(csFieldnames{i});
+
+    % Dejitter spikes unit-by-unit if already sorted
+    if isfield(tSpikesCh, 'hierarchy')
+        vAssigns = tSpikesCh.hierarchy.assigns;
+    else
+        vAssigns = zeros(size(tSpikesCh.spiketimes));
     end
-    tSpikes.threshV = tSpikes.threshV(1,:);
-    tSpikes.threshT = tSpikes.threshT(1);
-    try
-        tSpikes = ss_dejitter(tSpikes, round(tSpikes.Fs(1)/10000)*2); % dejitter spikes
-    catch
-        sStr = sprintf('Failed to dejitter channel %s. The error returned was:\n\n%s', csFieldnames{i}, lasterr);
-        hFig = warndlg(sStr);
-        uiwait(hFig)
-        continue
+        
+    for a = unique(vAssigns)'
+        iThis = vAssigns == a;
+        tSpikes = struct([]);
+        % Get waveforms of current unit
+        tSpikes(1).waveforms = tSpikesCh.waveforms(iThis, :);
+        tSpikes.spiketimes = tSpikesCh.spiketimes(iThis);
+        tSpikes.Fs = tSpikesCh.Fs;
+        tSpikes.threshV = tSpikesCh.threshV;
+        tSpikes.threshT = tSpikesCh.threshT;
+        
+        % in case several thresholds are given (eg. for merged files) check
+        % they are all the same; if not, dejittering cannot be made
+        if length(unique(tSpikes.threshV(:,1))) > 1
+            sStr = ['Channel ' csFieldnames{i} ' contains more than one threshold value. Therefore, the channel cannot be dejittered.'];
+            uiwait(warndlg(sStr))
+            continue
+        end
+        tSpikes.threshV = tSpikesCh.threshV(1,:);
+        tSpikes.threshT = tSpikesCh.threshT(1);
+        
+        % Dejitter
+        try
+            tSpikes = ss_dejitter(tSpikes, round(tSpikes.Fs(1)/10000)*2);
+        catch
+            tSpikes.waveforms = [];
+        end
+
+        if isempty(tSpikes.waveforms)
+             % Dejitter failed
+            sStr = sprintf('Failed to dejitter channel %s (unit %d). The error returned was:\n\n%s', ...
+                csFieldnames{i}, a, lasterr);
+            hFig = warndlg(sStr);
+            uiwait(hFig)
+        else
+            % Dejitter succeeded
+            if size(tSpikes.waveforms, 1) == size(tSpikesCh.waveforms, 1)
+                tSpikesCh.waveforms = tSpikes.waveforms;
+            else
+                % Pad waveforms with NaNs
+                nPad = size(tSpikesCh.waveforms, 2) - size(tSpikes.waveforms, 2);
+                mPad = nan(size(tSpikes.waveforms, 1), nPad);
+                tSpikesCh.waveforms(iThis, :) = [tSpikes.waveforms mPad];
+            end
+            sStr = ['Dejittered unit ' num2str(a) ' channel ' csFieldnames{i}];
+        end
+        sp_disp(sStr)
     end
-    % Sometimes ss_dejitter fails; if so, show an error msg
-    if isempty(tSpikes.waveforms)
-        sStr = ['Failed to dejitter channel ' csFieldnames{i}];
-        hFig = warndlg(sStr);
-        uiwait(hFig)
-    else % Dejittering succeeded
-        FV.tSpikes.(csFieldnames{i}) = tSpikes;
-        FV.tSpikes.(csFieldnames{i}).dejittered = 1;
-        sStr = ['Dejittered channel ' csFieldnames{i}];
-    end
-    sp_disp(sStr)
+    % Remove columns in tSpikesCh.waveforms that contain only NaNs
+    iCols = all(isnan(tSpikesCh.waveforms), 1);
+    tSpikesCh.waveforms(:, iCols) = [];
+
+    % Replace remaining NaNs with zeros
+    tSpikesCh.waveforms(isnan(tSpikesCh.waveforms)) = 0;
+
+    % Return dejittered waveforms
+    FV.tSpikes.(csFieldnames{i}) = tSpikesCh;
+    FV.tSpikes.(csFieldnames{i}).dejittered = 1;
 end
 if length(csFieldnames) > 1, close(hWait); end
 SetStruct(FV)
@@ -3980,7 +4096,6 @@ for f = 1:length(csPaths)
 end
 sp_disp(sprintf('Done deleting settings on %d loaded files.', length(csPaths)))
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CreateMergeFile(varargin)
@@ -4068,7 +4183,9 @@ if isempty(csPaths)
     return
 end
 bResult = SpikyWaitbar(0, length(csPaths));
-for f = 1:length(csPaths)
+if iscell(csPaths) nLen = length(csPaths);
+else nLen = 1; end
+for f = 1:nLen
     bWaitResult = SpikyWaitbar(f, length(csPaths));
     if ~bWaitResult % waitbar was closed
         StopMergeMode();
@@ -4076,7 +4193,11 @@ for f = 1:length(csPaths)
         uiwait(warndlg('Merge mode has been cancelled.'))
         return
     end
-    bResult = LoadTrial(csPaths{f}); % load trial data and settings
+    if iscell(csPaths)
+        bResult = LoadTrial(csPaths{f}); % load trial data and settings
+    else
+        bResult = LoadTrial(csPaths);
+    end
     drawnow
     [FV,hWin] = GetStruct;
     
@@ -4417,10 +4538,8 @@ FV.bPlotRasters = 1;
 FV.sLoadedTrial = CheckFilename([FV_merge.sDirectory '\MergeFile.spb']);
 SetStruct(FV)
 save(FV.sLoadedTrial, 'FV', '-MAT', '-V6') % Save merged results to disk
-if length(FV.sLoadedTrial) > 70
-    sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
-else sLoadedTrial = FV.sLoadedTrial; end
-set(g_hSpike_Viewer, 'Name', sprintf('Spiky - %s', sLoadedTrial))
+set(g_hSpike_Viewer, 'Name', sprintf('%s - Spiky', GetCurrentFile()))
+
 ViewTrialData();
 ChannelStatistics(); % show channel statistics
 
@@ -5191,6 +5310,7 @@ if nStatus == 0 % Initialize
     p_nStatus = nStatus;
 else % Update
     hToolbar = findobj(g_hSpike_Viewer, 'Tag', 'Spiky_Waitbar');
+    set(get(hToolbar, 'children'), 'separator', 'off')
     for i = 1:nStatus
         set(findobj(hToolbar, 'Tag', sprintf('Spiky_Waitbar_%d', i)), 'Enable', 'On');
         p_nStatus = 0;
@@ -5207,13 +5327,13 @@ else % Update
     end
     p_nStatus = nStatus;
 end
-drawnow
 hCancelButton = findobj(g_hSpike_Viewer, 'Tag', 'Spiky_Waitbar_Cancel');
 if ~isempty(hCancelButton)
     if strcmp(get(hCancelButton(1), 'State'), 'on')
         bResult = false; % process running waitbar was cancelled
     end
 end
+return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ChannelDescriptions(varargin)
@@ -5611,7 +5731,10 @@ for nCh = 1:length(csChannels)
     cData{nCh, 2} = FV.tData.([csChannels{nCh} '_KHz']);
     cData{nCh, 3} = length(FV.tData.([csChannels{nCh} '_Up']));
     cData{nCh, 4} = length(FV.tData.([csChannels{nCh} '_Down']));
-    vDur = FV.tData.([csChannels{nCh} '_Down']) - FV.tData.([csChannels{nCh} '_Up']);
+    vDown = FV.tData.([csChannels{nCh} '_Down']);
+    vUp = FV.tData.([csChannels{nCh} '_Up']);
+    iMax = min([length(vDown) length(vUp)]);
+    vDur = vDown(1:iMax) - vUp(1:iMax);
     vDur = unique(round(vDur.*1000));
     cData{nCh, 5} = sprintf('%.0f,', vDur);
     cData{nCh, 5} = cData{nCh, 5}(1:end-1);
@@ -5806,10 +5929,9 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function BatchRedo(varargin)
 % Set and store the electrode position used during the experiment.
-global g_hSpike_Viewer
-sAction = varargin{2};
+global g_hSpike_Viewer g_bBatchMode
 persistent sLastAction
-global g_bBatchMode
+sAction = varargin{2};
 
 % List of files
 hFileList = findobj(g_hSpike_Viewer, 'Tag', 'MenuFileList');
@@ -5834,10 +5956,6 @@ if strcmp(sAction, 'redo')
     if isempty(sLastAction) % Do nothing
         warndlg('There is no available action to run in batch mode. Note that only actions with the B suffix (e.g. in menus or buttons) can run as batch jobs. To start a batch job, you must first run one of the supported actions and then re-select Batch Redo from the menu.')
     else % Repeat last supported redo action
-        %sAns = questdlg(['The last supported action was ' sLastAction '. Do you want to repeat this function on (' num2str(nFiles) ') currently loaded files?'], 'Spiky');
-
-        %switch sAns
-        %    case 'Yes' % Load each movie, redo last action and save result
         if nFiles > 1
             sAns2 = questdlg('Should the batch operation be repeated on the currently loaded file?', 'Spiky', 'Yes', 'No', 'No');
         else sAns2 = 'Yes'; end
@@ -5870,6 +5988,9 @@ if strcmp(sAction, 'redo')
     end
 else % Record which action was last performed
     sLastAction = sAction;
+    % change toolbar button status
+    hBut = findobj(g_hSpike_Viewer, 'Tag', 'Spiky_WaitbarAction_BatchRedo');
+    set(hBut, 'TooltipString', sprintf('Repeat %s on all open files', sLastAction), 'enable', 'on');
 end
 g_bBatchMode = false;
 return
@@ -5937,23 +6058,18 @@ return
 function ShowVersion(varargin)
 sWT_dir = which('spiky');
 sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) 'VERSION']);
-
 hFID = fopen(sVERSIONPath, 'r');
 sHash = char(fread(hFID, 10, 'schar'))';
 fclose(hFID);
-
 inputdlg('GitHub SHA-1 Checksum:', 'Spiky Version', 1, {sHash});
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowLicense(varargin)
 [~, hWin] = GetStruct;
-
 sWT_dir = which('spiky');
 sLICENSEPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) 'LICENSE']);
-
 sLicense = textread(sLICENSEPath, '%s', 'whitespace', '', 'bufsize', 2^16);
-
 hFig = figure;
 set(hFig, 'name', 'Spiky License', 'menubar', 'none', 'numbertitle', 'off', 'color', 'w')
 uicontrol('parent', hFig, 'style', 'edit', 'backgroundcolor', 'w', 'max', 2, ...
@@ -5995,25 +6111,35 @@ hPlot = plot(vXt, vMean, 'color', vColor, 'LineWidth', 1); hold off
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function varargout = RunAnalysis(varargin)
+function varargout = RunAnalysis(hObject, eventdata, sFun, sDir)
 % Run selected analysis function from GUI. This function ensures that any
 % outputs are captured from the analysis and stored as needed.
-
-% Check if data has been loaded
+% sDir is the analysis function directory, e.g. 'discrete' or 'continuous'
+% sFun is the analysis function name (.m not necessary)
 if ~CheckDataLoaded() return, end
 [FV, hWin] = GetStruct;
 
+% Save batch job
+sPath = [sDir filesep() sFun];
+[sFullPath, sFunName] = fileparts(which(sPath));
+sEval = [sFullPath filesep() sFun '(FV)'];
+sLocalEval = [sFun '(FV)'];
+BatchRedo([], sEval)
+
+% Move to directory of analysis
+sCurrDir = pwd;
+cd(sFullPath)
+
 % Run analysis function
-sFun = varargin{1};
 switch nargout(sFun)
     case 0
-        eval([sFun '(FV)']);
+        eval(sLocalEval);
     case 1
-        tSig = eval([sFun '(FV)']);
+        tSig = eval(sLocalEval);
     otherwise
         warndlg(['Analysis function ' sFun ' returns an invalid number of output arguments.'], 'Spiky')
-        return;
 end
+cd(sCurrDir) % return to directory
 
 if ~exist('tSig', 'var') return; end
 
@@ -6035,5 +6161,4 @@ FV.csChannels = unique([FV.csChannels cFields{1}]);
 FV.csDisplayChannels = unique([FV.csDisplayChannels cFields{1}]);
 SetStruct(FV)
 ViewTrialData()
-
 return
