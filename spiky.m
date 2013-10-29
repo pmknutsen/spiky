@@ -184,10 +184,14 @@ uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Show Channels...', 'Callback
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Show &Events', 'Callback', @ShowEvents, 'Checked', 'off', 'Accelerator', 'E');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Zoom &In', 'Callback', @ZoomIn, 'separator', 'on');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Zoom &Out', 'Callback', @ZoomOut);
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Range', 'Callback', @ZoomRange, 'Accelerator', 'Z');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Zoom &Reset', 'Callback', @ZoomReset, 'Accelerator', 'X');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Pan', 'Callback', @PanWindow, 'Accelerator', 'L');
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Range', 'Callback', @ZoomRange, 'Accelerator', 'Z');
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Amplitude', 'Callback', @ZoomAmplitude, 'Accelerator', 'Y');
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Amplitude', 'Callback', @ZoomAmplitude, 'Accelerator', 'Y', 'separator', 'on');
+hAmpUnit = uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Amplitude Unit');
+uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Volts (V)', 'callback', {@SetAmplitudeUnit, 'v'});
+uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Millivolts (mV)', 'checked', 'on', 'callback', {@SetAmplitudeUnit, 'v'});
+uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Microvolts (µV)', 'callback', {@SetAmplitudeUnit, 'v'});
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Normal Time', 'Callback', @NormalTime, 'separator', 'on', 'Tag', 'ShowNormalTime');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', @ShowGrid);
 
@@ -350,9 +354,27 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function SetAmplitudeUnit(varargin)
+% Set the voltage amplitude unit on a per-channel basis.
+% SetAmplitudeUnit(S)
+%   sets a common unit S for all channels
+%
+% SetAmplitudeUnit(S, C)
+%   sets the voltage unit S for channel C
+%
+% where     S is
+%               'v'  (volts)
+%               'mv' (millivolts)
+%               'uv' (microvolts)
+[FV, ~] = GetStruct;
+
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanRight(varargin)
 if ~CheckDataLoaded, return, end
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 vChild = findobj(get(findobj('Tag', 'Spiky'), 'children'), 'Type', 'axes'); % axes handles
 vX = get(vChild(end), 'xlim');
 FV.vXlim = vX+(diff(vX)/4); % pan right by 25%
@@ -810,7 +832,10 @@ else
         sEval = FV.tChannelCalculator.(sCh);
     else sEval = ''; end
 end
-cAnswer = inputdlg('Equation to evaluate. Substitute signal vector with ''a'':', 'Channel Calculator', 3, {sEval});
+cAnswer = inputdlg(['Enter a string that will be evaluated every time this channel is used. ' ...
+                    'Note that not all operations currently support channel calculations. ' ...
+                    'Substitute signal vector with ''a'' in your string:'], ...
+                    'Channel Calculator', 3, {sEval});
 if isempty(cAnswer) return; end % cancel button pressed
 FV.tChannelCalculator(1).(sCh) = cAnswer{1};
 SetStruct(FV); ViewTrialData();
@@ -1281,7 +1306,8 @@ for i = 1:length(FV.csDisplayChannels)
         hItems(end+1) = uimenu(hMenu, 'Label', 'Show &Markers', 'Callback', 'set( get(gcbo, ''userdata''), ''marker'', ''o'')', 'userdata', hLin, 'Separator', 'on');
         hItems(end+1) = uimenu(hMenu, 'Label', 'Meas&ure', 'Callback', @MeasureLine, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', 'Digiti&ze Channel', 'Callback', @DigitizeChannelAuto, 'Tag', sCh, 'Separator', 'on');
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Digiti&ze Manually', 'Callback', @DigitizeChannel, 'Tag', sCh);
+        hItems(end+1) = uimenu(hMenu, 'Label', 'Digitize Manually', 'Callback', @DigitizeChannel, 'Tag', sCh);
+        hItems(end+1) = uimenu(hMenu, 'Label', 'Digitize Crossing', 'Callback', @DigitizeChannelCrossing, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', '&Properties', 'Separator', 'on', 'Callback', @ChannelProperties, 'Tag', sCh);
         hItems(end+1) = uimenu(hMenu, 'Label', 'Delete Channel', 'Callback', {@DeleteChannel, sCh}, 'Tag', sCh);
         set(hLin, 'uicontextmenu', hMenu)
@@ -1586,7 +1612,9 @@ if bShowDigitalEvents
     hMenu = uicontextmenu;
     uimenu(hMenu, 'Label', 'Event Statistics', 'Callback', @ShowEventStatistics);
     uimenu(hMenu, 'Label', 'Undigitize Channel', 'Callback', @UndigitizeChannel);
-    uimenu(hMenu, 'Label', 'Modify Event Durations (B)', 'Callback', @ModifyEventDuration);
+    uimenu(hMenu, 'Label', 'Edit Event Durations (B)', 'Callback', @ModifyEventDuration);
+    uimenu(hMenu, 'Label', 'Edit Event Intervals (B)', 'Callback', @ModifyEventInterval);
+    
     set(hSubplots(end), 'uicontextmenu', hMenu)
 end
 
@@ -1850,11 +1878,15 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, sOption)
+% option
+%   'decimate'
+%   'none'
+%
 vTimeOrig = vTime;
 
 % Interpolate NaN indices
 vNaNIndx = isnan(vCont);
-vCont(vNaNIndx) = interp1(find(~vNaNIndx), vCont(~vNaNIndx), find(vNaNIndx), 'linear');
+vCont(vNaNIndx) = interp1(find(~vNaNIndx), vCont(~vNaNIndx), find(vNaNIndx), 'linear', 'extrap');
 
 switch lower(sOption)
     case 'decimate'
@@ -3215,23 +3247,24 @@ cFieldsPos = fieldnames(FV.tSpikeThresholdsPos);
 nIndx = find(strcmpi(cFields, sCh));
 nIndxPos = find(strcmpi(cFieldsPos, sCh));
 
-if ~ishandle(hAx) return; end
+if ~ishandle(hAx); return; end
 if ~isempty(FV.tSpikeThresholdsNeg) && ~isempty(fieldnames(FV.tSpikeThresholdsNeg)) && ~isempty(nIndx) % negative threshold
     nT_neg = FV.tSpikeThresholdsNeg.(cFields{nIndx});
-    hLin = plot(get(hAx, 'xlim'), [nT_neg nT_neg], '--');
+    hLin = plot(get(hAx, 'xlim'), [nT_neg nT_neg], '--', 'Tag', 'threshold_neg');
     ThemeObject(hLin)
 end
 if ~isempty(FV.tSpikeThresholdsPos) && ~isempty(fieldnames(FV.tSpikeThresholdsPos))  && ~isempty(nIndxPos) % positive threshold
     nT_pos = FV.tSpikeThresholdsPos.(cFieldsPos{nIndxPos});
-    hLin = plot(get(hAx, 'xlim'), [nT_pos nT_pos], '--');
+    hLin = plot(get(hAx, 'xlim'), [nT_pos nT_pos], '--', 'Tag', 'threshold_pos');
     ThemeObject(hLin)
 end
 
-if ~ishandle(hMainWin) return, end
+if ~ishandle(hMainWin); return, end
 
 uicontrol(hMainWin, 'Style', 'popupmenu', 'units', 'normalized', ...
     'Position', [.1 .85 .2 .05], 'String', ...
-    {'Reassign spike' 'Reassign group' 'Assign as outlier' 'Merge clusters' 'Merge visible' 'Split cluster' 'Undo last action'}, 'callback', @ClusterControl)
+    {'Reassign spike' 'Reassign group' 'Assign as outlier' 'Merge clusters' ...
+    'Merge visible' 'Split cluster' 'Undo last action'}, 'callback', @ClusterControl)
 
 uicontrol(hMainWin, 'Style', 'text', 'units', 'normalized', ...
     'Tag', 'StatusField', 'Position', [.31 .855 .53 .04], 'backgroundcolor', [.1 .1 .1], ...
@@ -3260,7 +3293,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ClusterControl(varargin)
-[FV,hWin] = GetStruct;
+[FV, ~] = GetStruct;
 persistent FV_this
 
 hMenu = gco;
@@ -3340,7 +3373,8 @@ switch sSelected
         global g_pnt1 g_pnt2 g_lin
         waitforbuttonpress
         g_pnt1 = get(gca,'CurrentPoint'); % button down detected
-        g_lin = plot([g_pnt1(3) g_pnt1(3)], [g_pnt1(3) g_pnt1(3)], 'w');
+        g_lin = plot([g_pnt1(3) g_pnt1(3)], [g_pnt1(3) g_pnt1(3)], '--o', 'linewidth', 2);
+        ThemeObject(g_lin)
         set(gcf, 'windowButtonMotionFcn', 'global g_pnt1 g_pnt2 g_lin; g_pnt2 = get(gca,''CurrentPoint''); set(g_lin, ''xdata'', [g_pnt1(1) g_pnt2(1)], ''ydata'', [g_pnt1(3) g_pnt2(3)])')
         waitforbuttonpress
         set(gcf, 'windowButtonMotionFcn', '')        
@@ -3359,9 +3393,6 @@ switch sSelected
             vX_spk = get(hHandles(h), 'xdata');
             vY_spk = get(hHandles(h), 'ydata');
             if any(isnan(vX_spk)), continue, end
-            % Decimate waveform (reduces execution time)
-            %vY_spk = interp1(vX_spk, vY_spk, vX_spk(1:10:end),'nearest');
-            %vX_spk = vX_spk(1:10:end);
             % Iterate over line segments comprising spike waveform
             for i = 1:1:length(vX_spk)-1
                 vX_ln2 = vX_spk(i:i+1);
@@ -3373,7 +3404,8 @@ switch sSelected
                 b = [(vY_ln(2) - vY_ln(1))*vX_ln(1) - (vX_ln(2) - vX_ln(1))*vY_ln(1);...
                     (vY_ln2(2) - vY_ln2(1))*vX_ln2(1) - (vX_ln2(2) - vX_ln2(1))*vY_ln2(1) ];
                 if cond(A)
-                    PInt = inv(A)*b; % intersection point
+                    %PInt = inv(A)*b; % intersection point
+                    PInt = A\b; % intersection point
                     if (       PInt(1) >= min(vX_ln(1),vX_ln(2))) ...
                             && (PInt(1) >= min(vX_ln2(1),vX_ln2(2))) ...
                             && (PInt(1) <= max(vX_ln(1),vX_ln(2))) ...
@@ -3385,28 +3417,32 @@ switch sSelected
             end
         end
         SpikyWaitbar(length(hHandles), length(hHandles));
-        % Highlight intersecting waveforms
+
         if ~isempty(hSelectedHandles)
-            set(hSelectedHandles, 'marker', 'square', 'markersize', 4, 'MarkerEdgeColor', [1 1 1], 'LineWidth', 2)
+            % De-select threshold lines
+            hSelectedHandles(strcmp(get(hSelectedHandles, 'tag'), 'threshold_neg')) = [];
+            hSelectedHandles(strcmp(get(hSelectedHandles, 'tag'), 'threshold_pos')) = [];
+            
+            % Highlight intersecting waveforms
+            set(hSelectedHandles, 'marker', 'square', 'markersize', 4, 'MarkerEdgeColor', [.8 .8 .8], 'LineWidth', 2)
+            
             vSpikeClusters = str2num(cell2mat(get(hSelectedHandles, 'tag'))); % unit IDs of selected spikes
             set(hStatus, 'string', 'Select a spike from the new cluster', 'visible', 'on')
             waitfor(figure('visible', 'off', 'Tag', 'UIHoldFigure')) % Create an invisible figure
             hLine = findobj(gcf, 'type', 'line', 'marker', 's');
             nNewCluster = str2num(get(hLine, 'tag'));
-            %if strcmp(questdlg(sprintf('Reassign selected spikes from units [ %s] to unit %d?', sprintf('%d ', unique(vSpikeClusters)), nNewCluster), 'Spiky', 'OK', 'Cancel', 'OK'), 'OK')
             for h = 1:length(hSelectedHandles)
                 vYdata = get(hSelectedHandles(h), 'ydata');
                 vIndx = find(FV.tSpikes.(sChannel).hierarchy.assigns == vSpikeClusters(h));
                 mWaveforms = FV.tSpikes.(sChannel).waveforms(vIndx, :);
                 mYdata = repmat(vYdata, size(mWaveforms,1), 1);
-                nIndx = vIndx(find(all(mYdata == mWaveforms, 2)));
+                nIndx = vIndx(all(mYdata == mWaveforms, 2));
                 FV.tSpikes.(sChannel).hierarchy.assigns(nIndx) = nNewCluster;
             end
             SetStruct(FV)
             close(hFig)
             ShowOverlappingSpikeClusters(sChannel);
             return
-            %end
         end
 
     case 'Merge clusters'
@@ -5019,7 +5055,29 @@ DigitizeChannel(hObject, 'auto')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function varargout = DigitizeChannelCrossing(hObject, varargin)
+DigitizeChannel(hObject, 'crossing')
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function varargout = DigitizeChannel(varargin)
+% Digitize a channel interactively or automatically.
+%
+% Usage:
+%  DigitizeChannel(h)
+%   or
+%  DigitizeChannel(h, 'auto/crossing')
+%   where   h is a handle to any object that references the channel name in its Tag property
+%           'auto' indicates to automatically select a threshold
+%           'crossing' indicates to ....
+%
+%  DigitizeChannel(S, Y, FS, B, E)
+%   where   S is the signal
+%           Y the threshold
+%           FS the sampling rate (Hz)
+%           B the first sample to use (s)
+%           E the last sample to use (s)
+%
 
 % Check if data and threshold was supplied with function inputs
 if length(varargin) == 5 && isnumeric(varargin{1})
@@ -5027,6 +5085,8 @@ if length(varargin) == 5 && isnumeric(varargin{1})
 elseif length(varargin) == 2 && strcmp('auto', varargin{2})
     bInteractive = 1;
     nY = .5; % threshold for automatic digitization set at 0.5 V
+elseif length(varargin) == 2 && strcmp('crossing', varargin{2})
+    bInteractive = 1;
 else
     bInteractive = 1; % interactive mode; user clicks to set threshold
 end
@@ -5039,7 +5099,7 @@ if bInteractive
     % Select channel
     if ~exist('nY')
         zoom off;
-        [nX nY] = ginput(1);
+        [~, nY] = ginput(1);
         zoom xon
     end
     sTag = get(gca, 'Tag');
@@ -5047,7 +5107,8 @@ if bInteractive
     nFs = FV.tData.([sTag '_KHz']) * 1000; % sampling frequency (Hz)
     nBeginTime = FV.tData.([sTag '_TimeBegin']); % start of sampling (sec)
     nEndTime = FV.tData.([sTag '_TimeEnd']); % start of sampling (sec)
-
+    % Arbitrary channel operation
+    vContData = ChannelCalculator(vContData, sTag);
 else
     % Get data and threshold from function input
     vContData = varargin{1};
@@ -5086,6 +5147,10 @@ if ~isempty(vIndxHIGH) && ~isempty(vIndxLOW)
 else
     vUpTimes = [];
     vDownTimes = [];
+end
+
+if strcmp('crossing', varargin{2})
+    vDownTimes = vUpTimes + 0.005; % 5 ms events
 end
 
 if bInteractive
@@ -5195,10 +5260,10 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function UndigitizeChannel(varargin)
 % Undigitizes channels that were previously digitized through the GUI
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
-[sCh, bResult] = SelectChannelNumber(FV.csDigitalChannels);
+[sCh, ~] = SelectChannelNumber(FV.csDigitalChannels);
 if isempty(sCh), return, end % no channel was selected (i.e. dialog was closed)
 
 if ~isfield(FV.tData, sCh)
@@ -5216,21 +5281,21 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ModifyEventDuration(varargin)
 % Changes the duration of all Up-Down events on selected channel to set value
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 persistent p_nNewDur p_sCh
 global g_bBatchMode
 
-if ~g_bBatchMode | isempty(p_sCh)
-    [p_sCh, bResult] = SelectChannelNumber(FV.csDigitalChannels);
+if ~g_bBatchMode || isempty(p_sCh)
+    [p_sCh, ~] = SelectChannelNumber(FV.csDigitalChannels);
 end
 if isempty(p_sCh), return, end % no channel was selected (i.e. dialog was closed)
-if ~isfield(FV.tData, [p_sCh '_Up']) return; end
+if ~isfield(FV.tData, [p_sCh '_Up']); return; end
 
 % Current event duration (average)
 vUp = FV.tData.([p_sCh '_Up']);
 vDown = FV.tData.([p_sCh '_Down']);
-if isempty(vUp) | isempty(vDown), return; end
+if isempty(vUp) || isempty(vDown), return; end
 if length(vUp) ~= length(vDown)
     sp_disp(['Channel ' p_sCh ' has an unequal number of UP and DOWN events. Nothing done...'])
     return;
@@ -5243,10 +5308,10 @@ if length(unique(vDurs)) > 1
 end
 
 % Ask for new event duration
-if ~g_bBatchMode | isempty(p_nNewDur)
+if ~g_bBatchMode || isempty(p_nNewDur)
     cAns = inputdlg('New event duration (ms):', 'Spiky', 1, {num2str(p_nNewDur)});
     if isempty(cAns), return, end
-    p_nNewDur = str2num(cAns{1}); % ms
+    p_nNewDur = str2double(cAns{1}); % ms
 end
 if isempty(p_nNewDur) return; end
 
@@ -5254,7 +5319,56 @@ if isempty(p_nNewDur) return; end
 vNewDown = vUp + (p_nNewDur / 1000);
 FV.tData.([p_sCh '_Down']) = vNewDown;
 
-if ~g_bBatchMode BatchRedo([], 'ModifyEventDuration'); end
+if ~g_bBatchMode; BatchRedo([], 'ModifyEventDuration'); end
+SetStruct(FV)
+ViewTrialData
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ModifyEventInterval(varargin)
+% Set a minimum interval between events on selected channel. Events that
+% occur after a preceding event at less than the minimum interval are deleted.
+[FV, ~] = GetStruct;
+if ~CheckDataLoaded, return, end
+persistent p_nMinInt p_sCh
+global g_bBatchMode
+
+if ~g_bBatchMode || isempty(p_sCh)
+    [p_sCh, ~] = SelectChannelNumber(FV.csDigitalChannels);
+end
+if isempty(p_sCh), return, end % no channel was selected (i.e. dialog was closed)
+if ~isfield(FV.tData, [p_sCh '_Up']); return; end
+
+% Current event duration (average)
+vUp = FV.tData.([p_sCh '_Up']);
+vDown = FV.tData.([p_sCh '_Down']);
+if isempty(vUp) || isempty(vDown), return; end
+if length(vUp) ~= length(vDown)
+    sp_disp(['Channel ' p_sCh ' has an unequal number of UP and DOWN events. Nothing done...'])
+    return;
+end
+
+% Get event intervals
+vInt = diff(vUp) .* 1000; % ms
+
+% Get minimum interval interactively
+if ~g_bBatchMode || isempty(p_nMinInt)
+    cAns = inputdlg('Minimum event interval (ms):', 'Spiky', 1, {num2str(p_nMinInt)});
+    if isempty(cAns), return, end
+    p_nMinInt = str2double(cAns{1}); % ms
+end
+if isempty(p_nMinInt); return; end
+
+% Remove events that violate the minimum interval
+vRem = [false vInt < p_nMinInt];
+vUp(vRem) = [];
+vDown(vRem) = [];
+
+FV.tData.([p_sCh '_Up']) = vUp;
+FV.tData.([p_sCh '_Down']) = vDown;
+
+if ~g_bBatchMode; BatchRedo([], 'ModifyEventInterval'); end
 SetStruct(FV)
 ViewTrialData
 return
@@ -5588,11 +5702,11 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Shift BeginTime time of selected channel
 function ShiftBeginTime(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 
 % Check that tag of handle references a known channel
 sCh = get(varargin{1}, 'Tag');
-if ~(isempty(sCh) | ~any(strcmp(fieldnames(FV.tData), sCh)))
+if ~(isempty(sCh) || ~any(strcmp(fieldnames(FV.tData), sCh)))
     % Request timeshift in msec
     nNum = GetInputNum('Milliseconds to shift begin time (can be positive or negative):', 'Shift begin time', 0);
 
@@ -5611,32 +5725,33 @@ return
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Replace a particular value in selected channel
 function ReplaceValues(varargin)
-[FV, hWin] = GetStruct;
+% Replace a particular value in selected channel. Note that the FROM value
+% is searched for after applying define (if any) math operations. The new
+% value is, however, inserted into the original data vector.
+[FV, ~] = GetStruct;
 persistent p_cAns
-if isempty(p_cAns) p_cAns = {'' ''}; end
+if isempty(p_cAns); p_cAns = {'' ''}; end
 
 % Check that tag of handle references a known channel
 sCh = get(varargin{1}, 'Tag');
-if ~(isempty(sCh) | ~any(strcmp(fieldnames(FV.tData), sCh)))
+if ~(isempty(sCh) || ~any(strcmp(fieldnames(FV.tData), sCh)))
     % Get value to replace and new value
     cAns = inputdlg({'Value to replace:' 'New value:'}, 'Replace value', 1, p_cAns);
-    if isempty(p_cAns) return; end
-    if isempty(p_cAns{1}) || isempty(p_cAns{2}) return; end
+    if isempty(cAns); return; end
+    if isempty(cAns{1}) || isempty(cAns{2}); return; end
     p_cAns = cAns;
-    nFrom = str2num(p_cAns{1});
-    nTo = str2num(p_cAns{2});
-    vData = FV.tData.(sCh);
-    vData(vData == nFrom) = nTo;
-    nBeginTime = FV.tData.([sCh '_TimeBegin']);
-    nEndTime = FV.tData.([sCh '_TimeEnd']);
-
-    nBeginTime = nBeginTime + (nNum / 1000); % sec
-    nEndTime = nEndTime + (nNum / 1000); % sec
-
-    FV.tData.([sCh '_TimeBegin']) = nBeginTime;
-    FV.tData.([sCh '_TimeEnd']) = nEndTime;
+    nFrom = str2double(p_cAns{1});
+    nTo = str2double(p_cAns{2});
+    vDataOrig = FV.tData.(sCh);
+    vData = ChannelCalculator(vDataOrig, sCh);
+    if isnan(nFrom)
+        iChange = isnan(vData);
+    else
+        iChange = vData == nFrom;
+    end
+    vDataOrig(iChange) = nTo;
+    FV.tData.(sCh) = vDataOrig;
 end
 SetStruct(FV)
 ViewTrialData
