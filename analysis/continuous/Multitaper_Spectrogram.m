@@ -11,8 +11,8 @@ function tSig = Multitaper_Spectrogram(FV)
 % effects).
 %
 % To-do:
-%   Implement code in 'recycling area' at bottom
-%   See additional TODO's below
+%   See TODO's below
+%
 
 global Spiky g_bBatchMode
 tSig = struct([]);
@@ -95,21 +95,25 @@ end
 % Decimate signal to match user-defined frequency range (speeds up spectral analysis)
 % Note that nFs after decimation must be an integer as there will otherwise
 % be a temporal offset in the output of mtspecgramc (due to internal rounding of nFs)
-nFsO = nFs;
-nR_max = floor(nFs / (p_nMaxF*2.5));
-nR = nR_max;
-nFs = nFsO/nR;
-while 1
-    % Check that both nR and nFs are integers
-    if  (ceil(nR) == floor(nR)) && (ceil(nFs) == floor(nFs))
-        break
-    else
-        nR = nR - 1;
-        nFs = nFsO/nR;
+if 0
+    nFsO = nFs;
+    nR_max = floor(nFs / (p_nMaxF*2.5));
+    nR = nR_max;
+    nFs = nFsO/nR;
+    while 1
+        % Check that both nR and nFs are integers
+        if  (ceil(nR) == floor(nR)) && (ceil(nFs) == floor(nFs))
+            break
+        else
+            nR = nR - 1;
+            nFs = nFsO/nR;
+        end
+        if nR == 0 break; end
     end
-    if nR == 0 break; end
+    vCont = decimate(vCont, nR);
+else
+    nFsO = nFs;
 end
-vCont = decimate(vCont, nR);
 
 % Ensure window size and step (in samples) are integers, to avoid internal
 % rounding in mtspecgramc and temporal offset of spectrogram
@@ -178,45 +182,4 @@ tSig.([sPreFix '_Unit']) = 'Hz';
 tSig.([sPreFix '_Scale']) = f;
 
 return
-
-
-
-
-
-% Some other useful processing we'll recycle later....
-% Gamma vs time
-tFreqRange(1).hz = [2 4];
-tFreqRange(1).name = 'delta (2-4 Hz)';
-tFreqRange(2).hz = [6 10];
-tFreqRange(2).name = 'theta (6-10 Hz)';
-tFreqRange(3).hz = [8 12];
-tFreqRange(3).name = 'alpha (8-12 Hz)';
-tFreqRange(4).hz = [12 30];
-tFreqRange(4).name = 'beta (12-30 Hz)';
-tFreqRange(5).hz = [40 90];
-tFreqRange(5).name = 'gamma (40-90 Hz)';
-
-for k = 1:length(tFreqRange)
-    vFreqRange = tFreqRange(k).hz;
-    [~, vFreqRangeI(1)] = min(abs(f-vFreqRange(1)));
-    [~, vFreqRangeI(2)] = min(abs(f-vFreqRange(2)));
-    vGamma = [];
-    for i = 1:size(S, 1)
-        mGamma(i,k) = sum(S(i, vFreqRangeI(1):vFreqRangeI(2)));
-    end
-end
-
-figure
-hAx(1) = subplot(length(tFreqRange)+1,1,1);
-plot(linspace(0, (length(vCont)/nFs), length(vCont)), vCont)
-axis tight; grid on
-for k = 1:length(tFreqRange)
-    hAx(end+1) = subplot(length(tFreqRange)+1,1, k+1);
-    plot(t, log10(mGamma(:, k)))
-    legend(tFreqRange(k).name)
-    legend boxoff
-    axis tight; grid on
-end
-linkaxes(hAx, 'x')
-zoom xon
 
