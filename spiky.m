@@ -623,7 +623,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowEvents(varargin)
 if ~CheckDataLoaded, return, end
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 % update menu item
 global g_hSpike_Viewer % handle to Spiky window
 hMenuItem = findobj(g_hSpike_Viewer, 'Label', 'Show &Events'); % handle of 'Show Event'
@@ -2789,13 +2789,12 @@ for nCh = 1:length(csChUnique)
     [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % Adjust gain (mV)
     nFs = FV.tData.([sCh '_KHz']) * 1000; % channel sampling rate
     
-    % Use custom filter, if applicable
-    vContRaw = vCont;
+    % Filter channel
     vCont = GetFilteredChannel(sCh, vCont);
     
     % Run spike detection
     nBeginTime = FV.tData.([sCh '_TimeBegin']) * 1000; % begin time
-    tSpikes = GetWaveforms(vCont, vContRaw, vThresh, nFs, FV.nSpikeTrigPreMs, FV.nSpikeTrigPostMs, 0.01, nBeginTime);
+    tSpikes = GetWaveforms(vCont, vThresh, nFs, FV.nSpikeTrigPreMs, FV.nSpikeTrigPostMs, 0.01, nBeginTime);
     FV.tSpikes(1).(sCh) = tSpikes;
     FV.tSpikes.(sCh).dejittered = 0;
 
@@ -2822,9 +2821,8 @@ if ~g_bBatchMode, BatchRedo([], 'DetectSpikes'); end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function tSpikes = GetWaveforms(vTrace, vRawTrace, vThresh, nFS, nPreTrigMs, nPostTrigMs, nDeadTimeMs, nBeginTime)
+function tSpikes = GetWaveforms(vTrace, vThresh, nFS, nPreTrigMs, nPostTrigMs, nDeadTimeMs, nBeginTime)
 % vTrace        Continuous trace used for spike detection
-% vRawTrace     Continuous trace used for spike extraction (waveforms)
 % vThresh       Threshold [NEG POS]
 % nFs           Sampling rate
 % nPreTrigMs    Time to keep before spike onset (ms)
@@ -2855,7 +2853,7 @@ vSpiketimes_Pos = vSpiketimes_Pos(vTraceX(vSpiketimes_Pos+1) > 0);
 % note that only the negative threshold is used for alignment
 % the positive threshold is only an exclusive condition
 vDropSpikes = [];
-if ~isnan(vThresh(2)) & ~isempty(vSpiketimes_Pos)
+if ~isnan(vThresh(2)) && ~isempty(vSpiketimes_Pos)
     % condition: every negative threshold crossing need to be paired with a
     % positive threshold crossing within the window nPreTrig:nPostTrig
     mIntervals = [vSpiketimes_Neg - nPreTrig vSpiketimes_Neg + nPostTrig];
@@ -2885,7 +2883,7 @@ vSpiketimes((vSpiketimes-nPreTrig) < 1 | (vSpiketimes+nPostTrig) > length(vTrace
 vRange = -nPreTrig:nPostTrig;
 mIndx = [];
 for i = vRange, mIndx = [mIndx vSpiketimes+i]; end
-mWaveforms = vRawTrace(mIndx); % waveforms
+mWaveforms = vTrace(mIndx); % waveforms
 tSpikes.waveforms = double(mWaveforms); % spikes must of double() type (required by sorting functions)
 % Keep spiketimes after adjusting by nBeginTime
 nBeginTime = nBeginTime * (nFS/1000); % samples
