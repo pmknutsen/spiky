@@ -1,23 +1,25 @@
 ##Spiky
-Spiky is a Matlab GUI wrapper for the Chronux spike sorting library (http://www.chronux.org),
-with a number of extra features for improved sorting, visualization and analysis of spike
-trains and continuous data.
+Spiky is a Matlab application for the analysis of electrophysiological and behavioral data.
 
-###Requirements
-Matlab 6.5 or higher on Linux, Windows or Mac.
+Spiky includes the Chronux library for spike sorting and spectral analysis (http://www.chronux.org),
+along with extra features for convenient sorting, data visualization and analysis of discrete
+and continuous data.
 
 ##Features
-- GUI with zoom, scroll and pan abilities
-- 1-click automatic spike sorting*
+- Zoom, scroll and pan
+- 1-click automatic spike sorting
 - Visualization and validation tools
 - Basic channel operators
-- Bandpass filtering
+- Per-channel bandpass filtering
 - Custom math operators
-- Analysis tools for spike trains and continuous data (see Plug-ins below)
-- Merging of multiple data files
+- Analysis of discrete and continuous data
+- Merging across data files
 - Batch processing
 - Command line interface
 - Extendible through scripting
+
+###Requirements
+Matlab 6.5 (recommended) or higher on Linux, Windows or Mac.
 
 ###Install
 Synchronize the master branch with `git`, or download the latest '.zip' archive (see ZIP
@@ -42,15 +44,12 @@ Continuous:
 - Cross correlation
 - Event triggered average
 - Histogram
-- Spectral coherence*
-- Power spectral density*
-- Spectrogram*
+- Spectral coherence
+- Power spectral density
+- Spectrogram
 
 Discrete:
 - Cross correlations
 - Peristimulus time histogram (PSTH)
 - Spike triggered average (STA)
 - Temporal distribution
-
-* via Chronux
-
