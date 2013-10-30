@@ -11,10 +11,11 @@
 p.axes.color = [1 1 1];
 p.axes.xcolor = [0 0 0];
 p.axes.ycolor = [0 0 0];
-p.axes.tickdir = 'out';
+p.axes.tickdir = 'in';
+p.axes.fontsize = 10;
 
 % Figure properties
-p.figure.color = [.8 .8 .8];
+p.figure.color = [1 1 1];
 p.figure.NumberTitle = 'off';
 p.figure.colormap = jet(2^12);
 
@@ -39,4 +40,4 @@ p.hggroup.facecolor = [.15 .15 .15];
 p.hggroup.edgecolor = [.15 .15 .15];
 
 % colors on lines
-p.colors = distinguishable_colors(100, p.axes.color);
+p.colors = ones(100, 3)./5;

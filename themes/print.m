@@ -38,3 +38,5 @@ p.uipanel.shadowcolor     = [.8 .8 .8];
 p.hggroup.facecolor = [.15 .15 .15];
 p.hggroup.edgecolor = [.15 .15 .15];
 
+% colors on lines
+p.colors = distinguishable_colors(100, p.axes.color);

@@ -37,3 +37,6 @@ p.uipanel.shadowcolor     = [.2 .2 .2];
 % hggroup (e.g. bar graphs)
 p.hggroup.facecolor = [.85 .85 .85];
 p.hggroup.edgecolor = [.85 .85 .85];
+
+% colors on lines
+p.colors = distinguishable_colors(100, p.axes.color);
