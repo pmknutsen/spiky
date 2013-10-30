@@ -20,7 +20,7 @@ tSig = struct([]);
 
 % Select channel
 if isempty(p_sContCh) || ~g_bBatchMode
-    [p_sContCh, bResult] = Spiky.SelectChannelNumber(FV.csDisplayChannels, 'Select continuous signal', p_sContCh);
+    [p_sContCh, bResult] = Spiky.main.SelectChannelNumber(FV.csDisplayChannels, 'Select continuous signal', p_sContCh);
     if ~bResult return, end
 end
 
@@ -28,7 +28,7 @@ end
 vCont = double(FV.tData.(p_sContCh)');
 if all(size(vCont) > 1) return; end
 nFs = FV.tData.([p_sContCh '_KHz']) * 1000;
-vCont = Spiky.ChannelCalculator(vCont, p_sContCh);
+vCont = Spiky.main.ChannelCalculator(vCont, p_sContCh);
 
 % Check that signal is not 2D
 if all(size(vCont) > 1)
@@ -37,7 +37,7 @@ if all(size(vCont) > 1)
 end
 
 % Get channel descriptive string
-sDescr = Spiky.GetChannelDescription(p_sContCh);
+sDescr = Spiky.main.GetChannelDescription(p_sContCh);
 if isempty(sDescr) sDescr = p_sContCh; end
 
 % Get parameters interactively
@@ -59,10 +59,10 @@ if isempty(p_nSigLoPass) || ~g_bBatchMode
 end
 
 % Low-pass signal
-[vCont, ~, ~] = Spiky.FilterChannel(vCont, 1:length(vCont), nFs, p_nSigLoPass, 0, 0, 'none');
+[vCont, ~, ~] = Spiky.main.FilterChannel(vCont, 1:length(vCont), nFs, p_nSigLoPass, 0, 0, 'none');
 
 % Subtract set-point
-[vSetPoint, ~, ~] = Spiky.FilterChannel(vCont, 1:length(vCont), nFs, p_nSPLoPass, 0, 0, 'none');
+[vSetPoint, ~, ~] = Spiky.main.FilterChannel(vCont, 1:length(vCont), nFs, p_nSPLoPass, 0, 0, 'none');
 vSig = vCont - vSetPoint;
 
 % Replace NaNs with 0

@@ -91,7 +91,7 @@ for nCh = 1:length(sCh)
         'Position', [.85 .85-([nCh-1]*.06) .15 .05], 'String', sCh(nCh), ...
         'HorizontalAlignment', 'left', 'backgroundcolor', [.2 .2 .2], ...
         'value', 1, 'foregroundColor', vCol);
-    set(hCheckbox, 'Tag', char(nCh), 'callback', Spiky.ToggleWaveforms);
+    set(hCheckbox, 'Tag', char(nCh), 'callback', Spiky.main.ToggleWaveforms);
 end
 
 xlabel('Frequency (Hz)')

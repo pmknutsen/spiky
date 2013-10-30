@@ -3,8 +3,6 @@ function Spiketime_Distributions(FV)
 %
 %
 
-global Spiky;
-
 % Plot rasters of sorted units
 hFig = figure; % create figure
 set(hFig, 'color', [.2 .2 .2], 'Name', 'Spiky Spiketime Distributions', 'NumberTitle', 'off', 'menubar', 'none')

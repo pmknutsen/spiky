@@ -7,14 +7,14 @@ function FV = import_mat(sFile, FV)
 %  Spiky.SUB(var)
 %
 
-global Spiky;
+global Spiky
 
 % Import vectorized data from .mat files
 tImportedData = load([sPath sFile], '-MAT');
 cFields = fieldnames(tImportedData);
 
 % Select data vector(s)
-[cDataFields, nManualValue] = Spiky.SelectImportVariable(cFields, 'Set data vector(s)', {'Set data vector(s)'}, 0, NaN, p_cDataFields, 1);
+[cDataFields, nManualValue] = Spiky.main.SelectImportVariable(cFields, 'Set data vector(s)', {'Set data vector(s)'}, 0, NaN, p_cDataFields, 1);
 p_cDataFields = cDataFields;
 if isempty(cDataFields), return, end % user closed window
 
@@ -29,14 +29,14 @@ for c = 1:length(cDataFields)
 end
 
 % Select sampling rate (kHz)
-[cFsField, nManualValue] = Spiky.SelectImportVariable(cFields, 'Set sampling rate (Hz)', {'Set sampling rate (Hz)'}, 1, 40000, p_sFsField, 0);
+[cFsField, nManualValue] = Spiky.main.SelectImportVariable(cFields, 'Set sampling rate (Hz)', {'Set sampling rate (Hz)'}, 1, 40000, p_sFsField, 0);
 if isempty(cFsField), return, end % user closed window
 p_sFsField = cFsField{1};
 if ~isnan(nManualValue), nFs = double(nManualValue) / 1000;
 else nFs = double(tImportedData.(p_sFsField)) / 1000; end
 
 % Select gain
-[cGainField, nManualValue] = Spiky.SelectImportVariable(cFields, 'Set gain', {'Set gain'}, 1, 10000, p_sGainField, 0);
+[cGainField, nManualValue] = Spiky.main.SelectImportVariable(cFields, 'Set gain', {'Set gain'}, 1, 10000, p_sGainField, 0);
 if isempty(cGainField), return, end % user closed window
 p_sGainField = cGainField{1};
 if ~isnan(nManualValue), nGain = double(nManualValue);

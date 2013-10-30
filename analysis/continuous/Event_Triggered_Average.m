@@ -8,7 +8,7 @@ global Spiky g_bBatchMode
 % Select trigger event
 persistent p_sEventCh;
 if isempty(p_sEventCh) || (~g_bBatchMode && nargout == 0)
-    [p_sEventCh, bResult] = Spiky.SelectChannelNumber(FV.csDigitalChannels', 'Select trigger event', p_sEventCh);
+    [p_sEventCh, bResult] = Spiky.main.SelectChannelNumber(FV.csDigitalChannels', 'Select trigger event', p_sEventCh);
     if ~bResult, return, end
 end
 
@@ -21,7 +21,7 @@ for ch = 1:length(FV.csChannels)
 end
 persistent p_sContCh;
 if isempty(p_sContCh) || (~g_bBatchMode && nargout == 0)
-    [p_sContCh, bResult] = Spiky.SelectChannelNumber(FV.csChannels(vIndx)', 'Select continuous signal', p_sContCh);
+    [p_sContCh, bResult] = Spiky.main.SelectChannelNumber(FV.csChannels(vIndx)', 'Select continuous signal', p_sContCh);
     if ~bResult, return, end
 end
 
@@ -42,11 +42,11 @@ end
 
 % Get continuous signal
 nContFs = FV.tData.([p_sContCh '_KHz']) * 1000; % Hz
-vCont = Spiky.ChannelCalculator(FV.tData.(p_sContCh), p_sContCh);
+vCont = Spiky.main.ChannelCalculator(FV.tData.(p_sContCh), p_sContCh);
 vContBegin = FV.tData.([p_sContCh '_TimeBegin']);
 
 % Check if signal is 1D or 2D
-if all(size(vCont) > 1) bIs2D = true;
+if all(size(vCont) > 1); bIs2D = true;
 else bIs2D = false; end
 
 % Get parameters interactively (pre/post times and stimulus delay)
@@ -109,27 +109,49 @@ if bIs2D
     vTime = linspace(0, (1/nContFs)*length(vCont), size(vCont, 2));
 else
     vTime = linspace(0, (1/nContFs)*length(vCont), length(vCont));
-    [vCont, ~, nContFs] = Spiky.FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'none');
+    [vCont, ~, nContFs] = Spiky.main.FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'none');
 end
 
 % Convert unit to Intensity/s^-d
 vCont = vCont * (nContFs^p_nDerivative);
 
 % Compute event triggered average
-Spiky.SpikyWaitbar(0, 20);
+Spiky.main.SpikyWaitbar(0, 20);
 nLen = length(vCont);
 mAll = [];
 mAllBaseline = [];
 for o = p_nFirstPulse:nLastPulse
-    Spiky.SpikyWaitbar((o/length(vOnsets))*20, 20);
-    nStart = vOnsets(o) - round(p_nPre * nContFs);
-    nEnd   = vOnsets(o) + round(p_nPost * nContFs);
+    Spiky.main.SpikyWaitbar((o/length(vOnsets))*20, 20);
+    nStart = vOnsets(o) - (p_nPre * nContFs);
+    nEnd   = vOnsets(o) + (p_nPost * nContFs);
+    
+    nStartR = vOnsets(o) - round(p_nPre * nContFs);
+    nEndR  = vOnsets(o) + round(p_nPost * nContFs);
+    nSegLen = nEndR - nStartR;
+
+    % Extract interpolated trace from start to end
+
+    
     if nStart < 1 || nEnd > nLen, continue; end
     if bIs2D
-        vThis = vCont(:, nStart:nEnd);
+        vThis = vCont(:, nStartR:nEndR);
+        [M N] = size(vThis); %Assuming square matrix.
+        [xx yy] = meshgrid(1:N,1:M); %xx,yy are both outputs of meshgrid (so called plaid matrices).
+        sy = 0;
+        sx = nStartR - nStart;
+        try
+            vThis = interp2(xx, yy, vThis, xx+sx, yy+sy, 'spline', nan);
+        catch
+        end
+        %vThis = conv2(vThis, [sy; 1-sy]*[sx, 1-sx], 'valid'); % works only for 0<sx<1
+        
         vThisBaseline = vCont(:, (vOnsets(o) - round(.1 * nContFs)):vOnsets(o)); % 100 ms before pulse
     else
-        vThis = vCont(nStart:nEnd);
+        if nSegLen < 100
+            vThis = interp1(1:length(vCont), vCont, linspace(nStart, nEnd, nSegLen), 'spline');
+        else
+            vThis = vCont(nStartR:nEndR);
+        end
         vThisBaseline = vCont((vOnsets(o) - round(.1 * nContFs)):vOnsets(o)); % 100 ms before pulse
     end
     
@@ -164,7 +186,7 @@ for o = p_nFirstPulse:nLastPulse
         mAllBaseline(end+1, :) = vThisBaseline;
     end
 end
-Spiky.SpikyWaitbar(20, 20);
+Spiky.main.SpikyWaitbar(20, 20);
 
 % Compute statistics
 vMean = squeeze(nanmean(mAll, 1));
@@ -180,7 +202,7 @@ end
 
 % Initialize figure and plot
 hFig = figure('units', 'pixels', 'name', 'Spiky - Event Triggered Average');
-Spiky.ThemeObject(hFig);
+Spiky.main.ThemeObject(hFig);
 hAx = axes();
 if bIs2D
     hold on
@@ -191,33 +213,33 @@ if bIs2D
     set(hMedianLine, 'visible', 'off', 'tag', 'ETAMedian');
     set(hMeanLine, 'visible', 'on', 'tag', 'ETAMean');
 else
-    [hMeanLine, hMeanErr] = Spiky.mean_error_plot(vMean, vErrMean, [0 0 1], vTime);
+    [hMeanLine, hMeanErr] = Spiky.main.mean_error_plot(vMean, vErrMean, [0 0 1], vTime);
     hold on
-    [hMedianLine, hMedianErr] = Spiky.mean_error_plot(vMedian, vErrMedian, [0 1 0], vTime);
+    [hMedianLine, hMedianErr] = Spiky.main.mean_error_plot(vMedian, vErrMedian, [0 1 0], vTime);
     set([hMedianLine, hMedianErr], 'visible', 'off', 'tag', 'ETAMedian');
     set([hMeanLine, hMeanErr], 'visible', 'on', 'tag', 'ETAMean');
 
     % Plot all individual traces
     hold on
     hTrials = plot(repmat(vTime, size(mAll, 1), 1)', mAll');
-    Spiky.ThemeObject(hTrials);
+    Spiky.main.ThemeObject(hTrials);
     set([hTrials], 'visible', 'off', 'tag', 'AllTrials');
 end
 
 hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [1 1 70 20], 'String', 'Mean', ...
     'HorizontalAlignment', 'left', 'value', 1);
-Spiky.ThemeObject(hCheck);
+Spiky.main.ThemeObject(hCheck);
 set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''ETAMean''),''visible'',V);')
 
 hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [71 1 70 20], 'String', 'Median', ...
     'HorizontalAlignment', 'left', 'value', 0);
-Spiky.ThemeObject(hCheck);
+Spiky.main.ThemeObject(hCheck);
 set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''ETAMedian''),''visible'',V);')
 
 if ~bIs2D
     hCheck = uicontrol(hFig, 'Style', 'checkbox', 'Position', [141 1 70 20], 'String', 'Trials', ...
         'HorizontalAlignment', 'left', 'value', 0);
-    Spiky.ThemeObject(hCheck);
+    Spiky.main.ThemeObject(hCheck);
     set(hCheck, 'Callback', 'if(get(gcbo,''value'')),V=''on'';else,V=''off'';end;set(findobj(''tag'',''AllTrials''),''visible'',V);')
 end
 
@@ -250,7 +272,7 @@ end
 
 % Axes properties
 axis tight
-Spiky.ThemeObject(hAx);
+Spiky.main.ThemeObject(hAx);
 set(hAx, 'xlim', [-p_nPre p_nPost])
 xlabel('Time (s)')
 if bIs2D sYStr = FV.tData.([p_sContCh '_Unit']);
@@ -284,7 +306,7 @@ else
             p_sContCh, size(mAll,1) ), 'interpreter', 'none');
     end
 end
-Spiky.ThemeObject(hTit);
+Spiky.main.ThemeObject(hTit);
 
 if ~bIs2D
     plot([vTime(1) vTime(end)], [max(vMean) max(vMean)], 'r:') % max value indicator
@@ -297,6 +319,6 @@ if nargout > 0, varargout(1) = {vMean}; end
 if nargout > 1, varargout(2) = {vErrMean}; end
 if nargout > 2, varargout(3) = {vTime}; end
 set(hFig, 'toolbar', 'figure')
-if ~g_bBatchMode Spiky.BatchRedo([], 'ShowEventTriggeredAverage'); end
+if ~g_bBatchMode Spiky.main.BatchRedo([], 'ShowEventTriggeredAverage'); end
 
 return

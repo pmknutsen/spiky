@@ -2,9 +2,9 @@ function Peristimulus_Time_Histograms(FV)
 %
 %
 %
-global Spiky;
+global Spiky
 
-[sCh, ~] = Spiky.SelectChannelNumber(fieldnames(FV.tSpikes)');
+[sCh, ~] = Spiky.main.SelectChannelNumber(fieldnames(FV.tSpikes)');
 
 if isempty(sCh), warndlg('No channels were found that contained spiking data.'); return; end
 
@@ -63,7 +63,7 @@ vEventIndx(vRemIndx) = [];
 
 % Create figure
 hFig = figure();
-Spiky.ThemeObject(hFig)
+Spiky.main.ThemeObject(hFig)
 drawnow
 set(hFig, 'name', 'Spiky Peristimulus Time Histograms (PSTH)', 'NumberTitle', 'off');
 vXLim = [-.1 .1];
@@ -136,7 +136,7 @@ for u = 1:length(vUnits)
         end
         
         if isnan(nYMax) || nYMax < 0, nYMax = 0.1; end
-        Spiky.ThemeObject(hAx)
+        Spiky.main.ThemeObject(hAx)
         set(hAx, 'fontsize', 7, 'xlim', [-p_nPreStimDur p_nPostStimDur])
         box on; grid on
 
@@ -164,7 +164,7 @@ for u = 1:length(vUnits)
                 hTit = title(sprintf('%s (%s) n=%d', ...
                     FV.tChannelDescriptions(nIndx).sDescription, sChName, length(vUpTimes)));
             end
-            Spiky.ThemeObject(hTit)
+            Spiky.main.ThemeObject(hTit)
             set(hTit, 'FontSize', 8, 'FontWeight', 'bold', 'interpreter', 'none')
         elseif u == length(vUnits)
             xlabel('Time (s)');

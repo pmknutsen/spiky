@@ -41,7 +41,6 @@ if nargin > 0
     if strcmp(varargin{1}, 'GetGitHash')
         varargout{1} = eval(varargin{1});
     else
-        %eval(varargin{1}); % changed 07/11/11
         try
             varargout{1} = eval(varargin{1});
         catch
@@ -76,16 +75,58 @@ csStr = mlintmex('-calls', which('spiky.m'));
 [~,~,~,~,subs] = regexp(csStr, '[S]\d* \d+ \d+ (\w+)\n');
 cSubs = [subs{:}]';
 
-keyboard
-
 % Generate function handles for all sub-routines
 global Spiky;
 Spiky = struct([]);
+Spiky(1).main = struct([]);
+Spiky(1).import = struct([]);
+Spiky(1).export = struct([]);
+Spiky.analysis = struct('discrete', struct([]), 'continuous', struct([]));
 for i = 1:length(cSubs)
-    Spiky(1).(cSubs{i}) = eval(['@' cSubs{i}]);
+    Spiky.main(1).(cSubs{i}) = eval(['@' cSubs{i}]);
 end
-disp(sprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n'))
 
+% Create handles to all /analysis/discrete functions
+sThisPath = CheckFilename([sPath '/analysis/discrete/']);
+tFiles = dir(sThisPath);
+for f = 1:length(tFiles)
+    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
+        sName = tFiles(f).name(1:end-2);
+        Spiky.analysis.discrete(1).(sName) = eval(['@' sName]);
+    end
+end
+
+% Create handles to all /analysis/discrete functions
+sThisPath = CheckFilename([sPath '/analysis/continuous/']);
+tFiles = dir(sThisPath);
+for f = 1:length(tFiles)
+    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
+        sName = tFiles(f).name(1:end-2);
+        Spiky.analysis.continuous(1).(sName) = eval(['@' sName]);
+    end
+end
+
+% Create handles to all /import
+sThisPath = CheckFilename([sPath '/import/']);
+tFiles = dir(sThisPath);
+for f = 1:length(tFiles)
+    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
+        sName = tFiles(f).name(1:end-2);
+        Spiky.import(1).(sName) = eval(['@' sName]);
+    end
+end
+
+% Create handles to all /export
+sThisPath = CheckFilename([sPath '/export/']);
+tFiles = dir(sThisPath);
+for f = 1:length(tFiles)
+    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
+        sName = tFiles(f).name(1:end-2);
+        Spiky.export(1).(sName) = eval(['@' sName]);
+    end
+end
+
+disp(sprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n'))
 
 g_hSpike_Viewer = figure;
 
@@ -148,7 +189,8 @@ uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_PSTH
 mCData = im2double(imread([sPath 'tool_pc.png'])); mCData(mCData == 0) = NaN; % principal components
 uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_PC', 'TooltipString', 'Show principal components', 'ClickedCallback', @ViewWaveformPCs);
 mCData = im2double(imread([sPath 'tool_batch.png'])); mCData(mCData == 1) = NaN; % run batch job
-uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_BatchRedo', 'TooltipString', 'No command available to batch', 'ClickedCallback', 'global Spiky; Spiky.BatchRedo('''',''redo'');', 'enable', 'off');
+uipushtool('Parent', hToolbar, 'cdata', mCData, 'Tag', 'Spiky_WaitbarAction_BatchRedo', ...
+    'TooltipString', 'No command available to batch', 'ClickedCallback', 'global Spiky; Spiky.main.BatchRedo('''',''redo'');', 'enable', 'off');
 
 % Set Spiky to by default NOT be in MERGE MODE
 global g_bMergeMode g_bBatchMode
@@ -5621,7 +5663,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ChannelDescriptions(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
 hFig = figure('closeRequestFcn', 'set(gcbf,''userdata'',1)');
@@ -5676,7 +5718,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ExperimentDescriptions(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
 hFig = figure('closeRequestFcn', 'set(gcbf,''userdata'',''closed'')');
@@ -5689,7 +5731,7 @@ if ~isfield(FV, 'tExperimentVariables')
     FV_temp = SetFVDefaults();
     FV.tExperimentVariables = FV_temp.tExperimentVariables;
 end
-cData = repmat({''},200,2);;
+cData = repmat({''},200,2);
 for i = 1:length(FV.tExperimentVariables)
     cData{i, 1} = FV.tExperimentVariables(i).sVariable;
     cData{i, 2} = FV.tExperimentVariables(i).sValue;
@@ -5704,7 +5746,7 @@ cData = get(hTable, 'data'); % modified data
 
 FV.tExperimentVariables = struct([]); % clear variables
 for c = 1:size(cData, 1)
-    if isempty(cData{c,1}) | isempty(cData{c,2}), continue, end
+    if isempty(cData{c,1}) || isempty(cData{c,2}), continue, end
     FV.tExperimentVariables(end+1).sVariable = cData{c, 1};
     FV.tExperimentVariables(end).sValue = cData{c, 2};
 end
@@ -5716,7 +5758,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DeleteSortingData(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
 sAns = questdlg('All sorting data, including assignment of spikes as outliers, will be removed. Waveforms and dejittering is not affected. Continue?', ...
@@ -5743,8 +5785,8 @@ ViewTrialData()
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Adjust channel amplitude by specified gain. Returned gain is in units of mV
 function [vCont, FV] = AdjustChannelGain(FV, vCont, sCh) % mV
+% Adjust channel amplitude by specified gain. Returned gain is in units of mV
 
 % Adjust gain of signal
 bIsGain = 0;
@@ -5766,7 +5808,7 @@ if ~bIsGain
     if bResetGain, FV.tGain(1).(sCh) = 1; end % default gain of 1
     SetStruct(FV)
     SetGain('noplot')
-    [FV,hWin] = GetStruct; % get updated values
+    [FV, ~] = GetStruct; % get updated values
     nGain = FV.tGain.(sCh);
 end
 
@@ -5809,11 +5851,11 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Invert a selected channel
 function InvertChannel(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
 % Select channel
-[sCh, bResult] = SelectChannelNumber(FV.csChannels);
+[sCh, ~] = SelectChannelNumber(FV.csChannels);
 
 % Invert channel data
 FV.tData.(sCh) = FV.tData.(sCh) .* -1;
@@ -5840,7 +5882,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Show normal time (i.e. start of trial is zero)
 function NormalTime(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 switch lower(get(gcbo,'Checked'))
     case 'on'
         set(gcbo, 'Checked', 'off');
@@ -5856,7 +5898,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Turn on/off x axis grid
 function ShowGrid(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 switch lower(get(gcbo,'Checked'))
     case 'on'
         set(gcbo, 'Checked', 'off');
@@ -5931,7 +5973,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Show info stored in DAQ file
 function ShowDAQInfo(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 if isfield(FV, 'sLoadedTrial') % a trial is loaded
     sFilename = FV.sLoadedTrial;
     if ~isempty(sFilename) % we have a filename
@@ -5950,7 +5992,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function MeasureLine(varargin)
 hObj = varargin{1}; % get calling object
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 
 % Find axis with same tag and make that current
 sCh = get(hObj, 'Tag');
@@ -5968,7 +6010,7 @@ hold on
 % Point A
 [nXa nYa] = ginput(1);
 % Snap to nearest data point on time axis
-[nMinVal nMinIndx] = min(abs(vTime - nXa));
+[~ nMinIndx] = min(abs(vTime - nXa));
 nXa_samples = nMinIndx;
 nXa = vTime(nMinIndx);
 nYa = vCont(nMinIndx);
@@ -5977,7 +6019,7 @@ hPnta = plot(nXa, nYa, 'ro');
 % Point B
 [nXb nYb] = ginput(1);
 % Snap to nearest data point on time axis
-[nMinVal nMinIndx] = min(abs(vTime - nXb));
+[~ nMinIndx] = min(abs(vTime - nXb));
 nXb_samples = nMinIndx;
 nXb = vTime(nMinIndx);
 nYb = vCont(nMinIndx);
@@ -6049,7 +6091,7 @@ return
 % Delete section of selected channel. This function is only called by the context
 % menu which appears when right-clicking channel traces
 function DeleteSection(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 
 sCh = get(gcbo, 'tag'); % channel name
 hAx = findobj(gcf, 'type', 'axes', 'tag', sCh); % find corresponding axes
@@ -6113,7 +6155,7 @@ function ClassifyUnit(varargin)
 % Classify a selected unit. This function assumes that the calling object
 % (gcbo) identifies the channel and unit number in the UserData property
 tUserData = get(gcbo, 'UserData');
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 
 % Create quality structure if it doesnt already exist
 if ~isfield(FV.tSpikes.(tUserData.sChannel), 'quality')
@@ -6144,7 +6186,7 @@ return
 function SetElectrodePosition(varargin)
 % Set and store the electrode position used during the experiment.
 sCh = get(gcbo, 'tag');
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 % Get input from user
 nElecIndx = find(strcmp({FV.tChannelDescriptions.sChannel}, sCh));
 if isfield(FV.tChannelDescriptions(nElecIndx), 'nAPPos')
@@ -6169,7 +6211,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetReceptiveField(varargin)
 % Set and store the electrode position used during the experiment.
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 sCh = get(gcbo, 'tag');
 % Get unit number
 sChUnit = get(get(gcbo, 'parent'), 'tag');
@@ -6295,7 +6337,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RunScript(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 global g_bBatchMode
 
 % Get default path of ./scripts
@@ -6387,7 +6429,7 @@ return
 function [hPlot,hFill] = mean_error_plot(vMean, vError, vColor, vX)
 vMean = reshape(vMean, length(vMean), 1);
 vError = reshape(vError, length(vError), 1);
-if ~exist('vX'), vXt = (1:length(vError))';
+if ~exist('vX', 'var'), vXt = (1:length(vError))';
 else vXt = vX'; end
 vXb = flipud(vXt);
 vYt = vMean + vError;
@@ -6407,7 +6449,7 @@ if ~CheckDataLoaded() return, end
 
 % Save batch job
 sPath = [sDir filesep() sFun];
-[sFullPath, sFunName] = fileparts(which(sPath));
+[sFullPath, ~] = fileparts(which(sPath));
 sEval = [sFullPath filesep() sFun '(FV)'];
 sLocalEval = [sFun '(FV)'];
 BatchRedo([], sEval)

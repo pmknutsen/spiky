@@ -19,8 +19,8 @@ tSig = struct([]);
 
 persistent p_sContCh
 if isempty(p_sContCh) || ~g_bBatchMode
-    [p_sContCh, bResult] = Spiky.SelectChannelNumber(FV.csDisplayChannels, 'Select continuous signal', p_sContCh);
-    if ~bResult return, end
+    [p_sContCh, bResult] = Spiky.main.SelectChannelNumber(FV.csDisplayChannels, 'Select continuous signal', p_sContCh);
+    if ~bResult; return, end
 end
 drawnow
 
@@ -30,7 +30,7 @@ if all(size(vCont) > 1) return; end
 nFs = FV.tData.([p_sContCh '_KHz']) * 1000;
 
 % Get channel descriptive string
-sDescr = Spiky.GetChannelDescription(p_sContCh);
+sDescr = Spiky.main.GetChannelDescription(p_sContCh);
 if isempty(sDescr) sDescr = p_sContCh; end
 
 % Get parameters interactively
@@ -124,7 +124,7 @@ nWinStep = (round((p_nWinStep * nFs)/10) * 10) / nFs;
 % TW - time-bandwidth product (i.e. sec * Hz),
 % K  - number of tapers
 tParams.tapers = [p_nTW p_nTW*2-1]; % [NW K]
-tParams.pad    = 1;
+tParams.pad    = 2;
 tParams.Fs     = nFs;
 tParams.err    = 0; % make sure we don't compute error bars. too slow
 tParams.fpass  = [p_nMinF p_nMaxF];

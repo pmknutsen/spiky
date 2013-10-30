@@ -1,7 +1,7 @@
 function Histogram(FV)
 %
 %
-global Spiky;
+global Spiky
 
 [sCh, ~] = Spiky.SelectChannelNumber(FV.csChannels);
 

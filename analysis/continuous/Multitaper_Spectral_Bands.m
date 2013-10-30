@@ -29,7 +29,7 @@ if isempty(p_sSpecCh) || ~g_bBatchMode
         warndlg('No spectrograms were found. You must compute a spectrogram before using this function.', 'Spiky');
         return
     end
-    [p_sSpecCh, bResult] = Spiky.SelectChannelNumber(FV.csDisplayChannels(iCh), 'Select spectrogram', p_sSpecCh);
+    [p_sSpecCh, bResult] = Spiky.main.SelectChannelNumber(FV.csDisplayChannels(iCh), 'Select spectrogram', p_sSpecCh);
     if ~bResult return, end
 end
 

@@ -16,14 +16,14 @@ tSig = struct([]);
 
 % Select channel A
 if isempty(p_sContChA) || ~g_bBatchMode
-    [p_sContChA, bResult] = Spiky.SelectChannelNumber(FV.csDisplayChannels, 'Select continuous signal A', p_sContChA);
-    if ~bResult return, end
+    [p_sContChA, bResult] = Spiky.main.SelectChannelNumber(FV.csDisplayChannels, 'Select continuous signal A', p_sContChA);
+    if ~bResult; return, end
 end
 
 % Select channel B
 if isempty(p_sContChB) || ~g_bBatchMode
-    [p_sContChB, bResult] = Spiky.SelectChannelNumber(FV.csDisplayChannels, 'Select continuous signal B', p_sContChB);
-    if ~bResult return, end
+    [p_sContChB, bResult] = Spiky.main.SelectChannelNumber(FV.csDisplayChannels, 'Select continuous signal B', p_sContChB);
+    if ~bResult; return, end
 end
 
 % Fetch data
@@ -124,7 +124,7 @@ vColHi(vColHi > 1) = 1;
 hFig = figure;
 set(hFig, 'name', 'Multitaper Coherence')
 hAx = axes('position', [.1 .1 .74 .8], 'xscale', 'li', 'yscale', 'li');
-Spiky.ThemeObject([hFig hAx])
+Spiky.main.ThemeObject([hFig hAx])
 hold(hAx, 'on');
 
 % Error bar estimate
@@ -135,7 +135,7 @@ hLine = plot(hAx, f, C, 'color', vColLo);
 xlabel('Frequency (Hz)')
 ylabel('Coherence')
 hTit = title(sprintf('Multitaper Coherence (n=%d trials)', nSegs), 'color', 'w', 'interpreter', 'none');
-Spiky.ThemeObject(hTit)
+Spiky.main.ThemeObject(hTit)
 
 %%
 

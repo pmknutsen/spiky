@@ -15,7 +15,7 @@ global Spiky g_bBatchMode
 % Select spiking channel
 persistent p_sSpikeCh;
 if isempty(p_sSpikeCh) || (~g_bBatchMode && nargout == 0)
-    [p_sSpikeCh, bResult] = Spiky.SelectChannelNumber(fieldnames(FV.tSpikes)', 'Select spiking channel', p_sSpikeCh);
+    [p_sSpikeCh, bResult] = Spiky.main.SelectChannelNumber(fieldnames(FV.tSpikes)', 'Select spiking channel', p_sSpikeCh);
     if ~bResult, return, end
 end
 
@@ -28,7 +28,7 @@ for ch = 1:length(FV.csChannels)
 end
 persistent p_sContCh;
 if isempty(p_sContCh) || (~g_bBatchMode && nargout == 0)
-    [p_sContCh, bResult] = Spiky.SelectChannelNumber(FV.csChannels(vIndx)', 'Select continuous signal', p_sContCh);
+    [p_sContCh, bResult] = Spiky.main.SelectChannelNumber(FV.csChannels(vIndx)', 'Select continuous signal', p_sContCh);
     if ~bResult return, end
 end
 
@@ -62,7 +62,7 @@ else bIs2D = true; end
 % Initialize figure
 hFig = figure;
 set(hFig, 'Name', 'Spike Triggered Average', 'NumberTitle', 'off')
-Spiky.ThemeObject(hFig);
+Spiky.main.ThemeObject(hFig);
 
 % Get unit IDs
 if isfield(FV.tSpikes.(p_sSpikeCh), 'hierarchy')
@@ -73,7 +73,7 @@ else vUnits = NaN; end
 vUnits(vUnits == 0) = [];
 
 % Iterate over units
-Spiky.SpikyWaitbar(0, length(vUnits));
+Spiky.main.SpikyWaitbar(0, length(vUnits));
 for u = 1:length(vUnits)
     nFs = FV.tSpikes.(p_sSpikeCh).Fs;
     
@@ -94,7 +94,7 @@ for u = 1:length(vUnits)
     nW = .8/length(vUnits);
     figure(hFig)
     hAx = subplot(1, length(vUnits), u); %axes('position', [(nW+.5/length(vUnits))*(u-1)+.05 .1 nW .8] );
-    Spiky.ThemeObject(hAx);
+    Spiky.main.ThemeObject(hAx);
 
     vTime = (-nPreLen:nPostLen) .* (1/(nContFs));
     vMean = zeros(size(vTime));
@@ -122,7 +122,7 @@ for u = 1:length(vUnits)
     xlabel('Time (s)')
     box on; grid on
     hTit = title('');
-    Spiky.ThemeObject(hTit)
+    Spiky.main.ThemeObject(hTit)
     
     % Compute average
     mTrials = [];
@@ -175,14 +175,14 @@ for u = 1:length(vUnits)
         set(hFill, 'edgeColor', 'none', 'faceAlpha', 0.5)
         uistack(hAvg)
     end
-    Spiky.ThemeObject(hAx);
+    Spiky.main.ThemeObject(hAx);
     
     % Title
     if isnan(vUnits(u)) sID = ' Unit UN-SORTED';
     else sID = sprintf(' Unit %d', vUnits(u)); end
     set(hTit, 'string', sprintf('%s  n=%d', sID, length(vSpiketimes)));
     
-    Spiky.SpikyWaitbar(u, length(vUnits));
+    Spiky.main.SpikyWaitbar(u, length(vUnits));
     drawnow
 end
 drawnow

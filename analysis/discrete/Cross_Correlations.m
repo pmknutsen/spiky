@@ -3,8 +3,6 @@ function Cross_Correlations(FV)
 %
 %
 
-global Spiky;
-
 hFig = figure;
 set(hFig, 'color', [.2 .2 .2], 'name', 'Spiky Discrete Cross Correlations', 'NumberTitle', 'off');
 vXLim = [-.05 .05];

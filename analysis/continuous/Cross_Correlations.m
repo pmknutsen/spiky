@@ -14,7 +14,7 @@ csChannels = FV.csDisplayChannels;
 
 hFig = figure;
 set(hFig, 'name', 'Spiky Continuous Cross Correlations', 'NumberTitle', 'off')
-Spiky.ThemeObject(hFig)
+Spiky.main.ThemeObject(hFig)
 
 % Iterate over channels and generate subplot
 for ch1 = 1:length(csChannels)
@@ -74,7 +74,7 @@ for ch1 = 1:length(csChannels)
             plot(vX, vC, 'y')
         end
         set(hAx, 'fontsize', 7, 'ylim', [-.5 1] )
-        Spiky.ThemeObject(hAx)
+        Spiky.main.ThemeObject(hAx)
 
         % Labels above subplots (first row only)
         if ch1 == 1

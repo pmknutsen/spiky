@@ -8,7 +8,7 @@ function FV = import_daq(sFile, FV)
 %
 
 global Spiky
-sFile = Spiky.CheckFilename(sFile);
+sFile = Spiky.main.CheckFilename(sFile);
 [~, sFileOnly] = fileparts(sFile);
 
 try
@@ -17,7 +17,7 @@ catch
     sStr = sprintf('An error occurred when reading the file:\n%s\n\n%s\n\nThis file may be corrupted or truncated.', ...
         sFileOnly, lasterr);
     uiwait(warndlg(sStr, 'Spiky::LoadTrial', 'modal'));
-    Spiky.sp_disp(sStr)
+    Spiky.main.sp_disp(sStr)
     return
 end
 mData = single(mData); % convert to single precision to conserve memory
@@ -25,7 +25,7 @@ mData = single(mData); % convert to single precision to conserve memory
 if isempty(mData)
     sStr = 'An error occurred during loading of .DAQ file: File appears to be empty.';
     uiwait(warndlg(sStr, 'Spiky::LoadTrial', 'modal'))
-    Spiky.sp_disp(sStr)
+    Spiky.main.sp_disp(sStr)
     return
 end
 tData = struct([]);
@@ -71,7 +71,7 @@ for c = 1:length(cDaqChannels)
         nFs = tDAQInfo.ObjInfo.SampleRate; % Hz
         nTimeBegin = vSecSinceMidnight;
         nTimeEnd = (size(mData, 1) / tDAQInfo.ObjInfo.SampleRate) + vSecSinceMidnight;
-        [vUpTimes vDownTimes] = Spiky.DigitizeChannel(mData(:,c), nThresh, nFs, nTimeBegin, nTimeEnd);
+        [vUpTimes vDownTimes] = Spiky.main.DigitizeChannel(mData(:,c), nThresh, nFs, nTimeBegin, nTimeEnd);
         
         tData(1).([sChName '_Up']) = vUpTimes; % sec
         tData.([sChName '_Down']) = vDownTimes; % sec
