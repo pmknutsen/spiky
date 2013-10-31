@@ -1,7 +1,5 @@
 function tSig = Multitaper_Spectral_Bands(FV)
-% Extract power inside designated spectral bands
-%
-%
+% Average spectral power within a range a frequencies.
 %
 % Usage:
 %   S = Multitaper_Spectral_Bands(FV)
@@ -10,7 +8,12 @@ function tSig = Multitaper_Spectral_Bands(FV)
 %   Chronux spectral analysis library (re-distributed with Spiky)
 %   Spectrogram must be computed first (using Multitaper_Spectrogram)
 %
-% ToDO:
+% Default spectral bands:
+%       2 -  4 Hz    Delta
+%       6 - 10 Hz    Theta
+%       8 - 12 Hz    Alpha
+%      12 - 30 Hz    Beta
+%      40 - 90 Hz    Gamma
 %
 
 global Spiky g_bBatchMode
@@ -30,7 +33,7 @@ if isempty(p_sSpecCh) || ~g_bBatchMode
         return
     end
     [p_sSpecCh, bResult] = Spiky.main.SelectChannelNumber(FV.csDisplayChannels(iCh), 'Select spectrogram', p_sSpecCh);
-    if ~bResult return, end
+    if ~bResult; return, end
 end
 
 % Get data
@@ -38,29 +41,21 @@ mSpec = FV.tData.(p_sSpecCh);
 nFs = FV.tData.([p_sSpecCh '_KHz']);
 nTimeBegin = FV.tData.([p_sSpecCh '_TimeBegin']); % s
 nTimeEnd = FV.tData.([p_sSpecCh '_TimeEnd']); % s
-sUnit = FV.tData.([p_sSpecCh '_Unit']);
 vScale = FV.tData.([p_sSpecCh '_Scale']); % Hz
 
 % Get parameters interactively
 % We don't collect parameters when function in batch-mode (when known)
 if isempty(p_mSpecBands) || ~g_bBatchMode
-    % Default spectral bands:
-    %   2 -  4 Hz    Delta
-    %   6 - 10 Hz    Theta
-    %   8 - 12 Hz    Alpha
-    %  12 - 30 Hz    Beta
-    %  40 - 90 Hz    Gamma
     if isempty(p_mSpecBands)
         p_mSpecBands = [2 4;6 10;8 12; 12 30;40 90];
     end
     cPrompt = {'Spectral bands [min max]. One band per line.'};
     cAns = inputdlg(cPrompt,'Options', 5, {num2str(p_mSpecBands)});
     if isempty(cAns), return, end
-    p_mSpecBands = str2num(cAns{1}); % hz
+    p_mSpecBands = str2double(cAns{1}); % hz
 end
 
 % Iterate over frequency bands
-cBandAvg = cell(1, size(p_mSpecBands, 1));
 for fb = 1:size(p_mSpecBands, 1)
     iBand = vScale >= p_mSpecBands(fb, 1) & vScale <= p_mSpecBands(fb, 2);
     
@@ -82,6 +77,3 @@ for fb = 1:size(p_mSpecBands, 1)
 end
 
 return
-
-
-
