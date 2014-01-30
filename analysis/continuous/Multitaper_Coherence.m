@@ -1,5 +1,5 @@
 function tSig = Multitaper_Coherence(FV)
-% Multi taper coherence between two analog channels using Chronux library functions
+% Multi taper coherence of two continuous channels.
 %
 % Usage:
 %   S = Multitaper_Coherence(FV)
@@ -29,21 +29,23 @@ end
 % Fetch data
 vContA = double(FV.tData.(p_sContChA)');
 % TODO: Get vTime (for downsampling etc below)
-if all(size(vContA) > 1) return; end
+if all(size(vContA) > 1); return; end
 nFsA = FV.tData.([p_sContChA '_KHz']) * 1000;
+nTimeBeginA = FV.tData.([p_sContChA '_TimeBegin']);
 
 vContB = double(FV.tData.(p_sContChB)');
 % TODO: Get vTime (for downsampling etc below)
-if all(size(vContB) > 1) return; end
+if all(size(vContB) > 1); return; end
 nFsB = FV.tData.([p_sContChB '_KHz']) * 1000;
+nTimeBeginB = FV.tData.([p_sContChB '_TimeBegin']);
 
 % Get parameters interactively
 % We don't collect parameters when function in batch-mode (when known)
 if isempty(p_nMinF) || ~g_bBatchMode
     if isempty(p_nMinF), p_nMinF = 1; end
     if isempty(p_nMaxF), p_nMaxF = min(floor([nFsA nFsB]/2.5)); end
-    if isempty(p_nTW), p_nTW = 3; end % todo: guess better...
-    if isempty(p_nD), p_nD = 1; end % todo: guess better...
+    if isempty(p_nTW), p_nTW = 3; end
+    if isempty(p_nD), p_nD = 1; end
     cPrompt = {'Min frequency (Hz)', 'Max frequency (Hz)', ...
         'Time-bandwidth product (TW; s*Hz)', 'Signal derivative'};
     cAnswer = inputdlg(cPrompt,'Options', 1, ...
@@ -62,30 +64,51 @@ if p_nD > 0
     vContB = diff(vContB, p_nD);
 end
 
+% Check that onset time is the same for both signals
+if nTimeBeginA ~= nTimeBeginB
+    warndlg('Both channels need to start at the same time.', 'Multitaper Coherence')
+    return
+end
 
+% Check that sample rate is same for both channels
 if nFsA ~= nFsB
     % TODO: resample highest Fs trace to lower resolution HERE
-    % Check that nFsA now is equal to nFsB
+    warndlg('Sampling rate must be same for both channels.', 'Multitaper Coherence')
+    return
 end
 
 % TODO: Fix traces with NaNs HERE
 
-% TODO: Both traces need to start and end at the same time!
-% If different, interpolate one trace based on vTime of other trace??
-
-
 % Decimate signal to match user-defined frequency range (speeds up spectral analysis)
-nRA = floor(nFsA / (p_nMaxF*2.5));
-vContA = decimate(vContA, nRA);
-nFsA = nFsA/nRA;
+% Note that nFs after decimation must be an integer as there will otherwise
+% be a temporal offset in the output of mtspecgramc (due to internal rounding of nFs)
+if 0
+    nFsO = nFsA;
+    nR_max = floor(nFsA / (p_nMaxF*5)); % scalar must be at least 2.5
+    nR = nR_max;
+    nFsA = nFsO/nR;
+    nFsB = nFsO/nR;
+    while 1
+        % Check that both nR and nFs are integers
+        if  (ceil(nR) == floor(nR)) && (ceil(nFsA) == floor(nFsA))
+            break
+        else
+            nR = nR - 1;
+            nFsA = nFsO/nR;
+            nFsB = nFsO/nR;
+        end
+        if nR == 0 break; end
+    end
+    vContA = decimate(vContA, nR);
+    vContB = decimate(vContB, nR);
+else
+    nFsO = nFsA;
+end
 
-nRB = floor(nFsB / (p_nMaxF*2.5));
-vContB = decimate(vContB, nRB);
-nFsB = nFsB/nRB;
 
 %% Segment signal vector (to enable trial averaging)
-nSegLen = (1 / p_nMinF) * nFsA * 2;
-nSegs = floor(length(vContA) / nSegLen);
+nSegLen = (1 / (p_nMinF+2)) * nFsA * 2;
+nSegs = floor(length(vContA) / nSegLen)
 mS = [];
 mContA = [];
 mContB = [];
@@ -99,18 +122,15 @@ else
         mContB(:, i) = vContB(vRange(1):vRange(2));
     end
 end
-if p_nD > 0
-    mContA = diff(mContA, p_nD, 1);
-    mContB = diff(mContB, p_nD, 1);
-end
 
 % Initialize coherencyc parameters structure
-tParams.tapers   = [p_nTW p_nTW*2-1]; % [NW K]
-tParams.pad      = 1;
-tParams.err      = [2 .1];
+p_nTW = 5;
+tParams.tapers   = [p_nTW (p_nTW*2)-1]; % [NW K]
+tParams.pad      = 2;
+tParams.err      = [2 .05]; % 0 = no error bars, [1 p] = theoretical error bars, [2 p] = jackknife error
 tParams.fpass    = [p_nMinF p_nMaxF];
 tParams.trialave = 1;
-tParams.Fs = nFsA;
+tParams.Fs       = nFsA;
 
 [C, phi, S12, S1, S2, f, confC, phistd, Cerr] = coherencyc(mContA, mContB, tParams);
 
@@ -127,14 +147,31 @@ hAx = axes('position', [.1 .1 .74 .8], 'xscale', 'li', 'yscale', 'li');
 Spiky.main.ThemeObject([hFig hAx])
 hold(hAx, 'on');
 
+hAx(1) = subplot(2, 1, 1);
+hLin(1) = line([f(1) f(end)], confC*[1 1], 'lineStyle', '--'); % confidence level
+hold on
+hLin(2) = plot(f, C); % hz vs coherence
+ylabel('|Coherence|')
+xlabel('Frequency (Hz)')
+plot(f, Cerr, 'r')
+
+hAx(2) = subplot(2, 1, 2);
+hLin(3) = plot(f, (phi));
+ylabel('Phase')
+xlabel('Frequency (Hz)')
+
+hTit = title(hAx(1), sprintf('Multitaper Coherence\n%s vs %s, n=%d trials, %.0f%% confidence limit', ...
+    p_sContChA, p_sContChB, nSegs, tParams.err(2).*100), 'color', 'w', 'interpreter', 'none');
+Spiky.main.ThemeObject([hAx hLin hTit])
+
+%%
+
+
 % Error bar estimate
 axes(hAx);
 hFill = fill([f fliplr(f)], [C'+Cerr(1,:) fliplr(C'-Cerr(2,:))], vColHi, 'edgecolor', 'none');
 hLine = plot(hAx, f, C, 'color', vColLo);
 
-xlabel('Frequency (Hz)')
-ylabel('Coherence')
-hTit = title(sprintf('Multitaper Coherence (n=%d trials)', nSegs), 'color', 'w', 'interpreter', 'none');
 Spiky.main.ThemeObject(hTit)
 
 %%

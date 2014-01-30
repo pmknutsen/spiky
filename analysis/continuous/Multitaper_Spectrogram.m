@@ -26,12 +26,12 @@ drawnow
 
 % Fetch data
 vCont = double(FV.tData.(p_sContCh)');
-if all(size(vCont) > 1) return; end
+if all(size(vCont) > 1); return; end
 nFs = FV.tData.([p_sContCh '_KHz']) * 1000;
 
 % Get channel descriptive string
 sDescr = Spiky.main.GetChannelDescription(p_sContCh);
-if isempty(sDescr) sDescr = p_sContCh; end
+if isempty(sDescr); sDescr = p_sContCh; end
 
 % Get parameters interactively
 % We don't collect parameters when function in batch-mode (when known)
@@ -95,9 +95,9 @@ end
 % Decimate signal to match user-defined frequency range (speeds up spectral analysis)
 % Note that nFs after decimation must be an integer as there will otherwise
 % be a temporal offset in the output of mtspecgramc (due to internal rounding of nFs)
-if 0
+if 1
     nFsO = nFs;
-    nR_max = floor(nFs / (p_nMaxF*2.5));
+    nR_max = floor(nFs / (p_nMaxF*5));
     nR = nR_max;
     nFs = nFsO/nR;
     while 1

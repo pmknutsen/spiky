@@ -40,6 +40,11 @@ while 1
 end
 fclose(hFile);
 
+if isempty(mLog)
+    FV.ScriptError = sprintf('Emtpy GalvoScanner log:\n%s', sTrial);
+    return;
+end
+
 % Get LaserShutter Up/Down times
 nLaserIndx = find(strcmpi({FV.tChannelDescriptions.sDescription}, 'LaserShutter'));
 sField = FV.tChannelDescriptions(nLaserIndx).sChannel;
@@ -62,7 +67,6 @@ vLaserOff = round(vLaserOff * vLaserFs); % samples
 if length(vLaserOn) > length(vLaserOff)
     vLaserOn = vLaserOn(1:length(vLaserOff));
 end
-
 
 % Get all unique positions in preserved order
 vAP = mLog(:, 4);

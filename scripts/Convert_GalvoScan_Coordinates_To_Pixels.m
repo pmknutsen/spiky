@@ -1,9 +1,11 @@
 function FV = Convert_GalvoScan_Coordinates_To_Pixels(FV)
 % Convert GalvoScanner coordinates from millimeters to pixels
 %
+% *When/where is the output of this used???*
+%
 % Pre-requisites:
-% 1) Vessel image taken with GalvoScanner that indicates millimeters
-% 2) Image processing toolbox
+%   1) Vessel image taken with GalvoScanner that indicates millimeters
+%   2) Image processing toolbox
 %
 %
 

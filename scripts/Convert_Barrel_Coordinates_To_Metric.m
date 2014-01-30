@@ -1,10 +1,20 @@
 function FV = Convert_Barrel_Coordinates_To_Metric(FV)
-% Convert GalvoScanner coordinates from millimeters to pixels
+% Convert barrel coordinates to millimeters
 %
 % Pre-requisites:
-% 1) Vessel image taken with GalvoScanner that indicates millimeters
-% 2) Image processing toolbox
+%   - Image Processing Toolbox
+%   - run ISI_analysisGUI on all IOS files with the Export to MAT option
+%   - run the Map_Barrels plugin from ISI_analysisGUI
+%   - run the Import_Barrels script in Spiky
+% 
+% To run this function you also need:
+%   - A vessel image taken with GalvoScanner that indicates at least 2 pairs of [x y]
+%     coordinates in millimeters
 %
+% TODO:
+%   Barrels convert to GalvoScanner image ok, but rotation of scan grid to
+%   anatomical coordinates is buggy: It seems to only work if [x y] pairs
+%   with identical numbers is used, e.g. [-2 -2] and [-3 -3].
 %
 
 cd(FV.sDirectory)
@@ -30,15 +40,15 @@ title(sprintf('Click on two locations with known anterior/posterior and medial/l
 hAnaDots = plot(vX, vY, 'c+');
 hAnaTxt = text(vX, vY, {'  1', '  2'}, 'color', 'w');
 
-% Get anatomical coordinates
+% Get anatomical coordinates interactively
 cAns = inputdlg({'1 - Anterior/Posterior' '1 - Medial/Lateral' ...
     '2 - Anterior/Posterior' '2 - Medial/Lateral'}, 'Coordinates', 1);
 delete([hAnaDots; hAnaTxt])
 if isempty(cAns), return, end
 
 % Check that supplied coordinates are ok
-vAP = [str2num(cAns{1}) str2num(cAns{3})];
-vML = [str2num(cAns{2}) str2num(cAns{4})];
+vAP = [str2double(cAns{1}) str2double(cAns{3})];
+vML = [str2double(cAns{2}) str2double(cAns{4})];
 if length(vAP) < 2 || length(vML) < 2
     errordlg('You must enter a value in each field.')
     return
@@ -51,9 +61,9 @@ end
 % Store coordinates
 tAnaCoords = struct();
 tAnaCoords(1).vAP = vAP;
-tAnaCoords(1).vX  = [vX];
+tAnaCoords(1).vX  = vX;
 tAnaCoords(1).vML = vML;
-tAnaCoords(1).vY  = [vY];
+tAnaCoords(1).vY  = vY;
 
 % Conversion factor
 nXPixMM = diff(vX) / diff(vAP); % pix/mm
@@ -129,6 +139,10 @@ nYPixMM = diff(vY_r2) / diff(vML); % pix/mm
 nPixMM = (nXPixMM + nYPixMM) / 2;
 
 % iii) Find origin (average of both points, for accuracy)
+%vO(1,1) = vX_r2(1) - (vAP(1) * nPixMM);
+%vO(1,2) = vY_r2(1) - (vML(1) * nPixMM);
+%vO(2,1) = vX_r2(2) - (vAP(2) * nPixMM);
+%vO(2,2) = vY_r2(2) - (vML(2) * nPixMM);
 vO(1,1) = vX_r2(1) - (vAP(1) * nPixMM);
 vO(1,2) = vY_r2(1) - (vML(1) * nPixMM);
 vO(2,1) = vX_r2(2) - (vAP(2) * nPixMM);

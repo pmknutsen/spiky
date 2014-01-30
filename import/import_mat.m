@@ -2,19 +2,29 @@ function FV = import_mat(sFile, FV)
 %Matlab files
 
 % Import vectors from .mat files in Spiky
+%
+% No particular format is expected. Spiky will execute the load() function
+% and read all variables contained in the selected .mat file. Spiky will
+% ask which variables to import as data, and which variable to use as the
+% sampling rate of imported vectors.
 
 % Internal Spiky sub-rutines can be called with the syntax:
 %  Spiky.SUB(var)
 %
 
 global Spiky
+persistent p_cDataFields p_sFsField p_sGainField p_sONField p_nDefFs p_nDefGain
+
+if isempty(p_nDefFs), p_nDefFs = 40000; end % default sampling rate
+if isempty(p_nDefGain), p_nDefGain = 1; end % default sampling rate
 
 % Import vectorized data from .mat files
-tImportedData = load([sPath sFile], '-MAT');
+tImportedData = load(sFile, '-MAT');
 cFields = fieldnames(tImportedData);
 
 % Select data vector(s)
 [cDataFields, nManualValue] = Spiky.main.SelectImportVariable(cFields, 'Set data vector(s)', {'Set data vector(s)'}, 0, NaN, p_cDataFields, 1);
+
 p_cDataFields = cDataFields;
 if isempty(cDataFields), return, end % user closed window
 
@@ -29,14 +39,15 @@ for c = 1:length(cDataFields)
 end
 
 % Select sampling rate (kHz)
-[cFsField, nManualValue] = Spiky.main.SelectImportVariable(cFields, 'Set sampling rate (Hz)', {'Set sampling rate (Hz)'}, 1, 40000, p_sFsField, 0);
+[cFsField, nManualValue] = Spiky.main.SelectImportVariable(cFields, 'Set sampling rate (Hz)', {'Set sampling rate (Hz)'}, 1, p_nDefFs, p_sFsField, 0);
 if isempty(cFsField), return, end % user closed window
 p_sFsField = cFsField{1};
 if ~isnan(nManualValue), nFs = double(nManualValue) / 1000;
 else nFs = double(tImportedData.(p_sFsField)) / 1000; end
+p_nDefFs = nFs * 1000;
 
 % Select gain
-[cGainField, nManualValue] = Spiky.main.SelectImportVariable(cFields, 'Set gain', {'Set gain'}, 1, 10000, p_sGainField, 0);
+[cGainField, nManualValue] = Spiky.main.SelectImportVariable(cFields, 'Set gain', {'Set gain'}, 1, p_nDefGain, p_sGainField, 0);
 if isempty(cGainField), return, end % user closed window
 p_sGainField = cGainField{1};
 if ~isnan(nManualValue), nGain = double(nManualValue);
@@ -74,8 +85,8 @@ if ~isempty(FV.sLoadedTrial) && bAppend
             end
             
             % Get alignment event
-            [cONField, nManualValue, nButton] = SelectImportVariable([cFields(vIndx); 'Append to existing channels'], ...
-                'Align to event', {'Align Start', 'Align End'}, 1, 0, p_sONField, 0, ...
+            [cONField, nManualValue, nButton] = Spiky.main.SelectImportVariable([cFields(vIndx); 'Append to existing channels'], ...
+                'Align to event', {'Align Start', 'Align End'}, 1, NaN, p_sONField, 0, ...
                 [cDescriptions(vIndx)'; ' ']);
             if isempty(cONField), return, end % user closed window
             p_sONField = cONField{1};
@@ -124,7 +135,6 @@ for c = 1:length(p_cDataFields)
                         nOnsetTime = FV.tData.(p_sONField)(1);
                     case 'end' % align end of signal to trigger
                         nOffsetTime = FV.tData.(p_sONField)(1); % end of signal, sec
-                        %nDur = length(tImportedData.(sDataField)(:)) /  (nFs*1000);
                         nDur = length(mData(:,di)) /  (nFs*1000);
                         nOnsetTime = nOffsetTime - nDur; % start of signal, sec
                 end
@@ -134,10 +144,7 @@ for c = 1:length(p_cDataFields)
         if strcmpi(cONField, 'Append to existing channels')
             % Append new data to an existing field
             if isfield(FV.tData, sDataField)
-                %FV.tData.(sDataField) = [FV.tData(1).(sDataField) double(tImportedData.(sDataField)(:)')];
                 FV.tData.(sDataField) = [FV.tData(1).(sDataField) double(mData(:, di))];
-                %FV.tData(1).([sDataField '_TimeEnd']) = FV.tData(1).([sDataField '_TimeEnd']) + ...
-                %    (length(tImportedData.(sDataField)(:)') / (nFs*1000)); % sec
                 FV.tData(1).([sDataField '_TimeEnd']) = FV.tData(1).([sDataField '_TimeEnd']) + ...
                     (length(mData(:, di)) / (nFs*1000)); % sec
             else
@@ -146,20 +153,17 @@ for c = 1:length(p_cDataFields)
             end
         else
             % Create field for data
-            sChName = sprintf('%s%d', sDataField, di);
+            sChName = sDataField;
             FV.tGain(1).(sChName) = nGain;
             FV.tData(1).([sChName '_KHz']) = nFs;
             FV.tData(1).([sChName '_KHz_Orig']) = nFs;
-            %FV.tData(1).([sChName '_TimeEnd']) = nOnsetTime + (length(tImportedData.(sDataField)(:)') / (nFs*1000)); % sec
             FV.tData(1).([sChName '_TimeEnd']) = nOnsetTime + (length(mData(:, di)) / (nFs*1000)); % sec
-            %FV.tData(1).(sChName) = double(tImportedData.(sDataField)(:)');
             FV.tData(1).(sChName) = double(mData(:, di));
             FV.tData(1).([sChName '_Imported']) = 1; % Mark field as imported
-            FV.csDisplayChannels{end+1} = sChName;
+            FV.csDisplayChannels = unique([FV.csDisplayChannels sChName]);
             FV.tData(1).([sChName '_TimeBegin']) = nOnsetTime; % sec
         end
     end % end of channels loop
-    
 end
 
 return

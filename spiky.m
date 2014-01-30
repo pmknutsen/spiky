@@ -71,7 +71,7 @@ addpath(genpath(sPath), '-end');
 
 % Get list of all internal sub-routines
 disp('Initializing function handles...')
-csStr = mlintmex('-calls', which('spiky.m'));
+csStr = mlintmex('-calls', which(mfilename));
 [~,~,~,~,subs] = regexp(csStr, '[S]\d* \d+ \d+ (\w+)\n');
 cSubs = [subs{:}]';
 
@@ -204,12 +204,18 @@ uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Open...', 'Callback', @OpenF
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Open &Directory...', 'Callback', @SetDirectory, 'Accelerator', 'D');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Open Directory Tree...', 'Callback', @SetDirectoryTree, 'Accelerator', 'T');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Open Settings...', 'Callback', @OpenSettings);
+uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Import...', 'Callback', @ImportFile, 'Accelerator', 'I');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Save', 'Callback', @SaveResults, 'separator', 'on', 'Accelerator', 'S');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Export...', 'Callback', @ExportData);
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Publish to NEX', 'Callback', 'publish_spiky_data');
 hFileList = uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Files', 'Tag', 'MenuFileList', 'separator', 'on'); % filelist
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Previous...', 'Callback', 'spiky(''OpenFile([],-1)'');'); % previous
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Next...', 'Callback', 'spiky(''OpenFile([],0)'');', 'Accelerator', 'N'); % next
+hMerge  = uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Merge');
+uimenu(g_hSpike_Viewer, 'Parent', hMerge, 'Label', '&Distribute Settings', 'Callback', @DistributeSettings);
+uimenu(g_hSpike_Viewer, 'Parent', hMerge, 'Label', '&Merge Files', 'Callback', @CreateMergeFile, 'Accelerator', 'M');
+uimenu(g_hSpike_Viewer, 'Parent', hMerge, 'Label', '&Load Merge File...', 'Callback', @LoadMergeFile);
+uimenu(g_hSpike_Viewer, 'Parent', hMerge, 'Label', '&Delete All Settings', 'Callback', @RemoveSettings, 'Separator', 'on');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Pa&ge Setup...', 'Callback', 'pagesetupdlg(gcbf)', 'separator', 'on');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', 'Print Pre&view...', 'Callback', 'printpreview(gcbf)');
 uimenu(g_hSpike_Viewer, 'Parent', hFile, 'Label', '&Print...', 'Callback', 'printdlg(gcbf)', 'Accelerator', 'P');
@@ -237,7 +243,7 @@ hAmpUnit = uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Amplitude Unit');
 uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Volts (V)', 'callback', {@SetAmplitudeUnit, 'v'});
 uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Millivolts (mV)', 'checked', 'on', 'callback', {@SetAmplitudeUnit, 'v'});
 uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Microvolts (µV)', 'callback', {@SetAmplitudeUnit, 'v'});
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Normal Time', 'Callback', @NormalTime, 'separator', 'on', 'Tag', 'ShowNormalTime');
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Normal Time', 'Callback', @NormalTime, 'separator', 'on', 'Tag', 'ShowNormalTime', 'checked', 'on');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', @ShowGrid);
 
 % List of themes
@@ -257,10 +263,11 @@ uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'Digiti&ze', 'Callback', @
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'D&uplicate', 'Callback', @DuplicateChannel);
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', 'D&elete', 'Callback', @DeleteChannel);
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Noise Reduction... (B)', 'Callback', @PCACleaning);
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Merge...', 'Callback', @MergeChannels);
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Invert...', 'Callback', @InvertChannel);
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Filtered Channels...', 'Callback', @SetFilterChannels, 'separator', 'on', 'Accelerator', 'F');
 uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Filter Options...', 'Callback', @FilterOptions);
-uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Channel Calculator...', 'Callback', @SetChannelCalculator);
+uimenu(g_hSpike_Viewer, 'Parent', hChannels, 'Label', '&Channel Calculator...', 'Callback', @SetChannelCalculator, 'Accelerator', 'C');
 
 %  - Spikes menu
 hWaveforms  = uimenu(g_hSpike_Viewer, 'Label', '&Spikes');
@@ -326,13 +333,6 @@ end
 
 uimenu(g_hSpike_Viewer, 'Parent', hAnalysis, 'Label', 'Experiment &Variables...', 'Callback', @ExperimentDescriptions, 'separator', 'on', 'Accelerator', 'V');
 
-%  - Merge menu
-hMerge  = uimenu(g_hSpike_Viewer, 'Label', '&Merge');
-uimenu(g_hSpike_Viewer, 'Parent', hMerge, 'Label', '&Distribute Settings', 'Callback', @DistributeSettings);
-uimenu(g_hSpike_Viewer, 'Parent', hMerge, 'Label', '&Merge Files', 'Callback', @CreateMergeFile, 'Accelerator', 'M');
-uimenu(g_hSpike_Viewer, 'Parent', hMerge, 'Label', '&Load Merge File...', 'Callback', @LoadMergeFile);
-uimenu(g_hSpike_Viewer, 'Parent', hMerge, 'Label', '&Delete All Settings', 'Callback', @RemoveSettings, 'Separator', 'on');
-
 %  - Tools menu
 hTools  = uimenu(g_hSpike_Viewer, 'Label', '&Tools');
 hScripts = uimenu(g_hSpike_Viewer, 'Parent', hTools, 'Label', 'Scripts');
@@ -387,7 +387,13 @@ return
 function CheckUpdate(varargin)
 % Compare commit SHA hash on disk with latest version online
 hWin = msgbox('Checking for a newer version of Spiky...', 'Spiky Update');
-sResp = urlread('https://api.github.com/repos/pmknutsen/spiky/commits');
+try
+    sResp = urlread('https://api.github.com/repos/pmknutsen/spiky/commits');
+catch
+    close(hWin)
+    warndlg(lasterr, 'Spiky')
+    return
+end
 [~,~,~,~,cSHA] = regexp(sResp, '[{"sha":"(\w+)"');
 sSHA = cell2mat(cSHA{1});
 close(hWin)
@@ -1070,23 +1076,40 @@ ViewTrialData   % Update GUI
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function csExt = GetImportFilters()
+function csExt = GetImportFilters(varargin)
 % Get list of import filters
-sDir = which('spiky.m');
+% Usage:
+%   GetImportFilters(), returns list of filters
+%   GetImportFilters('*.mat'), returns filter list with '*.mat' at top
+%
+% The second calling syntax can be used to select a default filter.
+%
+if ~isempty(varargin) sDef = varargin{1}; % default from input
+else sDef = []; end
+sDir = which(mfilename);
 tDir = dir([sDir(1:end-7) 'import']);
 csExt = {};
 for i = 3:length(tDir)
+    if ~isempty(strfind(tDir(i).name, '~'))
+        continue % ignore backup files
+    end
     csExt{end+1,1} = ['*.' tDir(i).name(8:end-2)];
     sDescr = eval(['help(''' tDir(i).name ''')']);
     csExt{end,2} = [sDescr(2:end-1) ' (' csExt{end,1} ')'];
 end
+% Reorder if a default filter was specified
+if ~isempty(sDef)
+    iDef = strcmp(csExt(:, 1), sDef);
+    if any(iDef)
+        csExt = [csExt(iDef, :); csExt(~iDef, :)];
+    end
+end
 return
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function csExt = GetExportFilters()
 % Get list of import filters
-sDir = which('spiky.m');
+sDir = which(mfilename);
 tDir = dir([sDir(1:end-7) 'export']);
 csExt = {};
 for i = 3:length(tDir)
@@ -1096,10 +1119,9 @@ for i = 3:length(tDir)
 end
 return
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [cPaths, cFiles] = GetFilePaths(sBaseDir, sSuffix)
-% --- Get paths of videos in a directory and its sub-directories
+% Get paths of videos in a directory and its sub-directories
 % Recursive search for .bin files from a selected directory
 % inputs: sSuffix    Find files this file extension (e.g. '.avi')
 %         sBaseDir   Base directory
@@ -1125,7 +1147,28 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function vTime = GetTime(nBeginTime, nEndTime, vCont, nFs)
+% Get time vectors for continuous 1- or 2-D data
+if all(size(vCont) > 1) % 2D trace (e.g. spectrogram)
+    nEndTime = nBeginTime + (size(vCont, 2))*(1/nFs);
+    vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
+else % 1D trace (voltage etc)
+    % TODO: Why don't I always calculate vTime from nFs
+    vTime = linspace(nBeginTime, nEndTime, length(vCont));
+    % Check that time intervals == nFs; if not, then recalculate
+    % vTime from nFs
+    nFs_i = 1 / diff(vTime(1:2));
+    if nFs_i ~= nFs
+        vTime = nBeginTime:(1/nFs):(nBeginTime+(1/nFs)*length(vCont)+1);
+        vTime = vTime(1:length(vCont));
+    end
+end
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewTrialData(varargin)
+% Update main window in GUI (channels and events)
 
 % Make Spiky window current without raising it to the top
 hFig = findobj('Tag', 'Spiky');
@@ -1171,21 +1214,24 @@ cFields = fieldnames(FV.tData);
 for i = 1:length(cFields)
     if ~isempty(strfind(cFields{i}, '_TimeBegin'))
         FV.csChannels{end+1} = cFields{i}(1:end-10);
-        if isfield(FV.tData, cFields{i}(1:end-10))
-            sField = cFields{i}(1:end-10);
-            vMinMax = [min(FV.tData.(sField)) max(FV.tData.(sField))];
-            [vMinMax, FV] = AdjustChannelGain(FV, vMinMax, sField); % mV
-            if ~isfield(FV.tYlim, FV.csChannels{end})
-                FV.tYlim(1).(FV.csChannels{end}) = vMinMax;
-            end
-        else
-            if ~isfield(FV.tYlim, FV.csChannels{end})
-                FV.tYlim(1).(FV.csChannels{end}) = []; % assume its digital
-            end
-        end
     end
 end
 FV.csChannels = unique(FV.csChannels);
+
+% Update y-axis limits for all channels
+for i = 1:length(FV.csChannels)
+    if isfield(FV.tData, FV.csChannels{i})
+        vMinMax = [min(FV.tData.(FV.csChannels{i})) max(FV.tData.(FV.csChannels{i}))];
+        [vMinMax, FV] = AdjustChannelGain(FV, vMinMax, FV.csChannels{i}); % mV
+        if ~isfield(FV.tYlim, FV.csChannels{i})
+            FV.tYlim(1).(FV.csChannels{i}) = vMinMax;
+        end
+    else
+        if ~isfield(FV.tYlim, FV.csChannels{i})
+            FV.tYlim(1).(FV.csChannels{i}) = []; % assume its digital
+        end
+    end
+end
 
 % Check that all DisplayChannels exist (and remove those that dont)
 vRemIndx = [];
@@ -1222,12 +1268,7 @@ for i = 1:length(FV.csDisplayChannels)
         nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency (Hz)
         nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
         nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
-        if all(size(vCont) > 1) % 2D trace (e.g. spectrogram)
-            nEndTime = nBeginTime + (size(vCont, 2))*(1/nFs);
-            vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
-        else % 1D trace (voltage etc)
-            vTime = linspace(nBeginTime, nEndTime, length(vCont));
-        end
+        vTime = GetTime(nBeginTime, nEndTime, vCont, nFs);
 
         % Limit vector to FV.vXlim
         if ~isempty(FV.vXlim)
@@ -1276,9 +1317,12 @@ for i = 1:length(FV.csDisplayChannels)
     % Continuous trace
     nSubs = length(FV.csDisplayChannels);
 
-    nSubHeight = ((.91-(nSubs*.02+nSubEventHeight)) / nSubs);
-    nSubY = .075 + (.02*(i-1)) + (nSubHeight*(i-1));
-    hSubplots(end+1) = axes('position', [.07 nSubY .91 (nSubHeight)+.01]);
+    nYBase = .08; % lower boundary of bottom axis
+    nXBase = .07; % left-most boundary axes
+    nYSep = 0.01; % separation between events and top axis
+    nSubHeight = (((1-nYBase-nYSep)-(nSubs*.02+nSubEventHeight)) / nSubs);
+    nSubY = nYBase + (.02*(i-1)) + (nSubHeight*(i-1));
+    hSubplots(end+1) = axes('position', [nXBase nSubY .91 (nSubHeight)+.01], 'tag', sCh, 'nextplot', 'ReplaceChildren');
     
     % Plot spike rasters
     if FV.bPlotRasters && isfield(FV.tSpikes, sCh)
@@ -1392,9 +1436,9 @@ for i = 1:length(FV.csDisplayChannels)
         end
     else % plot continuous trace
         if length(find(size(vCont)>1)) == 1
-            if ~exist('nContTrace', 'var') nContTrace = 1; end
+            if ~exist('nContTrace', 'var'); nContTrace = 1; end
             nContTrace = nContTrace + 1;
-            hLin = plot(vTime, vCont, 'color', FV.mColors(nContTrace,:));
+            hLin = plot(hSubplots(end), vTime, vCont, 'color', FV.mColors(nContTrace,:));
         else
             vY = [];
             if isfield(FV.tData, [sCh '_Scale'])
@@ -1535,7 +1579,6 @@ for i = 1:length(FV.csDisplayChannels)
             end
         end
     end
-
 end
 
 % Plot digital events
@@ -1599,9 +1642,6 @@ if bShowDigitalEvents
 
         % Remove events outside of axis limits
         if ~isempty(FV.vXlim)
-            %nRAdj = abs(diff(FV.vXlim)*.5); % adjust extended range by 50% for panning purposes
-            %vIndx = find((vUpTimes < [min(FV.vXlim)-nRAdj] | vUpTimes > [max(FV.vXlim)+nRAdj]) ...
-            %    & (vDownTimes < [min(FV.vXlim)-nRAdj] | vDownTimes > [max(FV.vXlim)+nRAdj]));
             vIndx = find((vUpTimes < [min(FV.vXlim)] | vUpTimes > [max(FV.vXlim)]) ...
                 & (vDownTimes < [min(FV.vXlim)] | vDownTimes > [max(FV.vXlim)]));
             vUpTimes(vIndx) = [];
@@ -1629,11 +1669,11 @@ if bShowDigitalEvents
         % Rearrange indices
         vYs = repmat([nY nY NaN NaN], 1, length(vIndices)/4);
 
-        if length(vIndices) > 1000
-            vPlotIndx = 1:round(length(vIndices)/1000):length(vIndices);
-        else
+        %if length(vIndices) > 100000000
+        %    vPlotIndx = 1:round(length(vIndices)/1000):length(vIndices);
+        %else
             vPlotIndx = 1:length(vIndices);
-        end
+        %end
         
         % Set event width
         %vXlim = FV.vXlim;
@@ -1875,7 +1915,7 @@ persistent p
 if ~isfield(FV, 'CurrentTheme'); FV.CurrentTheme = 'spiky'; end
 if isempty(p) || ~strcmp(FV.CurrentTheme, p.theme)
     % Load selected theme properties
-    sDir = which('spiky.m');
+    sDir = which(mfilename);
     sDir = CheckFilename([sDir(1:end-7) 'themes/']);
     tDir = dir(sDir);
     tDir = tDir(3:end);
@@ -1914,19 +1954,36 @@ if strcmp(get(findobj(hWin, 'Tag', 'ShowNormalTime'), 'checked'), 'on')
     vTime = vTime - nBegin;
 end
 hFig = figure;
-plot(vTime, vCont, 'k', 'linewidth', 1)
-xlabel('Time (s)')
-ylabel('V (raw)')
-legend(sCh)
-legend boxoff
+ThemeObject(hFig)
+hAx = axes();
+if all(size(vCont) > 1) % 2D
+    imagesc(vCont)
+    if isfield(FV.tData, ([sCh '_Unit']))
+        vY = FV.tData.([sCh '_Scale']);
+    else
+        vY = 1:size(vCont, 2);
+    end
+    hLin = imagesc(vTime, vY, real(vCont));
+    set(gca, 'ydir', 'normal')
+    xlabel('Time (s)')
+    ylabel(FV.tData.([sCh '_Unit']))
+else
+    plot(vTime, vCont, 'k', 'linewidth', 1)
+    xlabel('Time (s)')
+    ylabel('V (raw)')
+end
+ThemeObject(hAx)
+hTit = title(['Copy of ' sCh], 'interpreter', 'none');
+ThemeObject(hTit)
 axis tight
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FileMarkerShowPath(varargin)
 hLeg = legend(gcbo);
-ThemeObject(hLeg)
-set(hLeg, 'interpreter', 'none');
+hTxt = findobj(hLeg, 'type', 'text');
+ThemeObject(hTxt)
+set(hTxt,'interpreter','none')
 legend boxoff;
 cTxt = get(hLeg,'string');
 if ~isempty(cTxt); sp_disp(cTxt{1}); end
@@ -1993,9 +2050,8 @@ return
 function UpdatePannedWindow(varargin)
 % Wait until x-axis limits have changed
 vOrigLims = get(gca, 'xlim');
-
 % Get new x limits
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 vCurrLim = get(gca, 'xlim');
 FV.vXlim = vCurrLim; % pan left by 25%
 SetStruct(FV); ViewTrialData
@@ -2003,12 +2059,21 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, sOption)
-% option
-%   'decimate'
-%   'none'
+% Bandpass vector.
 %
-vTimeOrig = vTime;
-
+% Usage:
+%   FilterChannel(C, T, Fs, LO, HI, R, OPT)
+%       where   C   signal to filter
+%               T   time vector (only required with 'decimate' option)
+%               Fs  sampling rate (Hz)
+%               LO  low-pass frequency (Hz)
+%               HI  high-pass frequency (Hz)
+%               R   1 = rectify, 0 = no rectify
+%               OPT 'decimate' or 'none'
+%
+% See:
+%   GetFilteredChannel()
+%
 if isnan(nLoPass) || isnan(nHiPass)
     nNewFs = nFs;
     return
@@ -2055,7 +2120,7 @@ if bRectify, vCont = abs(vCont); end
 
 % Return NaN's where they were removed above
 if any(vNaNIndx)
-    vCont(vNaNIndx) = NaN;
+    vCont(vNaNIndx(~isnan(vNaNIndx))) = NaN;
 end
 return
 
@@ -2063,7 +2128,7 @@ return
 function csSelected = SelectChannels(varargin)
 % Select the channels that should be displayed in the GUI
 if ~CheckDataLoaded, return, end
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 
 % If a channel was specific in varargin{1}, then toggle this in csDisplayChannels,
 % i.e. remove if its there or insert if its not already displayed
@@ -2154,26 +2219,55 @@ else % Assign channels to FV and update display
 end
 return
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ExportData(varargin)
-[FV, hWin] = GetStruct;
+[FV, ~] = GetStruct;
 
 sCurrFile = FV.sLoadedTrial;
 sCurrFile(strfind(sCurrFile, '.'):end) = [];
 [sFile, sPath] = uiputfile(GetExportFilters, 'Select file to write', CheckFilename([FV.sDirectory '\' sCurrFile]));
+if sFile == 0; return; end
 
 % Run export filter
 eval(sprintf('export_%s([sPath sFile], FV);', lower(sFile(end-2:end))))
-
 return
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function bStop = StopAcceleratorRepeat
+% StopAcceleratorRepeat() prevents the same function being repeated more
+% than once in rapid succession when an accelerator key combination is
+% pressed. In what appears to be a bug, Matlab occasionally registers a
+% continuously held down accelerator combo as multiple key-presses, rather
+% than a single press. When multiple accelerator key callbacks are
+% executed, add this line to the beginning of your function:
+%
+%   if StopAcceleratorRepeat(), return; end
+%
+bStop = 0;
+persistent tRepeats
+nThresh = 0.75; % threshold, seconds
+
+% Get the calling function
+csDBStack = dbstack();
+sCallingFunction = csDBStack(2).name;
+
+% Confirm that spiky is the first callback function. Tthen, it is at least possibly
+% we got here via an accelerator key. There seems to be no way to know for sure.
+if ~strcmpi(csDBStack(3).name, 'spiky'), return; end
+
+if isfield(tRepeats, sCallingFunction)
+    vLast = tRepeats(1).(sCallingFunction);
+    if etime(clock, vLast) <= nThresh, bStop = 1; end
+end
+tRepeats(1).(sCallingFunction) = clock;
+return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function OpenFile(varargin)
 % OpenFile loads both trial data and the associated settings/results file. This
 % function is called from all menu items in the GUI and is a higher-level function
 % than LoadTrial. Generally, OpenFile is the only function that calls LoadTrial.
+if StopAcceleratorRepeat(), return; end
 [FV, hWin] = GetStruct;
 global g_hSpike_Viewer g_bBatchMode;
 persistent p_bNeverApply;
@@ -2308,6 +2402,7 @@ switch sAns
         for fn = 1:length(csFieldnames)
             FV.(csFieldnames{fn}) = FV_old.(csFieldnames{fn});
         end
+        FV.sLoadedTrial = sNextTrial;
         SetStruct(FV, 'nosaveflag');
         % run spike detection
         DetectSpikes();
@@ -2320,6 +2415,7 @@ switch sAns
         FV = SetFVDefaults();
         if exist('sPath', 'var'), FV.sDirectory = sPath;
         else FV.sDirectory = pwd; end
+        FV.sLoadedTrial = sNextTrial;
         SetStruct(FV, 'nosaveflag');
         % Load trial data. Note that the LoadTrial function will replace
         % the default settings with saved settings/results if they exist
@@ -2327,7 +2423,67 @@ switch sAns
     otherwise
         return;
 end
+
+if length(FV.sLoadedTrial ) > 70
+    sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
+else
+    sLoadedTrial = FV.sLoadedTrial;
+end
+set(hWin, 'Name', sprintf('Spiky - %s', sLoadedTrial)) % update window name
+
 ViewTrialData
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ImportFile(varargin)
+% ImportFile retains the current data and imports data that can be
+% appended. If no data is already loaded, ImportFile() runs OpenFile()
+[FV, ~] = GetStruct;
+global g_hSpike_Viewer g_bBatchMode;
+if isempty(FV.sLoadedTrial), OpenTrial(varargin); return; end
+persistent p_nDefFilter
+
+% Decide which file to load next
+if isempty(varargin{2})
+    csFilters = GetImportFilters(p_nDefFilter);
+    if isfield(FV, 'sDirectory')
+        [sFile, sPath, nFiltIndx] = uigetfile(csFilters, 'Select data file', CheckFilename([FV.sDirectory '\']));
+    else
+        [sFile, sPath, nFiltIndx] = uigetfile(csFilters, 'Select data file');
+        set(g_hSpike_Viewer, 'UserData', FV);
+    end
+    if nFiltIndx == 0, return; end
+    p_nDefFilter = csFilters(nFiltIndx);
+
+    g_bBatchMode = false;
+    if sFile == 0, return, end
+    FV.sDirectory = sPath; % update current path
+    
+    SetStruct(FV, 'nosaveflag'); % update current path
+    sNextTrial = sFile; % this will be the file to load
+else
+    % If varargin{2} is a string, then load that file
+    if isstr(varargin{2})
+        if exist(varargin{2}, 'file')
+            sNextTrial = varargin{2};
+        else
+            sp_disp(['Failed to open ' varargin{2}])
+            return;
+        end
+    else
+        sp_disp(['Failed to open ' varargin{2}])
+    end
+end
+
+% Exit merge mode if applicable
+global g_bMergeMode
+if g_bMergeMode, StopMergeMode(); end
+
+% Load and store new data
+LoadTrial(sNextTrial);
+[FV, hWin] = GetStruct;
+SetStruct(FV, 'nosaveflag');
+ViewTrialData();
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2383,6 +2539,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetGain(varargin)
+% Manually set gain of channels in dialog window.
 [FV, hWin] = GetStruct;
 if ~CheckDataLoaded, return, end
 
@@ -2413,8 +2570,9 @@ for nCh = 1:length(FV.csChannels)
         if isfield(FV.tChannelDescriptions, 'sDescription')
             nIndx = find(strcmp({FV.tChannelDescriptions.sChannel}, sName));
             if ~isempty(nIndx)
-                if ~isempty(FV.tChannelDescriptions(nIndx).sDescription)
-                    sName = [sName ' (' FV.tChannelDescriptions(nIndx).sDescription ')'];
+                if ~isempty({FV.tChannelDescriptions(nIndx).sDescription})
+                    sDescr = FV.tChannelDescriptions(nIndx).sDescription;
+                    sName = [sName ' (' sDescr ')'];
                 end
             end
         end
@@ -2526,7 +2684,14 @@ end
 
 % Run import filter
 eval(sprintf('FV = import_%s(sFile, FV);', lower(sFile(end-2:end))))
-FV.sLoadedTrial = sFile;
+
+% Update filename unless we are importing
+sDBStack = dbstack;
+bImportMode = any(strcmpi({sDBStack.name}, 'ImportFile'));
+if ~bImportMode
+    FV.sLoadedTrial = sFile; % uncommented 01/27/14 to fix bug #36
+end
+
 tData = FV.tData; % make backup (gets reinserted below)
 
 % Names of all channels
@@ -2543,16 +2708,19 @@ end
 FV.vXlim = [];
 SetStruct(FV) % save settings obtained thus far
 
-% Load asspcoated .spb file
-sPath = [FV.sLoadedTrial(1:end-4) '.spb'];
-if exist(sPath, 'file')
-    OpenSettings([FV.sLoadedTrial(1:end-4) '.spb'])
-    [FV, hWin] = GetStruct;
-end
-
-% Put back tData as this was removed with the OpenSettings() call above
-if isempty(FV.tData)
-    FV.tData = tData;
+% Load associated .spb file (unless we are importing)
+%sPath = [FV.sLoadedTrial(1:end-4) '.spb'];
+if ~bImportMode
+    sPath = [sFile(1:end-4) '.spb'];
+    if exist(sPath, 'file')
+        OpenSettings([sFile(1:end-4) '.spb'])
+        [FV, hWin] = GetStruct;
+    end
+    
+    % Put back tData as this was removed with the OpenSettings() call above
+    if isempty(FV.tData)
+        FV.tData = tData;
+    end
 end
 
 % Some channels may have been digitized in another datafile and the setting
@@ -2589,10 +2757,6 @@ if ~isempty(csRemDigChannels)
 end
 SetStruct(FV) % update FV
 
-if length(sFile) > 70
-    sLoadedTrial = ['...' sFile(end-69:end)];
-else sLoadedTrial = sFile; end
-set(hWin, 'Name', sprintf('Spiky - %s', sLoadedTrial)) % update window name
 bResult = 1;
 return
 
@@ -2661,15 +2825,26 @@ ViewTrialData
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function vCont = GetFilteredChannel(sCh, vCont)
+function [vContOut, varargout] = GetFilteredChannel(sCh, vCont, varargin)
 % Checks for filtering parameters and filters a channel if necessary
 %
 % Usage:
 %   vCont = GetFilteredChannel(sCh, vCont)
+%   [vCont, vTime] = GetFilteredChannel(sCh, vCont, 'decimate')
+%   [vCont, vTime, nNewFs] = GetFilteredChannel(sCh, vCont, 'decimate')
 %    
-% This function is a higher-level call to FilterChannel() and does not
-% return a time vector nor does it decimate. If you need these functions,
-% call FilterChannel() directly.
+% This function is a higher-level call to FilterChannel() and can
+% optionally decimate. See usage.
+%
+% See:
+%   FilterChannel()
+%
+% Initialize outputs in case we abort early
+vContOut = vCont;
+if nargout > 1
+    varargout(1:(nargout-1)) = {[]};
+end
+
 [FV, ~] = GetStruct;
 
 if ~isfield(FV, 'tFilteredChannels'); return; end
@@ -2679,11 +2854,29 @@ if ~any(iCh); return; end
 nHiPass = FV.tFilteredChannels(iCh).vBandpass(1);
 nLoPass = FV.tFilteredChannels(iCh).vBandpass(2);
 bRectify = FV.tFilteredChannels(iCh).bRectify;
-
 nFs = FV.tData.([sCh '_KHz']) * 1000;
-[vCont, ~, ~] = FilterChannel(vCont, [], nFs, nLoPass, nHiPass, bRectify, 'nodecimate');
-return
 
+% Decimate
+bDecimate = 0;
+if ~isempty(varargin)
+    if strcmpi(varargin{1}, 'decimate')
+        bDecimate = 1;
+    end
+end
+
+if bDecimate
+    nBegin = FV.tData.([sCh '_TimeBegin']); % sampling start, sec
+    nEnd = FV.tData.([sCh '_TimeEnd']); % sampling end, sec
+    nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency Hz
+    vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
+    [vContOut, vTimeOut, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, 'decimate');
+    if nargout > 1, varargout{1} = vTimeOut; end
+    if nargout > 2, varargout{2} = nNewFs; end
+else
+    [vContOut, ~, ~] = FilterChannel(vCont, [], nFs, nLoPass, nHiPass, bRectify, 'nodecimate');
+end
+
+return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveSpikeThreshold(sCh, sDir)
@@ -3790,6 +3983,7 @@ for nCh = 1:length(csChannels)
     if length(csChannels) > 1, waitbar(nCh/length(csChannels), hWait, ['Sorting spikes on channel ' sCh]); end
     % waveforms and spiketimes
     tSpikes = FV.tSpikes.(sCh);
+    if isempty(tSpikes.waveforms); continue; end
     tSpikes.Fs = tSpikes.Fs(1);
     % Over-clustering
     tSpikes = ss_kmeans(tSpikes);
@@ -4276,7 +4470,7 @@ if ~CheckDataLoaded, return, end
 global g_hSpike_Viewer
 
 % Warn that this action is irreversible
-switch questdlg('All settings will be irreversibly removed from all loaded files. Are you sure you want to continue?', 'Spiky', 'Yes', 'No', 'Cancel', 'Cancel')
+switch questdlg(sprintf('DANGER ZONE:\nAll *.spb files associated with current files will be deleted from disk. This action is irreversible. Are you sure you want to continue?'), 'Spiky', 'Yes', 'No', 'Cancel', 'Cancel')
     case 'No', return
     case 'Cancel', return
 end
@@ -4307,22 +4501,26 @@ global g_hSpike_Viewer g_vSelCh
 
 if ~CheckDataLoaded(), return, end
 
-% Ask user what data to merge
+%% Ask user what data to merge
 hFig = figure;
-cFields = {'Spikes' 'Events' 'Imported channels' 'Filtered channels'};
-nCL = length(cFields)*25+5;
+% TODO Remove Imported Channels? This appears to no longer be used.
+cFields = {'Spikes' 'Events' 'Imported channels' 'Filtered channels' 'Displayed channels'};
+vVals = [1 1 1 1 0];
+nCL = length(cFields)*25+15;
 vHW = get(g_hSpike_Viewer, 'position');
-set(hFig, 'visible', 'off', 'position', [vHW(1:2) 200 nCL+25], 'menu', 'none', 'Name', 'Merge Data', 'NumberTitle', 'off')
+set(hFig, 'visible', 'off', 'position', [vHW(1:2) 250 nCL+25], 'menu', 'none', 'Name', 'Merge Files', 'NumberTitle', 'off')
+drawnow
 if exist('centerfig') centerfig(hFig, g_hSpike_Viewer); end
 set(hFig, 'visible', 'on')
 for i = 1:length(cFields)
     uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 150 20], 'String', [' ' cFields{i}], ...
-        'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 1);
+        'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', vVals(i));
     nCL = nCL - 25;
 end
 uicontrol(hFig, 'Style', 'pushbutton', 'Position', [75 nCL 50 20], ...
     'Callback', 'global g_vSelCh; g_vSelCh=flipud(get(get(gcf,''children''),''value'')); g_vSelCh=[g_vSelCh{:}];close(gcf)', ...
     'String', 'OK' ); % OK button
+
 uiwait % wait for user to close window or click OK button
 g_vSelCh = g_vSelCh(1:end-1);
 cMergeData = cFields(logical(g_vSelCh)); % selected data
@@ -4338,6 +4536,9 @@ else bImported = 0; end
 
 if any(strcmpi(cMergeData, 'filtered channels')), bFiltered = 1;
 else bFiltered = 0; end
+
+if any(strcmpi(cMergeData, 'displayed channels')), bDisplayed = 1;
+else bDisplayed = 0; end
 
 % Ask whether to save over existing file if it exists
 sPath = CheckFilename([FV.sDirectory '\MergeFile.spb']);
@@ -4356,6 +4557,7 @@ FV_merge.csDisplayChannels = {};
 FV_merge.csDigitalChannels = {};
 tFiltCh = struct([]);      % temporary variable that holds filtered channels
 tImported = struct([]); % temporary variable that holds imported data
+tDisplayed = struct([]); % temporary variable that holds displayed channels
 FV_merge.sDirectory = FV.sDirectory;
 sDiffSampleRateAction = 'none';
 
@@ -4545,6 +4747,13 @@ for f = 1:nLen
         for c = 1:length(FV.csDigitalChannels)
             vUpTimes = FV.tData.([FV.csDigitalChannels{c} '_Up']);
             vDownTimes = FV.tData.([FV.csDigitalChannels{c} '_Down']);
+            
+            % Remove downtimes that occur before the 1st uptime
+            vDownTimes(vDownTimes <= min(vUpTimes)) = [];
+            
+            % Remove uptimes that occur after the last downtime
+            vUpTimes(vUpTimes >= max(vDownTimes)) = [];
+            
             if isfield(FV_merge.tData, [FV.csDigitalChannels{c} '_Up'])
                 FV_merge.tData.([FV.csDigitalChannels{c} '_Up']) = ...
                     [FV_merge.tData.([FV.csDigitalChannels{c} '_Up']) vUpTimes];
@@ -4557,17 +4766,16 @@ for f = 1:nLen
             FV_merge.tData.([FV.csDigitalChannels{c} '_KHz']) = FV.tData.([FV.csDigitalChannels{c} '_KHz']);
             FV_merge.tData.([FV.csDigitalChannels{c} '_TimeBegin']) = FV.tData.([FV.csDigitalChannels{c} '_TimeBegin']);
             FV_merge.tData.([FV.csDigitalChannels{c} '_TimeEnd']) = FV.tData.([FV.csDigitalChannels{c} '_TimeEnd']);
-            
-            % Add fields that indicate start and end of file
-            if ~isfield(FV_merge.tData, 'FileStart'), FV_merge.tData(1).FileStart = {}; end
-            if ~isfield(FV_merge.tData, 'FileEnd'), FV_merge.tData(1).FileEnd = {}; end
-            
-            FV_merge.tData(1).FileStart(end+1).Timestamp = FV.tData.([FV.csDigitalChannels{c} '_TimeBegin']); % file start marker
-            FV_merge.tData(1).FileStart(end).File = FV.sLoadedTrial;
-            FV_merge.tData(1).FileEnd(end+1).Timestamp = FV.tData.([FV.csDigitalChannels{c} '_TimeEnd']); % file end marker
-            FV_merge.tData(1).FileEnd(end).File = FV.sLoadedTrial;
         end
     end % end of events merging
+    
+    % Add fields that indicate start and end of file
+    if ~isfield(FV_merge.tData, 'FileStart'), FV_merge.tData(1).FileStart = {}; end
+    if ~isfield(FV_merge.tData, 'FileEnd'), FV_merge.tData(1).FileEnd = {}; end
+    FV_merge.tData(1).FileStart(end+1).Timestamp = FV.tData.([FV.csDigitalChannels{c} '_TimeBegin']); % file start marker
+    FV_merge.tData(1).FileStart(end).File = FV.sLoadedTrial;
+    FV_merge.tData(1).FileEnd(end+1).Timestamp = FV.tData.([FV.csDigitalChannels{c} '_TimeEnd']); % file end marker
+    FV_merge.tData(1).FileEnd(end).File = FV.sLoadedTrial;
     
     % Merge imported fields
     if bImported
@@ -4580,12 +4788,19 @@ for f = 1:nLen
         for nCh = 1:length(csChannels) % iterate over imported channels
             vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
             [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh}); % Adjust gain (mV)
-            % time vector
+            
+            % Time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
             nEnd = FV.tData.([csChannels{nCh} '_TimeEnd']); % sampling end, sec
             nFs = FV.tData.([csChannels{nCh} '_KHz']) * 1000; % sampling frequency Hz
             vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
-            % move data into temporary variable
+
+            % Apply channel filter
+            [vCont, vTimeOut, nFsOut] = GetFilteredChannel(csChannels{nCh}, vCont, 'decimate');
+            if ~isempty(vTimeOut), vTime = vTimeOut; end
+            if ~isempty(nFsOut), nFs = nFsOut; end
+            
+            % Copy data to temporary variable
             if ~isfield(tImported, csChannels{nCh}), nIndx = 1;
             else nIndx = length(tImported.(csChannels{nCh})) + 1; end
             tImported(1).(csChannels{nCh})(nIndx).cont = vCont;
@@ -4607,36 +4822,88 @@ for f = 1:nLen
             csChannels = {};
         end
         for nCh = 1:length(csChannels)
-            % check first that channel exists
+            % Check if channel has already been merged
+            if isfield(tImported, csChannels(nCh)), continue; end
+            
+            % Check first that channel exists
             if ~isfield(FV.tData, csChannels{nCh}) continue, end
-            % raw signal
+            
+            % Raw signal
             sCh = csChannels{nCh};
             vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
             [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % Adjust gain (mV)
-            % time vector
+            
+            % Time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
             nEnd = FV.tData.([csChannels{nCh} '_TimeEnd']); % sampling end, sec
             nFs = FV.tData.([csChannels{nCh} '_KHz']) * 1000; % sampling frequency Hz
             vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
             
-            % Filter signal
-            iCh = find(strcmp(sCh, {FV.tFilteredChannels.sChannel}), 1);
-            if ~isempty(iCh)
-                nHiPass = FV.tFilteredChannels(iCh(1)).vBandpass(1);
-                nLoPass = FV.tFilteredChannels(iCh(1)).vBandpass(2);
-                bRectify = FV.tFilteredChannels(iCh(1)).bRectify;
-                [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, ...
-                    nLoPass, nHiPass, bRectify, 'decimate');
-            end
+            % Apply channel filter
+            [vCont, vTimeOut, nFsOut] = GetFilteredChannel(csChannels{nCh}, vCont, 'decimate');
+            if ~isempty(vTimeOut), vTime = vTimeOut; end
+            if ~isempty(nFsOut), nFs = nFsOut; end
             
-            % store signal in temporary variable
+            % Copy data to temporary variable
             if ~isfield(tFiltCh, csChannels{nCh}), nIndx = 1;
             else nIndx = length(tFiltCh.(csChannels{nCh})) + 1; end
             tFiltCh(1).(csChannels{nCh})(nIndx).cont = vCont;
             tFiltCh.(csChannels{nCh})(nIndx).timebegin = nBegin; % store begin time
             tFiltCh.(csChannels{nCh})(nIndx).timeend = nEnd; % store end time
             tFiltCh.(csChannels{nCh})(nIndx).time = vTime; % store continuous time vector, sec
-            tFiltCh.(csChannels{nCh})(nIndx).fs = nNewFs; % new sampling rate
+            tFiltCh.(csChannels{nCh})(nIndx).fs = nFs; % new sampling rate
+        end
+        clear vTime vCont
+    end
+    
+    % Merge displayed fields
+    % Displayed fields are merged at the original sampling rate, unless
+    % filter have been configured for these channels. A displayed field
+    % will not be merged again if it was already merged due it being an
+    % Imported or Filtered channel.
+    if bDisplayed
+        % Get displayed channels
+        csChannels = unique(FV.csDisplayChannels);
+        
+        % Verify that all displayed channels exist
+        for cs = 1:length(csChannels)
+            if ~isfield(FV.tData, csChannels(cs))
+                csChannels(cs) = [];
+            end
+        end
+        
+        % Iterate over displayed channels
+        for nCh = 1:length(csChannels)
+            % Check if channel has already been merged
+            if isfield(tFiltCh, csChannels(nCh)), continue; end
+            if isfield(tImported, csChannels(nCh)), continue; end
+            
+            % Apply custom math
+            vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
+            
+            % Adjust gain
+            [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh});
+            
+            % Time vector
+            nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
+            nEnd = FV.tData.([csChannels{nCh} '_TimeEnd']); % sampling end, sec
+            nFs = FV.tData.([csChannels{nCh} '_KHz']) * 1000; % sampling frequency Hz
+            vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
+
+            % Apply channel filter
+            [vCont, vTimeOut, nFsOut] = GetFilteredChannel(csChannels{nCh}, vCont, 'decimate');
+            if ~isempty(vTimeOut), vTime = vTimeOut; end
+            if ~isempty(nFsOut), nFs = nFsOut; end
+            
+            % Copy data to temporary variable
+            if ~isfield(tDisplayed, csChannels{nCh}), nIndx = 1;
+            else nIndx = length(tDisplayed.(csChannels{nCh})) + 1; end
+            
+            tDisplayed(1).(csChannels{nCh})(nIndx).cont = vCont;
+            tDisplayed.(csChannels{nCh})(nIndx).timebegin = nBegin; % store begin time
+            tDisplayed.(csChannels{nCh})(nIndx).timeend = nEnd; % store end time
+            tDisplayed.(csChannels{nCh})(nIndx).time = vTime; % store continuous time vector, sec
+            tDisplayed.(csChannels{nCh})(nIndx).fs = nFs; % sampling rate
         end
         clear vTime vCont
     end
@@ -4657,32 +4924,40 @@ for f = 1:nLen
     end
 end
 
-% Move imported data into FV_merge after creating one continuous vector
-% containing the concatenated signal from all files. Missing data segments
-% are filled with NaNs
-if bImported
-    cFields = fieldnames(tImported);
+% Move imported, filtered and displayed channels into FV_merge. For each category, a
+% continuous vector is created containing the concatenated signal from all files.
+% Missing data segments are filled with NaNs
+tAll.tImported = tImported;
+tAll.tFiltCh = tFiltCh;
+tAll.tDisplayed = tDisplayed;
+csOrder = fieldnames(tAll);
+for c = find([bImported bFiltered bDisplayed])
+    cFields = fieldnames(tAll.(csOrder{c}));
     for nF = 1:length(cFields)
-        % initialize continuous vector (min begintime to max endtime)
-        vTimeBegin = [tImported.(cFields{nF}).timebegin]; % file endtimes, sec
-        vTimeEnd = [tImported.(cFields{nF}).timeend]; % file endtimes, sec
-        vFs = [tImported.(cFields{nF}).fs];
+        
+        % Initialize continuous vector (min begintime to max endtime)
+        vTimeBegin = [tAll.(csOrder{c}).(cFields{nF}).timebegin]; % file endtimes, sec
+        vTimeEnd = [tAll.(csOrder{c}).(cFields{nF}).timeend]; % file endtimes, sec
+        vFs = [tAll.(csOrder{c}).(cFields{nF}).fs];
         if length(unique(vFs)) > 1
-            uiwait(warndlg('Sorry, cannot export all imported channels. Sampling rate must be same across all files. Use of different sampling rates for the same channel is currently not supported. Will continue to try to export remaining imported channels.'))
+            uiwait(warndlg('Failed importing channels. Sampling rate must be same across all files.'))
             continue
         end
+        
         nD = 1/vFs(1); % duration of one sampling points
         vContAll = [];
         nAbsBeginTime = round(min(vTimeBegin) / nD - 1); % begin time of first trial, samples
         vIndxAll = [];
+        
         for i = 1:length(vTimeEnd)
-            nBegin = tImported.(cFields{nF})(i).timebegin; % sec
+            nBegin = tAll.(csOrder{c}).(cFields{nF})(i).timebegin; % sec
             nBegin = round(nBegin / nD); % samples
-            vCont = tImported.(cFields{nF})(i).cont;
+            vCont = tAll.(csOrder{c}).(cFields{nF})(i).cont;
             vIndx = (nBegin:[nBegin+length(vCont)-1])-nAbsBeginTime;
             vIndxAll = [vIndxAll vIndx];
             vContAll(vIndx) = vCont; % samples
         end
+        
         % Replace empty segments with NaNs
         vContAll(setdiff(1:length(vContAll), vIndxAll)) = NaN;
         
@@ -4694,42 +4969,80 @@ if bImported
     end
 end
 
-% Move FILTERED data into FV_merge after creating one continuous vector
-% containing the concatenated signal from all files. Missing data segments
-% are filled with NaNs
-if bFiltered
-    cFields = fieldnames(tFiltCh);
-    for nF = 1:length(cFields)
-        % initialize continuous vector (min begintime to max endtime)
-        vTimeBegin = [tFiltCh.(cFields{nF}).timebegin]; % file endtimes, sec
-        vTimeEnd = [tFiltCh.(cFields{nF}).timeend]; % file endtimes, sec
-        vFs = [tFiltCh.(cFields{nF}).fs];
-        if length(unique(vFs)) > 1
-            uiwait(warndlg('Sorry, cannot export all imported channels. Sampling rate must be same across all files. Use of different sampling rates for the same channel is currently not supported. Will continue to try to export remaining imported channels.'))
-            continue
-        end
-        nD = 1/vFs(1); % duration of one sampling points
-        vContAll = [];
-        nAbsBeginTime = round(min(vTimeBegin) / nD - 1);
-        vIndxAll = [];
-        for i = 1:length(vTimeEnd)
-            nBegin = tFiltCh.(cFields{nF})(i).timebegin; % sec
-            nBegin = round(nBegin / nD); % samples
-            vCont = tFiltCh.(cFields{nF})(i).cont;
-            vIndx = (nBegin:[nBegin+length(vCont)-1])-nAbsBeginTime;
-            vIndxAll = [vIndxAll vIndx];
-            vContAll(vIndx) = vCont; % samples
-        end
-        % Replace empty segments with NaNs
-        vContAll(setdiff(1:length(vContAll), vIndxAll)) = NaN;
-        
-        % store continuous vector in FV_merge
-        FV_merge.tData(1).(cFields{nF}) = vContAll;
-        FV_merge.tData.([cFields{nF} '_KHz']) = vFs(1)/1000;
-        FV_merge.tData.([cFields{nF} '_TimeBegin']) = min(vTimeBegin);
-        FV_merge.tData.([cFields{nF} '_TimeEnd']) = max(vTimeEnd);
-    end
-end
+% 
+% % Move imported data into FV_merge after creating one continuous vector
+% % containing the concatenated signal from all files. Missing data segments
+% % are filled with NaNs
+% if bImported
+%     %cFields = fieldnames(tImported);
+%     for nF = 1:length(cFields)
+%         % initialize continuous vector (min begintime to max endtime)
+%         vTimeBegin = [tImported.(cFields{nF}).timebegin]; % file endtimes, sec
+%         vTimeEnd = [tImported.(cFields{nF}).timeend]; % file endtimes, sec
+%         vFs = [tImported.(cFields{nF}).fs];
+%         if length(unique(vFs)) > 1
+%             uiwait(warndlg('Sorry, cannot export all imported channels. Sampling rate must be same across all files. Use of different sampling rates for the same channel is currently not supported. Will continue to try to export remaining imported channels.'))
+%             continue
+%         end
+%         nD = 1/vFs(1); % duration of one sampling points
+%         vContAll = [];
+%         nAbsBeginTime = round(min(vTimeBegin) / nD - 1); % begin time of first trial, samples
+%         vIndxAll = [];
+%         for i = 1:length(vTimeEnd)
+%             nBegin = tImported.(cFields{nF})(i).timebegin; % sec
+%             nBegin = round(nBegin / nD); % samples
+%             vCont = tImported.(cFields{nF})(i).cont;
+%             vIndx = (nBegin:[nBegin+length(vCont)-1])-nAbsBeginTime;
+%             vIndxAll = [vIndxAll vIndx];
+%             vContAll(vIndx) = vCont; % samples
+%         end
+%         % Replace empty segments with NaNs
+%         vContAll(setdiff(1:length(vContAll), vIndxAll)) = NaN;
+%         
+%         % store continuous vector in FV_merge
+%         FV_merge.tData(1).(cFields{nF}) = vContAll;
+%         FV_merge.tData.([cFields{nF} '_KHz']) = vFs(1)/1000;
+%         FV_merge.tData.([cFields{nF} '_TimeBegin']) = min(vTimeBegin);
+%         FV_merge.tData.([cFields{nF} '_TimeEnd']) = max(vTimeEnd);
+%     end
+% end
+% 
+% % Move FILTERED data into FV_merge after creating one continuous vector
+% % containing the concatenated signal from all files. Missing data segments
+% % are filled with NaNs
+% if bFiltered
+%     %cFields = fieldnames(tFiltCh);
+%     for nF = 1:length(cFields)
+%         % initialize continuous vector (min begintime to max endtime)
+%         %vTimeBegin = [tFiltCh.(cFields{nF}).timebegin]; % file endtimes, sec
+%         %vTimeEnd = [tFiltCh.(cFields{nF}).timeend]; % file endtimes, sec
+%         %vFs = [tFiltCh.(cFields{nF}).fs];
+%         %if length(unique(vFs)) > 1
+%         %    uiwait(warndlg('Sorry, cannot export all imported channels. Sampling rate must be same across all files. Use of different sampling rates for the same channel is currently not supported. Will continue to try to export remaining imported channels.'))
+%         %    continue
+%         %end
+%         %nD = 1/vFs(1); % duration of one sampling points
+%         %vContAll = [];
+%         %nAbsBeginTime = round(min(vTimeBegin) / nD - 1);
+%         %vIndxAll = [];
+%         %for i = 1:length(vTimeEnd)
+%             %nBegin = tFiltCh.(cFields{nF})(i).timebegin; % sec
+%             %nBegin = round(nBegin / nD); % samples
+%             %vCont = tFiltCh.(cFields{nF})(i).cont;
+%             %vIndx = (nBegin:[nBegin+length(vCont)-1])-nAbsBeginTime;
+%             %vIndxAll = [vIndxAll vIndx];
+%             %vContAll(vIndx) = vCont; % samples
+%         %end
+%         % Replace empty segments with NaNs
+%         %vContAll(setdiff(1:length(vContAll), vIndxAll)) = NaN;
+%         
+%         % store continuous vector in FV_merge
+%         %FV_merge.tData(1).(cFields{nF}) = vContAll;
+%         %FV_merge.tData.([cFields{nF} '_KHz']) = vFs(1)/1000;
+%         %FV_merge.tData.([cFields{nF} '_TimeBegin']) = min(vTimeBegin);
+%         %FV_merge.tData.([cFields{nF} '_TimeEnd']) = max(vTimeEnd);
+%     end
+% end
 
 % Set FV as FV_merge
 if strcmpi(sAppendReplace, 'Replace')
@@ -4923,7 +5236,7 @@ zoom off
 set(g_hSpike_Viewer,'Pointer','arrow')
 % store y-limits
 if ishandle(hAx)
-    sCh = get(hAx,'Tag');
+    sCh = get(hAx, 'Tag');
     FV.tYlim.(sCh) = get(hAx, 'ylim');
     ThemeObject(hAx)
 end
@@ -5116,13 +5429,18 @@ function [cSelectedFields, nManualValue, nButton] = SelectImportVariable(cFields
 %   bMultiSel   option to enable/diable multi-select
 %   cDescr      cell of fieldnames descriptions
 %
+nFields = length(cFields);
+
 if bManualOpt, cFields{end+1} = 'Set Manually'; end
+if bManualOpt && ~isempty(nDefManVal) && ~isnan(nDefManVal)
+    cFields{end+1} = sprintf('Default (%d)', nDefManVal);
+end
 
 % Modify fieldnames to include description strings
 if ~isempty(varargin)
     cDescr = varargin{1};
     cFieldsMod = {};
-    for i = 1:length(cFields)-1
+    for i = 1:nFields
         if isempty(cDescr{i}) || strcmp(cDescr{i}, ' ')
             cFieldsMod{i} = cFields{i};
         else
@@ -5151,21 +5469,25 @@ else
     end
 end
 
-if bMultiSel nMax = 10;
+if bMultiSel, nMax = 10;
 else nMax = 1; end
 
 hFig = figure;
-set(hFig, 'Menu', 'none', 'Name', sTitle, 'NumberTitle', 'off', 'Position', [200 600 300 length(cFields)*20+25]);
-hList = uicontrol('Position', [0 26 300 length(cFields)*20], 'Style', 'listbox', ...
+nElHeight = 16;
+vPos = get(hFig, 'position');
+set(hFig, 'Menu', 'none', 'Name', sTitle, 'NumberTitle', 'off', 'Position', [vPos(1) vPos(2) 300 length(cFields)*nElHeight+25]);
+
+hList = uicontrol(hFig, 'Position', [0 26 300 length(cFields)*nElHeight], 'Style', 'listbox', ...
     'String', cFieldsMod, 'Tag', 'ImportListBox', 'Max', nMax);
 if ~isempty(vDefField), set(hList, 'Value', vDefField); end
 
 for b = 1:length(csButton)
     nW = 300 / length(csButton);
     nX = nW * (b - 1);
-    uicontrol('Position', [nX 0 nW 25], 'Style', 'pushbutton', 'String', csButton{b}, ...
+    uicontrol(hFig, 'Position', [nX 0 nW 30], 'Style', 'pushbutton', 'String', csButton{b}, ...
         'Callback', 'global nSelectedIndx sButton; sButton = get(gcbo, ''string''); nSelectedIndx = get(findobj(''Tag'', ''ImportListBox''), ''value''); close');
 end
+
 uiwait(hFig)
 global nSelectedIndx sButton
 nButton = find(strcmp(csButton, sButton)); % get ID of button that was pressed
@@ -5182,7 +5504,11 @@ nManualValue = NaN;
 if length(cSelectedFields) == 1
     if strcmp(cSelectedFields(1), 'Set Manually')
         nManualValue = GetInputNum(sTitle, cSelectedFields{1}, nDefManVal);
-    else nManualValue = NaN; end
+    elseif ~isempty(cell2mat(strfind(cSelectedFields, 'Default')))
+        nManualValue = nDefManVal;
+    else
+        nManualValue = NaN;
+    end
 end
 
 clear global nSelectedIndx
@@ -5779,7 +6105,6 @@ for c = 1:length(cFields)
         FV.tSpikes.(cFields{c}) = rmfield(FV.tSpikes.(cFields{c}), 'outliers');
     end
 end
-
 SetStruct(FV)
 ViewTrialData()
 return
@@ -5801,7 +6126,6 @@ end
 
 if ~bIsGain
     % If no gain has been specified for a channel, open 'Set Channel Gains' dialog
-    %uiwait(warndlg(['No gain has been specified for ' GetChannelDescription(sCh) '. Adjust gain values in the next dialog window.']))
     bResetGain = 0;
     if isempty(FV.tGain), bResetGain = 1;
     elseif ~isfield(FV.tGain, sCh), bResetGain = 1; end
@@ -5826,8 +6150,8 @@ function sHash = GetGitHash
 
 % Set paths
 sWT_dir = which('spiky');
-sGITPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) '.git/refs/heads/master']);
-sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) 'VERSION']);
+sGITPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, mfilename)-1) '.git/refs/heads/master']);
+sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, mfilename)-1) 'VERSION']);
 
 % Get build number from SVN entries files
 sHash = 'Unknown';
@@ -5847,6 +6171,87 @@ elseif exist(sVERSIONPath, 'file')
     fclose(hFID);
 end
 return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Merge selected channels
+function MergeChannels(varargin)
+[FV, ~] = GetStruct;
+if ~CheckDataLoaded, return, end
+persistent p_sName
+if isempty(p_sName), p_sName = 'Merged'; end
+csCurrentCh = FV.csDisplayChannels;
+
+% Select channels
+csChannels = SelectChannels();
+
+% None or one channel selected
+if length(csChannels) < 2
+    SetStruct(FV)
+    ViewTrialData()
+    return
+end
+
+% Get data of channels
+cCont = cell(1, length(csChannels));
+cTime = cell(1, length(csChannels));
+vFs = nan(1, length(csChannels));
+vBegin = nan(1, length(csChannels));
+vEnd = nan(1, length(csChannels));
+for nCh = 1:length(csChannels) % iterate over imported channels
+    vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
+    [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh}); % Adjust gain (mV)
+    
+    % Time vector
+    nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
+    nEnd = FV.tData.([csChannels{nCh} '_TimeEnd']); % sampling end, sec
+    nFs = FV.tData.([csChannels{nCh} '_KHz']) * 1000; % sampling frequency Hz
+    vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
+    
+    % Apply channel filter
+    [vCont, vTimeOut, nFsOut] = GetFilteredChannel(csChannels{nCh}, vCont, 'decimate');
+    if ~isempty(vTimeOut), vTime = vTimeOut; end
+    if ~isempty(nFsOut), nFs = nFsOut; end
+    cCont{nCh} = vCont;
+    cTime{nCh} = vTime;
+    vFs(nCh) = nFs;
+    vBegin(nCh) = nBegin;
+    vEnd(nCh) = nEnd;
+end
+
+% Check that sampling rate is same for all merging channels
+if length(unique(vFs)) > 1
+    uiwait(warndlg('Sampling rate of all merging channels must be the same. Aborting merge.', 'Spiky'));
+    return
+end
+
+% Initialize vector that will contain all data
+nDur = max(vEnd) - min(vBegin); % duration, s
+nLen = ceil(nFs * nDur); % new length, samples
+nFs = nLen / nDur;
+vContAll = nan(1, nLen);
+
+% Insert mergin channels
+for nCh = 1:length(vFs)
+    nBegin = round((vBegin(nCh) - min(vBegin)) * nFs) + 1; % relative start time, samples
+    vContAll(nBegin:(nBegin-1+length(cCont{nCh}))) = cCont{nCh};
+end
+
+% Get new channel name interactively
+cAns = inputdlg('New channel name:', 'Channel Name', 1, {p_sName});
+if ~isempty(cAns), p_sName = cAns{1}; end
+
+% Insert new, merged channel into FV
+FV.tData.(p_sName) = vContAll;
+FV.tData.([p_sName '_TimeBegin']) = min(vBegin);
+FV.tData.([p_sName '_TimeEnd']) = min(vBegin) + (nLen / nFs);
+FV.tData.([p_sName '_KHz']) = nFs / 1000;
+
+% Display previously viewed channels, minus the merged ones
+FV.csDisplayChannels = unique([setdiff(csCurrentCh, csChannels) p_sName]);
+SetStruct(FV)
+ViewTrialData
+return
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Invert a selected channel
@@ -5990,6 +6395,7 @@ warndlg('No DAQ file loaded or loaded file is not a DAQ (.daq) file.', 'Spiky')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Measure time between two positions along displayed channel
 function MeasureLine(varargin)
 hObj = varargin{1}; % get calling object
 [FV, ~] = GetStruct;
@@ -6003,14 +6409,15 @@ else axes(hAx(1)), end
 vCont = ChannelCalculator(FV.tData.(sCh), sCh); % continuous trace (V)
 nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
 nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
-vTime = linspace(nBeginTime, nEndTime, length(vCont));
+nFs = FV.tData.([sCh '_KHz']) * 1000; % Hz
+vTime = GetTime(nBeginTime, nEndTime, vCont, nFs);
 
 hold on
 
 % Point A
-[nXa nYa] = ginput(1);
+[nXa, ~] = ginput(1);
 % Snap to nearest data point on time axis
-[~ nMinIndx] = min(abs(vTime - nXa));
+[~, nMinIndx] = min(abs(vTime - nXa));
 nXa_samples = nMinIndx;
 nXa = vTime(nMinIndx);
 nYa = vCont(nMinIndx);
@@ -6019,7 +6426,7 @@ hPnta = plot(nXa, nYa, 'ro');
 % Point B
 [nXb nYb] = ginput(1);
 % Snap to nearest data point on time axis
-[~ nMinIndx] = min(abs(vTime - nXb));
+[~, nMinIndx] = min(abs(vTime - nXb));
 nXb_samples = nMinIndx;
 nXb = vTime(nMinIndx);
 nYb = vCont(nMinIndx);
@@ -6385,7 +6792,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowVersion(varargin)
 sWT_dir = which('spiky');
-sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) 'VERSION']);
+sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, mfilename)-1) 'VERSION']);
 hFID = fopen(sVERSIONPath, 'r');
 sHash = char(fread(hFID, 10, 'schar'))';
 fclose(hFID);
@@ -6396,7 +6803,7 @@ return
 function ShowLicense(varargin)
 [~, hWin] = GetStruct;
 sWT_dir = which('spiky');
-sLICENSEPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, 'spiky.m')-1) 'LICENSE']);
+sLICENSEPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, mfilename)-1) 'LICENSE']);
 sLicense = textread(sLICENSEPath, '%s', 'whitespace', '', 'bufsize', 2^16);
 hFig = figure;
 set(hFig, 'name', 'Spiky License', 'menubar', 'none', 'numbertitle', 'off', 'color', 'w')
