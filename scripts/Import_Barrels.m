@@ -18,15 +18,34 @@ function FV = Import_Barrels(FV)
 debug = 0;
 
 % Load MapBarrelsResult.mat file and IOS vessel image
+if ~exist(FV.sDirectory, 'dir')
+    errordlg(sprintf('The directory %s no longer exists. Drive disconnected?', FV.sDirectory));
+    return
+end
 cd(FV.sDirectory)
+persistent p_sMapBarrelsResultPath
+sPwd = pwd;
+if ~isempty(p_sMapBarrelsResultPath)
+    cd(p_sMapBarrelsResultPath)
+end
 [sFile, sPath] = uigetfile( {'*.mat'}, 'Pick a MapBarrelsResult.mat file');
+p_sMapBarrelsResultPath = sPath;
+cd(sPwd)
+
 if ~sFile, return, end
 load(fullfile(sPath, sFile))
 unregistered = tResults.VesselImage(:,:,1); % IOS vessel (blue) image
 cd(sPath)
 
 % Load the GalvoScanner blue/vessel image WITHOUT stereotactic coordinates
+persistent p_sRefImgPath
+sPwd = pwd;
+if ~isempty(p_sRefImgPath)
+    cd(p_sRefImgPath)
+end
 [sFile, sPath] = uigetfile('*.png', 'Select GalvoScanner vessel image wo/coordinates');
+p_sRefImgPath = sPath;
+cd(sPwd)
 if ~sFile, return, end
 reference = imread(fullfile(sPath, sFile));
 reference = reference(:,:,1);
@@ -47,23 +66,29 @@ if exist(sCtrlPntsPath, 'file')
 end
 
 % Get control points interactively
-if ~exist('input_points', 'var')
+if exist('input_points', 'var')
+    % Use existing control points
+    [input_points, base_points] = cpselect(unregistered, reference, ...
+        input_points, base_points, 'Wait', true);
+else
     [input_points, base_points] = cpselect(unregistered, reference, 'Wait', true);
-    % Find transform
-    if size(input_points, 1) > 10
-        sTransMethod = 'polynomial';
-    elseif size(input_points, 1) > 4
-        sTransMethod = 'projective';
-    elseif size(input_points, 1) > 3
-        sTransMethod = 'affine';
-    else
-        warndlg('Too few control points. Aborting.', 'modal')
-        return
-    end
-    TFORM = cp2tform(input_points, base_points, sTransMethod);
-    % Save controlpoints and transform
-    save(sCtrlPntsPath, 'input_points', 'base_points', 'TFORM', 'sTransMethod')
 end
+
+% Find transform
+if size(input_points, 1) > 10
+    sTransMethod = 'polynomial';
+elseif size(input_points, 1) > 4
+    sTransMethod = 'projective';
+elseif size(input_points, 1) > 3
+    sTransMethod = 'affine';
+else
+    warndlg('Too few control points. Aborting.', 'modal')
+    return
+end
+TFORM = cp2tform(input_points, base_points, sTransMethod);
+
+% Save controlpoints and transform
+save(sCtrlPntsPath, 'input_points', 'base_points', 'TFORM', 'sTransMethod')
 
 % Perform affine transformation of unregistered image (IOS blue/vessel image)
 [nrows ncols] = size(reference);
