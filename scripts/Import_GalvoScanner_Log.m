@@ -1,4 +1,6 @@
 function FV = Import_GalvoScanner_Log(FV)
+%
+%
 
 if isempty(FV.sLoadedTrial)
     sStr = 'No trial loaded. Aborting now.';
@@ -66,6 +68,15 @@ vLaserOff = round(vLaserOff * vLaserFs); % samples
 % Make sure vLaserOn and vLaserOff vectors are same length
 if length(vLaserOn) > length(vLaserOff)
     vLaserOn = vLaserOn(1:length(vLaserOff));
+end
+if length(vLaserOn) < length(vLaserOff)
+    vLaserOff = vLaserOff(1:length(vLaserOn));
+end
+
+% Check that all vLaserOff values are larger than vLaserOn
+if any(vLaserOff < vLaserOn)
+    FV.ScriptError = sprintf('On/off times do not match in GalvoScanner log for:\n%s', sTrial);
+    return
 end
 
 % Get all unique positions in preserved order
