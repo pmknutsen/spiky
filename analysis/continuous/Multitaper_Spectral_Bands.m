@@ -52,7 +52,7 @@ if isempty(p_mSpecBands) || ~g_bBatchMode
     cPrompt = {'Spectral bands [min max]. One band per line.'};
     cAns = inputdlg(cPrompt,'Options', 5, {num2str(p_mSpecBands)});
     if isempty(cAns), return, end
-    p_mSpecBands = str2double(cAns{1}); % hz
+    p_mSpecBands = str2num(cAns{1}); % hz
 end
 
 % Iterate over frequency bands

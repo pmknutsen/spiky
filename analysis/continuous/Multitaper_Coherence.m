@@ -9,6 +9,8 @@ function tSig = Multitaper_Coherence(FV)
 %
 % To-do:
 %   Everything!!
+%   Allow coherence of channels with different sampling rate;
+%       i.e. 
 
 global Spiky g_bBatchMode
 persistent p_sContChA p_sContChB p_nMinF p_nMaxF p_nTW p_nD
