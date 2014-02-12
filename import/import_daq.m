@@ -16,16 +16,14 @@ try
 catch
     sStr = sprintf('An error occurred when reading the file:\n%s\n\n%s\n\nThis file may be corrupted or truncated.', ...
         sFileOnly, lasterr);
-    uiwait(warndlg(sStr, 'Spiky::LoadTrial', 'modal'));
-    Spiky.main.sp_disp(sStr)
+    FV.sImportError = sStr;
     return
 end
 mData = single(mData); % convert to single precision to conserve memory
 
 if isempty(mData)
     sStr = 'An error occurred during loading of .DAQ file: File appears to be empty.';
-    uiwait(warndlg(sStr, 'Spiky::LoadTrial', 'modal'))
-    Spiky.main.sp_disp(sStr)
+    FV.sImportError = sStr;
     return
 end
 tData = struct([]);
