@@ -253,7 +253,8 @@ tDir = dir(sDir);
 for th = 3:length(tDir)
     uimenu(g_hSpike_Viewer, 'Parent', hThemes, 'Tag', 'Spiky_Menu_ShowTheme', 'Label', [tDir(th).name(1:end-2)], 'Callback', @SetTheme);
 end
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Refresh', 'Callback', @ViewTrialData, 'Accelerator', 'R');
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Refresh', 'Accelerator', 'R', ...
+    'Callback', 'global Spiky g_bBatchMode;Spiky.main.ViewTrialData();g_bBatchMode=0;');
 
 %  - Channels menu
 hChannels = uimenu(g_hSpike_Viewer, 'Label', '&Channels');
@@ -2251,8 +2252,9 @@ nThresh = 0.75; % threshold, seconds
 csDBStack = dbstack();
 sCallingFunction = csDBStack(2).name;
 
-% Confirm that spiky is the first callback function. Tthen, it is at least possibly
+% Confirm that spiky is the first callback function. Then, it is at least possibly
 % we got here via an accelerator key. There seems to be no way to know for sure.
+if length(csDBStack) < 3, return; end
 if ~strcmpi(csDBStack(3).name, 'spiky'), return; end
 
 if isfield(tRepeats, sCallingFunction)
@@ -2684,6 +2686,13 @@ end
 
 % Run import filter
 eval(sprintf('FV = import_%s(sFile, FV);', lower(sFile(end-2:end))))
+
+% Check for errors that may have been reported during import
+if isfield(FV, 'sImportError')
+    sp_disp(FV.sImportError)
+    uiwait(warndlg(FV.sImportError, 'Spiky::LoadTrial', 'modal'));
+    return
+end
 
 % Update filename unless we are importing
 sDBStack = dbstack;
@@ -3452,6 +3461,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowOverlappingSpikeClusters(varargin)
+% Plot overlapping, color-coded unit/spike clusters from a single
+% electrode/multi-trode
 if ~CheckDataLoaded, return, end
 [FV,hWin] = GetStruct;
 if ~isempty(varargin)
@@ -3533,7 +3544,7 @@ for u = 1:length(vUnits) % one row per unit
         nDisplaySpikesCount = round(nDisplaySpikesPercent * length(vIndx));
         vIndxKeep = unique(round(linspace(1, length(vIndx), nDisplaySpikesCount)));
         
-        % Always show spikes with extreme amplitudes
+        % Always show the largets spikes
         vSums = sum(abs(mWaveforms(vIndx,:)),2);
         vIndxKeep = [vIndxKeep find(vSums > nanmean(vSums)+(3*nanstd(vSums)))'];
         
@@ -3543,6 +3554,9 @@ for u = 1:length(vUnits) % one row per unit
         figure(hMainWin);
         hLines = plot(vXX, vYY, '-', 'color', mCol, 'linewidth', .5);
         set(hLines, 'tag', sLineTag);
+        
+        % Hide outliers by default
+        if vUnits(u) == 0, set(hLines, 'visible', 'off'); end
     else
         set(hLines, 'color', mCol)
     end
@@ -6770,7 +6784,7 @@ end
 % The remainder of this function runs if a script is run for a single movie
 
 % Save action for later global Redo
-if ~g_bBatchMode BatchRedo([], sprintf('RunScript(''%s'')', sFile)); end
+if ~g_bBatchMode, BatchRedo([], sprintf('RunScript(''%s'')', sFile)); end
 
 if sFile == 0, return, end
 sCurrDir = pwd;
