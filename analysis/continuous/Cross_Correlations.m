@@ -5,9 +5,12 @@ function Cross_Correlations(FV)
 % Plot cross correlations between all continuous channels.
 %
 % TODO
+%    - interactive selection of channels to cross correlate
 %   - Plot CCs only of channels currently displayed in GUI
 %   - Plot cross correlations between all continuous data traces; rows vs axes
 %   - See additional TODOs below
+%   
+
 
 global Spiky
 csChannels = FV.csDisplayChannels;
