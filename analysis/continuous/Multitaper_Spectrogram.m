@@ -76,6 +76,7 @@ if ~isempty(iTurnsNaN)
     iNaNDone = find([0;diff(iNaN)] == -1); % end indices of nan segments
     iNaNDone(iNaNDone <= iTurnsNaN(1)) = [];
     iNaNDone = iNaNDone(1:length(iTurnsNaN));
+    iTurnsNaN(iTurnsNaN > iNaNDone(end)) = [];
     for i = 1:length(iTurnsNaN)
         nL = ceil((iNaNDone(i)-iTurnsNaN(i)+1)/2);
         if (iTurnsNaN(i)+nL <= length(vCont)) && (iTurnsNaN(i)-nL > 0)
@@ -95,7 +96,7 @@ end
 % Decimate signal to match user-defined frequency range (speeds up spectral analysis)
 % Note that nFs after decimation must be an integer as there will otherwise
 % be a temporal offset in the output of mtspecgramc (due to internal rounding of nFs)
-if 1
+if 0
     nFsO = nFs;
     nR_max = floor(nFs / (p_nMaxF*5));
     nR = nR_max;
