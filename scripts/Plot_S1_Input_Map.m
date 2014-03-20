@@ -1,8 +1,23 @@
-function FV = Plot_S1_Input_Map(FV)
+function FV = Plot_S1_Input_Map(FV, varargin)
 % Display the S1 input map to SpVi units
+%
 % Specifically, graph:
 %   Rasters for all positions
 %   Map image (with statistics)
+%
+% This script can be run silently, using the default parameters, by setting
+% the global variable g_bPlotS1MapQuiet to true (or 1).
+%
+% If g_bPlotS1MapQuiet is used, the default parameters can also be changed
+% by passing a structure as a second input. This structure should contain
+% fields with names that match any of the persistent variables and the
+% corresponding values to use. For instance:
+%
+%   tParams = struct('p_nSmooth', 0.5, 'p_vSearchStrSel', [1 2])
+%
+%       FV = Plot_S1_Input_Map(FV, tParams)
+%
+%
 %
 % TODO
 %   Plot maps on top of vessel image
@@ -10,7 +25,14 @@ function FV = Plot_S1_Input_Map(FV)
 %   Change unit of smoothing parameter to millimeters
 %   Add prestim and poststim parameters
 %   Add scaling factors to image titles (max spike-rate or max z-score)
+%   Return map matrix that indicates N pulses per location (to normalize maps to
+%   probabilities later)
 %
+global g_bPlotS1MapQuiet
+if g_bPlotS1MapQuiet
+    global g_S1MapAnalysis
+    g_S1MapAnalysis = struct([]);
+end
 
 % Check if any channel has been sorted
 csFieldnames = fieldnames(FV.tSpikes)';
@@ -19,6 +41,7 @@ for fn = 1:length(csFieldnames)
     if ~isfield(FV.tSpikes.(csFieldnames{fn}), 'hierarchy'), vDel(end+1) = fn; end
 end
 csFieldnames(vDel) = [];
+
 % Abort if no channels have been sorted
 if isempty(csFieldnames)
     uiwait(warndlg('You need to spike sort channels first.', 'modal'))
@@ -43,9 +66,20 @@ if isempty(p_nWinEnd), p_nWinEnd = 0.04; end
 if isempty(p_nPreStimPeriod), p_nPreStimPeriod = 0.025; end
 if isempty(p_nPostStimPeriod), p_nPostStimPeriod = 0.1; end
 if isempty(p_bShowZScore), p_bShowZScore = 0; end
-if isempty(p_vSearchStrSel), p_vSearchStrSel = 1; end
+if isempty(p_vSearchStrSel), p_vSearchStrSel = 1; end % eg [1] or [1 2] for multiple selections
 if isempty(p_nZCutOff), p_nZCutOff = 0; end
 if isempty(p_bRemoveInfreqPos), p_bRemoveInfreqPos = 1; end
+
+% Change default parameters if a second input parameters is passed
+if nargin == 2
+    tParams = varargin{1};
+    if isstruct(tParams)
+        csFieldnames = fieldnames(tParams);
+        for i = 1:length(csFieldnames)
+            eval(sprintf('%s = tParams.%s;', csFieldnames{i}, csFieldnames{i}));
+        end
+    end
+end
 
 if ~isfield(FV, 'S1Map_GetROI') && ~g_bPlotS1MapQuiet
     cPrompt = {'Smoothing (sigma)','Evoked activity window start (s)', 'Evoked activity window end (s)', ...
@@ -112,6 +146,10 @@ if isfield(FV.tData, 'FileStart')
     end
     mInclRanges = unique(mInclRanges, 'rows'); % s
 else mInclRanges = [0 inf]; end
+
+% Abort now if there are zero data inclusion ranges (typically means that
+% the file inclusion string is not relevant to this dataset.
+if isempty(mInclRanges), return; end
 
 % Iterate over units
 vUnits = unique(FV.tSpikes.(sCh).hierarchy.assigns);
@@ -232,10 +270,40 @@ for u = 1:length(vUnits)
     vAPLookup = unique(mPos(:,1));
     vMLLookup = unique(mPos(:,2));
     
-    % Generate spike-rate map (#spikes in window)
-    mImg = zeros(sqrt(size(mPosUniq, 1)));
-    mImgBaseline = zeros(sqrt(size(mPosUniq, 1)));
+    % Initialize spike-rate map (#spikes in window)
+    %mImg = zeros(round(sqrt(size(mPosUniq, 1))));
+    %mImgBaseline = zeros(round(sqrt(size(mPosUniq, 1))));
     
+    mImg = zeros(round([length(vAPLookup) length(vMLLookup)]));
+    mImgBaseline = zeros(round([length(vAPLookup) length(vMLLookup)]));
+    
+    % Initialize stimulus count map
+    mStims = zeros(sqrt(size(mPosUniq, 1)));
+    
+    % Compute PSTH
+    if ~isfield(FV, 'S1Map_GetROI'), FV.S1Map_Mask = ones(size(mImg)); end
+    vStimSpikesInsideROI = [];
+    vStimSpikesOutsideROI = [];
+    for c = 1:size(mPosUniq, 1)
+        % Get matrix location
+        nI = mPosUniq(c, 1) == vAPLookup;
+        nJ = mPosUniq(c, 2) == vMLLookup;
+        
+        % Iterate over all repetitions at current position
+        vIndx = find(all(mPos == repmat(mPosUniq(c, :), size(mPos, 1), 1), 2));
+        for i = 1:length(vIndx)
+            % Determine if current position is inside or outside ROI
+            if FV.S1Map_Mask(nJ, nI)
+                vStimSpikesInsideROI = [vStimSpikesInsideROI(:); cSpikes{vIndx(i)}]; % spikes inside mask
+            else
+                vStimSpikesOutsideROI = [vStimSpikesOutsideROI(:); cSpikes{vIndx(i)}]; % spikes outside mask
+            end
+        end
+    end
+    nBin = 0.001;
+    [vN, vX_psth] = hist(vStimSpikesInsideROI, (-p_nPreStimPeriod):nBin:p_nPostStimPeriod);
+    vN_psth = vN./nBin./length(cSpikes); % spikes/s
+        
     vStimSpikesInsideROIAll = [];
     vStimSpikesOutsideROIAll = [];
     for c = 1:size(mPosUniq, 1)
@@ -261,35 +329,44 @@ for u = 1:length(vUnits)
             vSpikes = cSpikes{vIndx(i)}(cSpikes{vIndx(i)} >= p_nWinEnd);
             vPostStimSpikes = [vPreStimSpikes(:); vSpikes];
         end
+        
+        % Stimulus number maps (one count per presentation at a location)
+        mStims(nJ, nI) = length(vIndx);
 
         % Evoked firing rate (spikes/sec)
-        mImg(nJ, nI) = length(vStimSpikes) / (p_nWinStart+p_nWinEnd) / i;
+        mImg(nJ, nI) = length(vStimSpikes) / (p_nWinStart+p_nWinEnd) / length(vIndx);
         
         % Baseline firing rate (spikes/sec)
-        nPreRate = length(vPreStimSpikes) / (p_nPreStimPeriod) / i;
-        nPostRate = length(vPostStimSpikes) / (p_nPostStimPeriod - (p_nWinEnd*2)) / i;
+        nPreRate = length(vPreStimSpikes) / (p_nPreStimPeriod) / length(vIndx);
+        nPostRate = length(vPostStimSpikes) / (p_nPostStimPeriod - (p_nWinEnd*2)) / length(vIndx);
         mImgBaseline(nJ, nI) = (nPreRate + nPostRate) / 2;
     end
     
+    % Compute baseline from PSTH, rather than individual pixels
+    % Computing the average baseline across pixels from mImgBaseline seems
+    % to overestimate the baseline rate
+    nBaseline = mean(vN_psth(vX_psth <= 0));
+    % nBaseline = mean(mImgBaseline(:)); % old way
+    
     if p_bShowZScore
         % Compute z-score matrix
-        mImg = (mImg - mean(mImgBaseline(:))) ./ std(mImgBaseline(:));
+        mImg = (mImg - nBaseline) ./ std(mImgBaseline(:));
 
-        
-        %imagesc( (mImg - mean(mImgBaseline(:))) ./ [mean(mImg(:)) / sqrt()] )
+        %imagesc( (mImg - nBaseline) ./ [mean(mImg(:)) / sqrt()] )
         
         % Z-Test
         mImg(mImg(:) < p_nZCutOff & mImg(:) > -p_nZCutOff) = 0;
     else
         % Subtract baseline and normalize to peak (absolute)
-        mImg = mImg - mean(mImgBaseline(:));
+        % mImg is in spikes/s here
+        mImg = mImg - nBaseline;
         nMaxSpikeRate = max(mImg(:));
         mImg = mImg ./ max(abs(mImg(:)));
     end
     
     % Display intensity map
     if ~ishandle(hFig), return; end
-    if gcf ~= hFig figure(hFig); end
+    if gcf ~= hFig, figure(hFig); end
     hImAx = subplot(2, length(vUnits), u);
     if p_nSmooth > 0
         hImg = imagesc(filt2(mImg, p_nSmooth, 'lm'));
@@ -427,47 +504,21 @@ for u = 1:length(vUnits)
     end
     
     if ~ishandle(hFig), return; end
-    if gcf ~= hFig figure(hFig); end
-    
-    % Compute PSTH
-    if ~isfield(FV, 'S1Map_GetROI') FV.S1Map_Mask = ones(size(mImg)); end
-    vStimSpikesInsideROI = [];
-    vStimSpikesOutsideROI = [];
-    for c = 1:size(mPosUniq, 1)
-        % Get matrix location
-        nI = mPosUniq(c, 1) == vAPLookup;
-        nJ = mPosUniq(c, 2) == vMLLookup;
-        
-        % Iterate over all repetitions at current position
-        vIndx = find(all(mPos == repmat(mPosUniq(c, :), size(mPos, 1), 1), 2));
-        for i = 1:length(vIndx)
-            % Determine if current position is inside or outside ROI
-            if FV.S1Map_Mask(nJ, nI)
-                vStimSpikesInsideROI = [vStimSpikesInsideROI(:); cSpikes{vIndx(i)}]; % spikes inside mask
-            else
-                vStimSpikesOutsideROI = [vStimSpikesOutsideROI(:); cSpikes{vIndx(i)}]; % spikes outside mask
-            end
-        end
-    end
+    if gcf ~= hFig, figure(hFig); end
     
     % Plot PSTH
     if ~ishandle(hFig), return; end
-    if gcf ~= hFig figure(hFig); end
+    if gcf ~= hFig, figure(hFig); end
     hAx = subplot(2, length(vUnits), u+(length(vUnits))); hold on
-
-    nBin = 0.001;
-    [vN, vX] = hist(vStimSpikesInsideROI, (-p_nPreStimPeriod):nBin:p_nPostStimPeriod);
-    vN_psth = vN./nBin./length(cSpikes);
     
     % Draw thick bar to denote evoked activity window
     hPatch = patch([p_nWinStart p_nWinEnd p_nWinEnd p_nWinStart p_nWinStart], [0 0 max(vN_psth) max(vN_psth) 0], [.7 0 0]);
     set(hPatch, 'edgeColor', [.7 0 0])
     
     % Plot PSTH
-    bar(vX, vN_psth, 'facecolor', [.8 .8 .8], 'edgecolor', [.8 .8 .8]);
+    bar(vX_psth, vN_psth, 'facecolor', [.8 .8 .8], 'edgecolor', [.8 .8 .8]);
     
     % Plot baseline activity on PSTH
-    nBaseline = mean(mImgBaseline(:));
     plot([-p_nPreStimPeriod p_nPostStimPeriod], [nBaseline nBaseline], 'g--')
     set(hAx, 'xlim', [-p_nPreStimPeriod p_nPostStimPeriod], 'color', [.1 .1 .1], 'xcolor', [.6 .6 .6], ...
         'ycolor', [.6 .6 .6], 'ylim', [0 max([0.001 max(vN_psth)])])
@@ -503,9 +554,6 @@ FV = rmfield(FV, 'S1Map_Mask');
 % through some automated scripting. In such case, close the figure and make
 % available a global structure which contains the S1 map and PSTH.
 if g_bPlotS1MapQuiet
-    global g_S1MapAnalysis
-    g_S1MapAnalysis = struct([]);
-    
     % Parameters
     g_S1MapAnalysis(1).p_nSmooth = p_nSmooth;
     g_S1MapAnalysis(1).p_nWinStart = p_nWinStart;
@@ -516,7 +564,7 @@ if g_bPlotS1MapQuiet
     g_S1MapAnalysis(1).p_vSearchStrSel = p_vSearchStrSel;
     g_S1MapAnalysis(1).p_nZCutOff = p_nZCutOff;
     g_S1MapAnalysis(1).p_bRemoveInfreqPos = p_bRemoveInfreqPos;
-    
+
     % Results
     g_S1MapAnalysis(1).map = mImg;
     g_S1MapAnalysis(1).map_xcoords_mm = vXlabels;
@@ -526,6 +574,7 @@ if g_bPlotS1MapQuiet
     g_S1MapAnalysis(1).psth_baseline = nBaseline;
     g_S1MapAnalysis(1).psth_rate = vN_psth; % normalized spikes/sec
     g_S1MapAnalysis(1).map_max = nMaxSpikeRate; % max spikes/sec
+    g_S1MapAnalysis(1).stimulus_count_map = mStims; % one count per stim at each location
     
     close(hFig);
 end
