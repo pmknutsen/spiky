@@ -708,8 +708,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function OpenSettings(varargin)
-% OpenSettings loads the .spb file of a .mat file. This file contains various
-% settings and results
+% OpenSettings loads data and settings from an SPB files.
+
 persistent p_bAlwaysUseDuplicate
 if isempty(p_bAlwaysUseDuplicate) p_bAlwaysUseDuplicate = 0; end
 if ~CheckDataLoaded, return, end
@@ -774,7 +774,7 @@ if isfield(FV, 'tData') % is there saved data?
                     case 'Always use duplicate'
                         p_bAlwaysUseDuplicate = 1;
                     case 'Reload data' % retrieve and keep original field
-                        cFieldnamesDAQ{f}
+                        %cFieldnamesDAQ{f}
                         tDataTemp.(cFieldnamesDAQ{f}) = tData.(cFieldnamesDAQ{f});
                 end
             else % Keep by default new/imported fields that do not exist in .daq file
@@ -887,7 +887,14 @@ FV.tFilteredChannels = tFilteredChannels;
 FV.csDisplayChannels = unique([FV.csDisplayChannels csCh]);
 clear global g_vSelCh
 SetStruct(FV)
-ViewTrialData
+
+% Display filters options dialog of any of the settings are NaNs
+if any( isnan([FV.tFilteredChannels.vBandpass FV.tFilteredChannels.bRectify]) )
+    FilterOptions(varargin)
+else
+    ViewTrialData
+end
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1030,7 +1037,7 @@ for f = 1:size(sFiles, 1)
 end
 FV.sDirectory = sDirectory;
 SetStruct(FV)
-OpenFile([],1); % Load first trial
+OpenFile([], 1); % Load first trial
 g_bBatchMode = false;
 ViewTrialData   % Update GUI
 return
@@ -1165,7 +1172,6 @@ else % 1D trace (voltage etc)
     end
 end
 return
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewTrialData(varargin)
@@ -1495,7 +1501,7 @@ for i = 1:length(FV.csDisplayChannels)
     ThemeObject(hSubplots(end))
     
     if g_bMergeMode
-        if isempty(FV.vXlim), axis tight
+        if isempty(FV.vXlim), axis(hSubplots(end), 'tight')
         else set(hSubplots(end), 'xlim', FV.vXlim); end
     else
         nX_s = vTime(1); nX_e = vTime(end);
@@ -1578,6 +1584,9 @@ for i = 1:length(FV.csDisplayChannels)
                     set(hSubplots(end), 'ylim',  vYLim); % use saved ylim * 5%
                 end
             end
+        else
+            % 2D plot
+            set(hSubplots(end), 'ylim', [vY(1) vY(end)])
         end
     end
 end
@@ -2353,7 +2362,7 @@ else
     end
 end
 
-% Ask first, then save
+% Ask to save changes to current open file
 if ~isempty(strfind(get(g_hSpike_Viewer, 'Name'), '*')) && ~isempty(FV.sLoadedTrial)
     switch questdlg('Save changes to current file?', 'Spiky', 'Yes', 'No', 'Cancel', 'Yes')
         case 'Yes', SaveResults
@@ -2382,7 +2391,7 @@ if isfield(FV_old, 'tData'), FV_old = rmfield(FV_old, 'tData'); end
 if isfield(FV_old, 'tSpikes'), FV_old = rmfield(FV_old, 'tSpikes'); end
 if isfield(FV_old, 'sLoadedTrial'), FV_old = rmfield(FV_old, 'sLoadedTrial'); end
 
-% Ask to re-use settings
+% Ask to re-use current settings
 if isempty(FV.sLoadedTrial)
     sAns = 'No';
 else
@@ -2440,6 +2449,9 @@ return
 function ImportFile(varargin)
 % ImportFile retains the current data and imports data that can be
 % appended. If no data is already loaded, ImportFile() runs OpenFile()
+%
+% ImportFile() is a batch compatible function
+%
 [FV, ~] = GetStruct;
 global g_hSpike_Viewer g_bBatchMode;
 if isempty(FV.sLoadedTrial), OpenTrial(varargin); return; end
@@ -2486,16 +2498,31 @@ LoadTrial(sNextTrial);
 [FV, hWin] = GetStruct;
 SetStruct(FV, 'nosaveflag');
 ViewTrialData();
+if ~g_bBatchMode, BatchRedo([], 'ImportFile([],[])'); end % set up batch job
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [FV,hWin] = GetStruct
+function [FV, hWin] = GetStruct(varargin)
+% Fetch the FV structure from the Spiky GUI, or a sub-field of FV.
+%
+%   FV = GetStruct()
+%   tData = GetStruct('tData'), returns FV.tData
+%
 global g_hSpike_Viewer
 hWin = g_hSpike_Viewer;
 if ishandle(g_hSpike_Viewer)
     FV = get(g_hSpike_Viewer, 'UserData');
 else
     FV = SetFVDefaults();
+end
+
+% Return only the requested field in FV (if any)
+if nargin == 1
+    if isfield(FV, varargin{1})
+        FV = FV.(varargin{1});
+    else
+        error(['The requested field ' varargin{1} ' is not a field in FV.']);
+    end
 end
 return
 
@@ -2527,12 +2554,12 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function sLoadedFile = GetCurrentFile()
-% Get the current loaded file
+% Get name of the currently loaded file.
 FV = GetStruct();
 if isfield(FV, 'sLoadedTrial')
     iSep = strfind(FV.sLoadedTrial, filesep);
     if isempty(iSep)
-        sLoadedFile = '';
+        sLoadedFile = FV.sLoadedTrial;
     else
         sLoadedFile = FV.sLoadedTrial(iSep(end)+1:end);
     end
@@ -2664,7 +2691,6 @@ else
     nNum = str2num(sNum);
 end
 return
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function bResult = LoadTrial(snTrial)
@@ -4515,7 +4541,7 @@ global g_hSpike_Viewer g_vSelCh
 
 if ~CheckDataLoaded(), return, end
 
-%% Ask user what data to merge
+% Ask user what data to merge
 hFig = figure;
 % TODO Remove Imported Channels? This appears to no longer be used.
 cFields = {'Spikes' 'Events' 'Imported channels' 'Filtered channels' 'Displayed channels'};
@@ -4620,6 +4646,9 @@ for f = 1:nLen
     % Get spike mergedata
     if bSpikes
         DetectSpikes(); % detect spikes on thresholded channels
+        [tSpikes, ~] = GetStruct('tSpikes'); % get spikes from the updated FV
+        FV.tSpikes = tSpikes;
+
         % concatenate multitrodes
         csMultiTrodes = {}; % get names of multitrodes
         csCh = fieldnames(FV.tSpikes);
