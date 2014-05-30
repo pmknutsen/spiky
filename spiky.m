@@ -3,7 +3,7 @@ function varargout = spiky(varargin)
 %
 % Usage:
 %   < spiky >
-%   Runs the Spiky GUIo
+%   Runs the Spiky GUI
 %
 %   < spiky(FUN) >
 %   Runs the internal function FUN in Spiky. Ex:
@@ -232,7 +232,7 @@ uimenu(g_hSpike_Viewer, 'Parent', hEdit, 'Label', '&DAQ Info', 'Callback', @Show
 %  - View menu
 hView  = uimenu(g_hSpike_Viewer, 'Label', '&View');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Show Channels...', 'Callback', @SelectChannels);
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Show &Events', 'Callback', @ShowEvents, 'Checked', 'off', 'Accelerator', 'E');
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Show &Events', 'Callback', @ToggleStatus, 'Checked', 'on', 'Accelerator', 'E');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Zoom &In', 'Callback', @ZoomIn, 'separator', 'on');
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Zoom &Out', 'Callback', @ZoomOut);
 uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Zoom Range', 'Callback', @ZoomRange, 'Accelerator', 'Z');
@@ -243,8 +243,8 @@ hAmpUnit = uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', 'Amplitude Unit');
 uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Volts (V)', 'callback', {@SetAmplitudeUnit, 'v'});
 uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Millivolts (mV)', 'checked', 'on', 'callback', {@SetAmplitudeUnit, 'v'});
 uimenu(g_hSpike_Viewer, 'Parent', hAmpUnit, 'Label', 'Microvolts (µV)', 'callback', {@SetAmplitudeUnit, 'v'});
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Normal Time', 'Callback', @NormalTime, 'separator', 'on', 'Tag', 'ShowNormalTime', 'checked', 'on');
-uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', @ShowGrid);
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Normal Time', 'Callback', @ToggleStatus, 'separator', 'on', 'Tag', 'ShowNormalTime', 'checked', 'on');
+uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', @ToggleStatus, 'Checked', 'on');
 
 % List of themes
 hThemes = uimenu(g_hSpike_Viewer, 'Parent', hView, 'Label', '&Themes', 'separator', 'on');
@@ -375,6 +375,7 @@ hHelp  = uimenu(g_hSpike_Viewer, 'Label', '&Help');
 hWebResSub = uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', 'Web &Resources');
 uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&Version', 'Callback', @ShowVersion, 'Separator', 'on');
 uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&Licence', 'Callback', @ShowLicense);
+uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&Keyboard Shortcuts', 'Callback', @KeyboardShortcuts);
 uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&Check for Updates', 'Callback', @CheckUpdate);
 uimenu(g_hSpike_Viewer, 'Parent', hHelp, 'Label', '&About Spiky', 'Callback', @AboutSpiky);
 
@@ -671,22 +672,6 @@ figure(hWin)
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function ShowEvents(varargin)
-if ~CheckDataLoaded, return, end
-[FV, ~] = GetStruct;
-% update menu item
-global g_hSpike_Viewer % handle to Spiky window
-hMenuItem = findobj(g_hSpike_Viewer, 'Label', 'Show &Events'); % handle of 'Show Event'
-switch get(hMenuItem, 'Checked')
-    case 'on' % turn off if on
-        set(hMenuItem, 'Checked', 'off');
-    case 'off' % turn on if off
-        set(hMenuItem, 'Checked', 'on');
-end
-ViewTrialData
-return
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SaveResults(varargin)
 % Save trial settings
 global g_bMergeMode g_hSpike_Viewer
@@ -698,8 +683,8 @@ sPath = [FV.sLoadedTrial(1:end-4) '.spb'];
 if ~g_bMergeMode % remove raw data so its not duplicated on disk
     %FV = rmfield(FV, 'tData');
 end
-%save(sPath, 'FV', '-MAT', '-V6') % no compression
-save(sPath, 'FV', '-MAT')
+save(sPath, 'FV', '-v7.3')
+
 % Update the title of the Spiky window to reflect that settings were saved
 global g_hSpike_Viewer
 set(g_hSpike_Viewer, 'Name', sprintf('%s - Spiky', GetCurrentFile()))
@@ -1265,7 +1250,7 @@ for i = 1:length(FV.csDisplayChannels)
 
     % Get channel description
     sYLabel = GetChannelDescription(sCh);
-    if isempty(sYLabel) sYLabel = sCh; end
+    if isempty(sYLabel), sYLabel = sCh; end
 
     if ( ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh) ) || ~g_bMergeMode
         [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % mV
@@ -1497,7 +1482,7 @@ for i = 1:length(FV.csDisplayChannels)
     else
         hLabel = ylabel([sYLabel ' (' sUnit ')']);
     end
-    set(hLabel, 'Interpreter', 'none')
+    set(hLabel, 'Interpreter', 'tex')
     ThemeObject(hSubplots(end))
     
     if g_bMergeMode
@@ -1583,10 +1568,15 @@ for i = 1:length(FV.csDisplayChannels)
                 else
                     set(hSubplots(end), 'ylim',  vYLim); % use saved ylim * 5%
                 end
+                % Reduce number of y-ticks
+                vYTicks = get(hSubplots(end), 'ytick');
+                set(hSubplots(end), 'ytick', vYTicks(1:2:end));
             end
         else
             % 2D plot
-            set(hSubplots(end), 'ylim', [vY(1) vY(end)])
+            if exist('vY', 'var')
+                set(hSubplots(end), 'ylim', [vY(1) vY(end)])
+            end
         end
     end
 end
@@ -1608,7 +1598,7 @@ if bShowDigitalEvents
     if any(strcmp('DAQ_Trigger', FV.csDigitalChannels))
         nEvents = nEvents - 1;
     end
-
+    
     % Get height of event markers
     set(hSubplots(end), 'units', 'pixels')
     vPos = get(hSubplots(end), 'position');
@@ -3173,7 +3163,7 @@ function DejitterSpikes(varargin)
 % bulk. TODO [[If spikes are already sorted, dejitter spikes instead on a
 % unit-by-unit basis]].
 if ~CheckDataLoaded, return, end
-[FV,hWin] = GetStruct;
+[FV, ~] = GetStruct;
 csFieldnames = fieldnames(FV.tSpikes);
 if length(csFieldnames) > 1
     hWait = waitbar(0, 'Dejittering spikes ...');
@@ -3192,7 +3182,7 @@ for i = 1:length(csFieldnames)
     else
         vAssigns = zeros(size(tSpikesCh.spiketimes));
     end
-        
+    
     for a = unique(vAssigns)'
         iThis = vAssigns == a;
         tSpikes = struct([]);
@@ -3202,6 +3192,9 @@ for i = 1:length(csFieldnames)
         tSpikes.Fs = tSpikesCh.Fs;
         tSpikes.threshV = tSpikesCh.threshV;
         tSpikes.threshT = tSpikesCh.threshT;
+        
+        % Skip if there are less than 10 spikes
+        if any(size(tSpikes.waveforms) < 10), continue; end
         
         % in case several thresholds are given (eg. for merged files) check
         % they are all the same; if not, dejittering cannot be made
@@ -3262,7 +3255,7 @@ function RemoveOutlierSpikes(varargin)
 % Remove waveforms that are considered outliers using K-means based outlier
 % detection algorithm
 if ~CheckDataLoaded, return, end
-[FV,hWin] = GetStruct;
+[FV, ~] = GetStruct;
 csFieldnames = fieldnames(FV.tSpikes);
 if length(csFieldnames) > 1,
     hWait = waitbar(0, 'Removing outliers from all channels...');
@@ -3271,6 +3264,8 @@ end
 for nCh = 1:length(csFieldnames)
     if length(csFieldnames) > 1, waitbar(nCh/length(csFieldnames), hWait), end
     tSpikes = FV.tSpikes.(csFieldnames{nCh});
+    % Skip if there are less than 10 spikes
+    if any(size(tSpikes.waveforms) < 10), continue; end
     tSpikes = ss_outliers(tSpikes, (1-1/(size(tSpikes.waveforms,2)*100))); % remove outliers
     FV.tSpikes.(csFieldnames{nCh}) = tSpikes;
 end
@@ -3285,7 +3280,7 @@ function ShowAggregationTree(varargin)
 % Show overclustered assignments and results after joining clusters
 % TODO: Needs to be modified if users has joined/split clusters manually
 if ~CheckDataLoaded, return, end
-[FV,hWin] = GetStruct;
+[FV, ~] = GetStruct;
 % Select channel from list of sorted units
 csFieldnames = fieldnames(FV.tSpikes)';
 vDel = [];
@@ -3310,8 +3305,9 @@ SetStruct(FV)
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check whether spikes have been sorted on at least one channel/electrode
 function bSorted = CheckIfSorted(varargin)
-[FV,hWin] = GetStruct;
+[FV, ~] = GetStruct;
 % Select channel from list of sorted units
 csFieldnames = fieldnames(FV.tSpikes)';
 vDel = [];
@@ -3327,7 +3323,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowSpikeClusters(varargin)
-[FV,hWin] = GetStruct;
+[FV, ~] = GetStruct;
 % Select channel from list of sorted units
 csFieldnames = fieldnames(FV.tSpikes)';
 vDel = [];
@@ -4004,10 +4000,29 @@ ViewTrialData();
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Display list of all available keyboard shortcuts
+function KeyboardShortcuts(varargin)
+[~, hWin] = GetStruct;
+hMenuItems = findobj(hWin, 'type', 'uimenu');
+cData(:, 1) = get(hMenuItems, 'Label');
+cData(:, 2) = get(hMenuItems, 'Accelerator');
+vValid = ~cellfun(@isempty, cData(:, 2));
+hFig = figure();
+set(hFig, 'Name', 'Spiky Keyboard Shortcuts', 'ToolBar', 'none', 'menuBar','none')
+ThemeObject(hFig)
+cColumnNames = {'Label', 'Accelerator'};
+cColumnFormat = {{'char' 'fixed'}, {'char' 'fixed'}};
+cColumnEditable =  [false false];
+hTable = uitable('Units', 'normalized', 'Position', [0 0 1 1], 'Data', flipud(cData(vValid, :)), ...
+    'ColumnName', cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth', {400, 100});
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SortAllChannels(varargin)
 % Run spike sorting on all thresholded channels
 if ~CheckDataLoaded, return, end
-[FV,hWin] = GetStruct;
+bSortGood = 0;
+[FV, ~] = GetStruct;
 if isempty(FV.tSpikes)
     uiwait(warndlg('You must first run spike detection.'))
     return
@@ -4024,6 +4039,14 @@ for nCh = 1:length(csChannels)
     % waveforms and spiketimes
     tSpikes = FV.tSpikes.(sCh);
     if isempty(tSpikes.waveforms); continue; end
+    % Skip if there are less than 5 spikes
+    if any(size(tSpikes.waveforms) < 5)
+        uiwait(warndlg(['There are too few spikes on channel ' csChannels{nCh} ' to sort.']))
+        tSpikes.hierarchy = struct('assigns', repmat(0, size(tSpikes.waveforms, 1), 1));
+        FV.tSpikes.(sCh) = tSpikes;
+        SetStruct(FV)
+        continue;
+    end
     tSpikes.Fs = tSpikes.Fs(1);
     % Over-clustering
     tSpikes = ss_kmeans(tSpikes);
@@ -4033,9 +4056,12 @@ for nCh = 1:length(csChannels)
     % Save results
     FV.tSpikes.(sCh) = tSpikes;
     SetStruct(FV)
+    bSortGood = 1;
 end
 if length(csChannels) > 1, close(hWait); end
-ShowOverlappingSpikeClusters;
+if bSortGood
+    ShowOverlappingSpikeClusters;
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4496,7 +4522,7 @@ for f = 1:length(csPaths)
     end
     FV.sLoadedTrial = sNewFile;
     % save settings (and imported fields)
-    save(CheckFilename([FV.sLoadedTrial(1:end-4) '.spb']), 'FV', '-MAT', '-V6')
+    save(CheckFilename([FV.sLoadedTrial(1:end-4) '.spb']), 'FV', '-v7.3')
 end
 sp_disp(sprintf('Done distributing current settings to %d files in current directory', length(csPaths)))
 return
@@ -5105,7 +5131,7 @@ FV.tChannelDescriptions = FV_merge.tChannelDescriptions;
 FV.bPlotRasters = 1;
 FV.sLoadedTrial = CheckFilename([FV_merge.sDirectory '\MergeFile.spb']);
 SetStruct(FV)
-save(FV.sLoadedTrial, 'FV', '-MAT', '-V6') % Save merged results to disk
+save(FV.sLoadedTrial, 'FV', '-v7.3') % Save merged results to disk
 set(g_hSpike_Viewer, 'Name', sprintf('%s - Spiky', GetCurrentFile()))
 
 ViewTrialData();
@@ -5368,22 +5394,34 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [sTxt] = ShowCurrentLine(obj, event_obj)
+% Highlight a line when clicked on and bring to front
 sTxt = {['']};
 
-sTypeOfCurrObj = get(gco, 'Type');
-if ~strcmp(lower(sTypeOfCurrObj), 'line'), return, end
+hObj = gco;
+sTypeOfCurrObj = get(hObj, 'Type');
+if ~strcmpi(sTypeOfCurrObj, 'line'), return, end
 
 % Reset color on unclicked lines
-hToggleHandles = findobj(gcf, 'Tag', get(gco,'tag'), 'Type', 'line');
+hToggleHandles = findobj(gcf, 'Tag', get(hObj, 'tag'), 'Type', 'line');
 cCol = get(hToggleHandles(2:end), 'color');
-mCol = reshape([cCol{:}],3,length(hToggleHandles)-1)';
+if iscell(cCol)
+    mCol = reshape([cCol{:}], 3, length(hToggleHandles)-1)';
+else
+    mCol = reshape(cCol, 3, length(hToggleHandles)-1)';
+end
 set(hToggleHandles(2:end), 'color', median(mCol,1), 'linewidth', 1, 'marker', 'none');
 
 % Reset marker on all line objects
 hHandles = findobj(gcf, 'Type', 'line');
 set(hHandles, 'marker', 'none')
 
-set(gco, 'color', median(mCol,1), 'linewidth', 2, 'marker', 's', 'markeredgecolor', 'w', 'markersize', 4)
+% Change thickness and add markers to clicked line
+set(hObj, 'color', median(mCol,1), 'linewidth', 3, 'marker', 's', 'markeredgecolor', 'w', 'markersize', 4)
+
+% Move clicked line to top of stack
+hAx = get(gco, 'parent');
+hHandles = get(hAx, 'children');
+set(hAx, 'children', [hObj; setdiff(hHandles, hObj)]);
 
 % If an UIHoldFigure figure is open, close it/them
 close(findobj('Tag', 'UIHoldFigure'));
@@ -6328,24 +6366,8 @@ spiky('BatchRedo([],''redo'')')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Show normal time (i.e. start of trial is zero)
-function NormalTime(varargin)
-[FV, ~] = GetStruct;
-switch lower(get(gcbo,'Checked'))
-    case 'on'
-        set(gcbo, 'Checked', 'off');
-    case 'off'
-        set(gcbo, 'Checked', 'on');
-end
-SetStruct(FV)
-if ~isempty(FV.csDisplayChannels)
-    ViewTrialData
-end
-return
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Turn on/off x axis grid
-function ShowGrid(varargin)
+% Toggle status of menu item (e.g. Grid, Normal Time etc)
+function ToggleStatus(varargin)
 [FV, ~] = GetStruct;
 switch lower(get(gcbo,'Checked'))
     case 'on'
@@ -6382,7 +6404,6 @@ end
 SetStruct(FV)
 ViewTrialData
 return
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ReplaceValues(varargin)
@@ -6834,19 +6855,24 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowVersion(varargin)
-sWT_dir = which('spiky');
-sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, mfilename)-1) 'VERSION']);
-hFID = fopen(sVERSIONPath, 'r');
-sHash = char(fread(hFID, 10, 'schar'))';
-fclose(hFID);
+sWT_dir = fileparts(mfilename('fullpath'));
+sVERSIONPath = [sWT_dir filesep 'VERSION'];
+if ~exist(sVERSIONPath, 'file')
+    sHash = 'Unknown';
+else
+    hFID = fopen(sVERSIONPath, 'r');
+    sHash = char(fread(hFID, 10, 'schar'))';
+    fclose(hFID);
+end
 inputdlg('GitHub SHA-1 Checksum:', 'Spiky Version', 1, {sHash});
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowLicense(varargin)
 [~, hWin] = GetStruct;
-sWT_dir = which('spiky');
-sLICENSEPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, mfilename)-1) 'LICENSE']);
+sWT_dir = fileparts(mfilename('fullpath'));
+sLICENSEPath = [sWT_dir filesep 'LICENSE'];
+if ~exist(sLICENSEPath, 'file'), return; end
 sLicense = textread(sLICENSEPath, '%s', 'whitespace', '', 'bufsize', 2^16);
 hFig = figure;
 set(hFig, 'name', 'Spiky License', 'menubar', 'none', 'numbertitle', 'off', 'color', 'w')

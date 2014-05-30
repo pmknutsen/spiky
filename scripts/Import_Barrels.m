@@ -15,6 +15,8 @@ function FV = Import_Barrels(FV)
 % the GalvoScanner image using either an affine or polynomial approach.
 %
 
+global Spiky;
+
 debug = 0;
 
 % Load MapBarrelsResult.mat file and IOS vessel image
@@ -107,10 +109,12 @@ registered = registered(1:size(reference,1),1:size(reference,2));
 %% Show all images
 tBarrelOutlines = struct([]);
 hFig = figure;
+Spiky.main.ThemeObject(hFig);
+
 colormap gray
 
 % IOS - unregistered w/barrel outlines
-hAx = subplot(2,3,1);
+hAx = subplot(2,3,1, 'parent', hFig);
 imshow(unregistered); hold on
 mIdentityMap = tResults.IdentityMap;
 hContFig = figure;
@@ -142,7 +146,7 @@ axis image
 title('IOS - Unregistered w/outlines')
 
 % IOS - registered
-subplot(2,3,2)
+subplot(2,3,2, 'parent', hFig)
 imshow(registered)
 axis image
 title('IOS - Registered')
@@ -161,7 +165,7 @@ axis image
 title('IOS - Unregistered w/barrels')
 
 % GalvoScanner w/barrels outlines
-hAx = subplot(2,3,4);
+hAx = subplot(2,3,4, 'parent', hFig);
 h1 = imshow(reference); hold on
 mIdentityMap = tResults.IdentityMap;
 mDistanceMap = tResults.DistanceMap;
@@ -220,13 +224,13 @@ delete(hContFig)
 title('Reference w/outlines')
 
 % IOS - GalvoScanner
-subplot(2,3,5)
+subplot(2,3,5, 'parent', hFig)
 imshow(reference)
 axis image
 title('Reference')
 
 % GalvoScanner w/barrels
-subplot(2,3,6)
+subplot(2,3,6, 'parent', hFig)
 h1 = imshow(reference); hold on
 mNorm = barrelmap_reg;
 mNorm = mNorm - min(mNorm(:));
