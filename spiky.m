@@ -2701,7 +2701,8 @@ if ~exist(sFile, 'file')
 end
 
 % Run import filter
-eval(sprintf('FV = import_%s(sFile, FV);', lower(sFile(end-2:end))))
+iDot = strfind(sFile, '.');
+eval(sprintf('FV = import_%s(sFile, FV);', lower(sFile(iDot+1:end))))
 
 % Check for errors that may have been reported during import
 if isfield(FV, 'sImportError')
