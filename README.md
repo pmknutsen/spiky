@@ -6,16 +6,16 @@ along with extra features for convenient sorting, data visualization and analysi
 and continuous data.
 
 ##Features
-- Zoom, scroll and pan
 - 1-click automatic spike sorting
 - Visualization and validation tools
 - Basic channel operators
 - Per-channel bandpass filtering
 - Custom math operators
+- Zoom, scroll and pan data
 - Analysis of discrete and continuous data
 - Merging across data files
 - Batch processing
-- Command line interface
+- Matlab API
 - Extendible through scripting
 
 ###Requirements
@@ -26,6 +26,10 @@ Synchronize the master branch with `git`, or download the latest '.zip' archive 
 button above) and unpack to a local location. Add all sub-folders to the Matlab path. Type
 `spiky` to start.
 
+###API
+Spiky is accessible from the command line or your own functions and scripts via a global
+structure containing function handles to all Spiky routines.
+
 ###Documentation
 https://github.com/pmknutsen/spiky/wiki
 
@@ -35,11 +39,13 @@ https://github.com/pmknutsen/spiky/issues
 ##Data Formats
 Import:
 - Matlab Data Acquisition Toolbox (.daq)
+- Hierarchical Data Format (.hd5)
+- Matlab vectors (.mat)
 
 Export:
 - Matlab (.mat)
 
-##Analysis Plug-Ins
+##Analysis Routines
 Continuous:
 - Cross correlation
 - Event triggered average

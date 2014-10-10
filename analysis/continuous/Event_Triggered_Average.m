@@ -1,9 +1,36 @@
 function Event_Triggered_Average(FV)
 % Outputs: [mean, error, time]
 %
+% Plot an event triggered average of a selected channel.
+%
+% TODO
+%   Allow to filter out 'noisy' trials, eg. to those with a high variance
+%   (use a relative measure)
+%
+%   Allow to use a filter (e.g. to exclude or include certain triggers)
 %
 
 global Spiky g_bBatchMode
+
+% Select continuous channel (1D or 2D)
+% Check if function was called from a context menu. If so, use the Tag to
+% detect the channel
+persistent p_sContCh;
+sTag = get(get(get(gcbo, 'parent'), 'parent'), 'Tag');
+if any(strcmp(sTag, FV.csChannels))
+    p_sContCh = sTag;
+else
+    vIndx = [];
+    for ch = 1:length(FV.csChannels)
+        if isempty(find(strcmp(FV.csChannels(ch), FV.csDigitalChannels), 1))
+            vIndx(end+1) = ch;
+        end
+    end
+    if isempty(p_sContCh) || (~g_bBatchMode && nargout == 0)
+        [p_sContCh, bResult] = Spiky.main.SelectChannelNumber(FV.csChannels(vIndx)', 'Select continuous signal', p_sContCh);
+        if ~bResult, return, end
+    end
+end
 
 % Select trigger event
 persistent p_sEventCh;
@@ -12,16 +39,10 @@ if isempty(p_sEventCh) || (~g_bBatchMode && nargout == 0)
     if ~bResult, return, end
 end
 
-% Select continuous channel (1D or 2D)
-vIndx = [];
-for ch = 1:length(FV.csChannels)
-    if isempty(find(strcmp(FV.csChannels(ch), FV.csDigitalChannels), 1))
-        vIndx(end+1) = ch;
-    end
-end
-persistent p_sContCh;
-if isempty(p_sContCh) || (~g_bBatchMode && nargout == 0)
-    [p_sContCh, bResult] = Spiky.main.SelectChannelNumber(FV.csChannels(vIndx)', 'Select continuous signal', p_sContCh);
+% Select filter event
+persistent p_sFilterCh;
+if isempty(p_sFilterCh) || (~g_bBatchMode && nargout == 0)
+    [p_sFilterCh, bResult] = Spiky.main.SelectChannelNumber(['None'; FV.csDigitalChannels'], 'Select filter event', p_sFilterCh);
     if ~bResult, return, end
 end
 
@@ -53,7 +74,7 @@ else bIs2D = false; end
 % We don't collect parameters when function is called with outputs or if we
 % are in batch-mode (assuming parameters are known, which they should be).
 persistent p_nStimDel p_nPre p_nPost p_nDetrend p_nFirstPulse p_nLastPulse p_nDerivative
-persistent p_bAbsolute p_bLowPassHz p_bHiPassHz p_bHilbert
+persistent p_bAbsolute p_bLowPassHz p_bHiPassHz p_bHilbert p_nFilterTime
 if isempty(p_nStimDel) || (~g_bBatchMode && nargout == 0)
     if isempty(p_nStimDel), p_nStimDel = 0; end
     if isempty(p_nPre), p_nPre = 1; end
@@ -66,13 +87,17 @@ if isempty(p_nStimDel) || (~g_bBatchMode && nargout == 0)
     if isempty(p_bHiPassHz), p_bHiPassHz = 0; end
     if isempty(p_bLowPassHz), p_bLowPassHz = 1000; end
     if isempty(p_bHilbert), p_bHilbert = 0; end
+    if isempty(p_nFilterTime), p_nFilterTime = 0; end
     cPrompt = {'Pre-event duration (s)','Post-event duration (s)', 'Detrend (1=yes, 0=no)', ...
         'Stimulus delay (ms)', 'First pulse', sprintf('Last pulse (max %d)', length(vEventTimes)), ...
-        'Derivative', 'Use absolute values (1=yes, 0=no)', 'High pass (Hz; 1D only)', 'Low pass (Hz; 1D only)', 'Average Hilbert amplitude (1=yes, 0=no; 1D only)'};
+        'Derivative', 'Use absolute values (1=yes, 0=no)', 'High pass (Hz; 1D only)', 'Low pass (Hz; 1D only)', ...
+        'Average Hilbert amplitude (1=yes, 0=no; 1D only)', ...
+        'Exclude if filter is ON at time relative to trigger (s)'};
     cAnswer = inputdlg(cPrompt,'Averaging options', 1, ...
         {num2str(p_nPre), num2str(p_nPost), num2str(p_nDetrend), num2str(p_nStimDel), ...
         num2str(p_nFirstPulse), num2str(min([p_nLastPulse length(vEventTimes)])), num2str(p_nDerivative), ...
-        num2str(p_bAbsolute), num2str(p_bHiPassHz), num2str(p_bLowPassHz), num2str(p_bHilbert)});
+        num2str(p_bAbsolute), num2str(p_bHiPassHz), num2str(p_bLowPassHz), num2str(p_bHilbert), ...
+        num2str(p_nFilterTime)});
     if isempty(cAnswer), return, end
     p_nPre  = str2num(cAnswer{1}); % sec
     p_nPost  = str2num(cAnswer{2}); % sec
@@ -85,6 +110,37 @@ if isempty(p_nStimDel) || (~g_bBatchMode && nargout == 0)
     p_bHiPassHz = str2num(cAnswer{9});
     p_bLowPassHz = str2num(cAnswer{10});
     p_bHilbert = str2num(cAnswer{11});
+    p_nFilterTime = str2num(cAnswer{12});
+end
+
+% Remove event times where the filter event was UP at the selected relative
+% time (s)
+if ~strcmp('None', p_sFilterCh)
+    % Get filter UP and DOWN times
+    vFilterUPTimes = FV.tData.([p_sFilterCh '_Up']); % s, abs time
+    vFilterDOWNTimes = FV.tData.([p_sFilterCh '_Down']); % s, abs time
+    
+    vRemInd = [];
+    for e = 1:length(vEventTimes)
+        % Get absolute time
+        nAbsTime = vEventTimes(e) + p_nFilterTime;
+        
+        % Check if filter event was UP at time nAbsTime
+        
+        % Get last filter UP event before trigger
+        nFiltStart = vFilterUPTimes(nAbsTime > vFilterUPTimes);
+        if isempty(nFiltStart), continue; end
+        nFiltStart = nFiltStart(end);
+        
+        nFiltEnd = vFilterDOWNTimes(vFilterDOWNTimes > nFiltStart);
+        nFiltEnd = nFiltEnd(1); % first filter DOWN event after UP
+
+        % Check if trigger occurred before filter DOWN event
+        if nAbsTime < nFiltEnd
+            vRemInd = [vRemInd e];
+        end
+    end
+    vEventTimes(vRemInd) = [];    
 end
 
 % Limit last pulse to max number of events
@@ -128,15 +184,13 @@ for o = p_nFirstPulse:nLastPulse
     nStartR = vOnsets(o) - round(p_nPre * nContFs);
     nEndR  = vOnsets(o) + round(p_nPost * nContFs);
     nSegLen = nEndR - nStartR;
-
-    % Extract interpolated trace from start to end
-
     
+    % Extract interpolated trace from start to end
     if nStart < 1 || nEnd > nLen, continue; end
     if bIs2D
         vThis = vCont(:, nStartR:nEndR);
-        [M N] = size(vThis); %Assuming square matrix.
-        [xx yy] = meshgrid(1:N,1:M); %xx,yy are both outputs of meshgrid (so called plaid matrices).
+        [M N] = size(vThis); % Assuming square matrix.
+        [xx yy] = meshgrid(1:N,1:M); % xx,yy are both outputs of meshgrid (so called plaid matrices).
         sy = 0;
         sx = nStartR - nStart;
         try

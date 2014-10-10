@@ -26,6 +26,7 @@ if ~exist(FV.sDirectory, 'dir')
 end
 cd(FV.sDirectory)
 persistent p_sMapBarrelsResultPath
+if p_sMapBarrelsResultPath == 0, p_sMapBarrelsResultPath = []; end
 sPwd = pwd;
 if ~isempty(p_sMapBarrelsResultPath)
     cd(p_sMapBarrelsResultPath)
@@ -41,6 +42,7 @@ cd(sPath)
 
 % Load the GalvoScanner blue/vessel image WITHOUT stereotactic coordinates
 persistent p_sRefImgPath
+if p_sRefImgPath == 0, p_sRefImgPath = []; end
 sPwd = pwd;
 if ~isempty(p_sRefImgPath)
     cd(p_sRefImgPath)

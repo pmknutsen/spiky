@@ -1,4 +1,4 @@
-function FV = Plot_S1_Input_Map(FV, varargin)
+function FV = GalvoScanner_Spiking_Response_Map.m.m(FV, varargin)
 % Display the S1 input map to SpVi units
 %
 % Specifically, graph:
@@ -15,7 +15,7 @@ function FV = Plot_S1_Input_Map(FV, varargin)
 %
 %   tParams = struct('p_nSmooth', 0.5, 'p_vSearchStrSel', [1 2])
 %
-%       FV = Plot_S1_Input_Map(FV, tParams)
+%       FV = GalvoScanner_Spiking_Response_Map.m.m(FV, tParams)
 %
 %
 %
@@ -32,6 +32,12 @@ global g_bPlotS1MapQuiet
 if g_bPlotS1MapQuiet
     global g_S1MapAnalysis
     g_S1MapAnalysis = struct([]);
+end
+
+% Check that data is loaded
+global Spiky
+if ~Spiky.main.CheckDataLoaded()
+    return
 end
 
 % Check if any channel has been sorted

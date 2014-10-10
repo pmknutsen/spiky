@@ -19,8 +19,13 @@ function varargout = spiky(varargin)
 %   where SUB is the subroutine to run.
 %
 
+% Notes:
+%   When adding help entries to local functions, last comment line should
+%   end with a single percentage and then newline.
+%
+
 % Spiky - Spike sorting GUI for Matlab
-% Copyright (C) 2012 Per M Knutsen <pmknutsen@gmail.com>
+% Copyright (C) 2005-2014 Per M Knutsen <pmknutsen@gmail.com>
 % 
 % This program is free software: you can redistribute it and/or modify
 % it under the terms of the GNU General Public License as published by
@@ -51,15 +56,15 @@ if nargin > 0
 end
 
 % Abort if Spiky is already running
-global g_hSpike_Viewer
-if ishandle(g_hSpike_Viewer)
+hPlot = findobj('Tag', 'Spiky');
+if ~isempty(hPlot)
     disp('Spiky is already running')
     return
 end
 
 clc
 disp('Spiky - Automated spike-sorting for Matlab')
-disp('Copyright (C) 2005-2013 Per M Knutsen <pmknutsen@gmail.com>')
+disp('Copyright (C) 2005-2014 Per M Knutsen <pmknutsen@gmail.com>')
 disp('This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are')
 disp(sprintf('are welcome to redistribute it under certain conditions; see LICENSE for details.\n'))
 
@@ -81,6 +86,8 @@ Spiky = struct([]);
 Spiky(1).main = struct([]);
 Spiky(1).import = struct([]);
 Spiky(1).export = struct([]);
+Spiky(1).help = eval('@GetHelp');
+
 Spiky.analysis = struct('discrete', struct([]), 'continuous', struct([]));
 for i = 1:length(cSubs)
     Spiky.main(1).(cSubs{i}) = eval(['@' cSubs{i}]);
@@ -126,21 +133,19 @@ for f = 1:length(tFiles)
     end
 end
 
-disp(sprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n'))
+evalin('base', 'global Spiky')
 
+disp(sprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n'))
+disp(sprintf('To view a function help entry use Spiky.help(). For example:\n\tSpiky.help(''ZoomReset'')\n\tSpiky.help(Spiky.main.ZoomReset)'))
+disp(sprintf('\n'))
+
+global g_hSpike_Viewer
 g_hSpike_Viewer = figure;
 
 % Set FV default settings
 FV = SetFVDefaults();
 SetStruct(FV);
 ThemeObject([]); % set default line colors
-
-% Check if Spiky is already running
-hPlot = findobj('Tag', 'Spiky');
-if ~isempty(hPlot) % activate existing Spiky window
-    figure(hPlot)
-    return
-end
 
 vPos = get(g_hSpike_Viewer, 'position');
 ThemeObject(g_hSpike_Viewer)
@@ -301,36 +306,8 @@ uimenu(g_hSpike_Viewer, 'Parent', hSorting, 'Label', 'Delete sorting data...', '
 
 %  - Analysis menu
 hAnalysis = uimenu(g_hSpike_Viewer, 'Label', '&Analysis');
-
-% - Continuous analysis functions
-hContinuous = uimenu(g_hSpike_Viewer, 'Parent', hAnalysis, 'Label', '&Continuous');
-sContPath = CheckFilename([sSpikyPath(1:end-7) '/analysis/continuous/' ]);
-tFiles = dir(sContPath);
-for f = 1:length(tFiles)
-    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'));
-        sName = strrep(tFiles(f).name(1:end-2), '_', ' ');
-        vIndx = strfind(sName, ' ');
-        sName([1 vIndx+1]) = upper(sName([1 vIndx+1]));
-        uimenu(g_hSpike_Viewer, 'Label', sName, 'Parent', hContinuous, ...
-            'Callback', ...
-            {@RunAnalysis, tFiles(f).name(1:end-2), 'continuous'});
-    end
-end
-
-% - Discrete analysis functions
-hDiscrete = uimenu(g_hSpike_Viewer, 'Parent', hAnalysis, 'Label', '&Discrete');
-sContPath = CheckFilename([sSpikyPath(1:end-7) '/analysis/discrete/' ]);
-tFiles = dir(sContPath);
-for f = 1:length(tFiles)
-    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'));
-        sName = strrep(tFiles(f).name(1:end-2), '_', ' ');
-        vIndx = strfind(sName, ' ');
-        sName([1 vIndx+1]) = upper(sName([1 vIndx+1]));
-        uimenu(g_hSpike_Viewer, 'Label', sName, 'Parent', hDiscrete, ...
-            'Callback', ...
-            {@RunAnalysis, tFiles(f).name(1:end-2), 'discrete'});
-    end
-end
+CreateAnalysisMenu(hAnalysis, 'continuous')
+CreateAnalysisMenu(hAnalysis, 'discrete')
 
 uimenu(g_hSpike_Viewer, 'Parent', hAnalysis, 'Label', 'Experiment &Variables...', 'Callback', @ExperimentDescriptions, 'separator', 'on', 'Accelerator', 'V');
 
@@ -385,9 +362,121 @@ uimenu(g_hSpike_Viewer, 'Parent', hWebResSub , 'Label', '&Wiki', 'Callback', 'we
 uimenu(g_hSpike_Viewer, 'Parent', hWebResSub , 'Label', '&Bug Tracker', 'Callback', 'web(''https://github.com/pmknutsen/spiky/issues'', ''-browser'')');
 return
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function GetScriptHelp(varargin)
+% Get help entry of a script file
+% 
+% Usage:
+%   GetScriptHelp() to select script manually
+%   GetScriptHelp('script.m')
+%
+sScriptPath = which('spiky');
+sScriptPath = [sScriptPath(1:end-7) 'scripts' filesep];
+
+if nargin == 1
+    sScript = varargin{1};
+else
+    % Select script file manually
+    [sScript, sScriptPath] = uigetfile(sprintf('%s*.m', sScriptPath), 'Select script file');
+end
+
+% Strip .m from filename
+[sPath, sScript, sExt] = fileparts(sScript);
+
+% Get full path to script file
+sScriptPath = [sScriptPath sScript '.m'];
+
+if exist(sScriptPath, 'file')
+    disp(sprintf('Script:\t%s', sScript))
+    disp(help(sScriptPath))
+else
+    sp_disp(sprintf('No help entry for script %s', sScript));
+end
+
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function GetHelp(varargin)
+% Get help entry of local function inside spiky.m
+%
+if nargin < 1
+    sp_disp('Which help entry do you want?');
+    return;
+else
+    sFunction = varargin{1};
+    % Remove @ sign in case a function handle was passed, eg:
+    % Spiky.help(Spiky.main.MergeChannels)
+    if isa(sFunction, 'function_handle')
+        sFunction = func2str(sFunction);
+    end
+end
+
+% Read spiky.m
+sPath = which('spiky');
+sSpiky = fileread(sPath);
+
+% Find the string 'function FUNCTIONNAME'
+sExpr = ['[^\n]*function ' sFunction '([^\n]*'];
+[~, nStart, nEnd] = regexp(sSpiky, sExpr, 'match');
+if isempty(nStart)
+    sp_disp(sprintf('No help entry for %s()', sFunction));
+    return
+end
+
+disp(sprintf('Function call:\t%s', sSpiky(nStart+9:nEnd)))
+
+% Find comments that follow
+sExpr = '%[\r\n|\n|\r]';
+[~, nStartC, nEndC] = regexp(sSpiky(nEnd+2:nEnd+5000), sExpr, 'match');
+disp(sSpiky(nEnd:(nEnd+nStartC(1))))
+
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function CreateAnalysisMenu(hParent, sType, varargin)
+% Create and return a uimenu with callbacks to continuous analysis
+% functions. Use this function to create uimenus for GUIs and figures.
+% 
+% Usage:
+%   CreateAnalysisMenu(H, TYPE)
+% 
+% where H is the parent of the uimenu and TYPE is the type of analysis
+% functions included in the menu. Valid values of TYPE are 'continuous' or
+% 'discrete'.
+%
+
+[FV, hWin] = GetStruct;
+
+% Load list of continuous analysis functions
+sSpikyPath = which('spiky');
+sContPath = CheckFilename([sSpikyPath(1:end-7) '/analysis/' sType '/' ]);
+tFiles = dir(sContPath);
+
+% Create menu with label
+if nargin > 2
+    sLabel = varargin{1};
+else
+    sLabel = ['&' regexprep(sType, '(\<[a-z])','${upper($1)}')];
+end
+hMenu = uimenu('Parent', hParent, 'Label', sLabel);
+
+for f = 1:length(tFiles)
+    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'));
+        sName = strrep(tFiles(f).name(1:end-2), '_', ' ');
+        vIndx = strfind(sName, ' ');
+        sName([1 vIndx+1]) = upper(sName([1 vIndx+1]));        
+        uimenu('Label', sName, 'Parent', hMenu, ...
+            'Callback', {@RunAnalysis, tFiles(f).name(1:end-2), sType});
+    end
+end
+return
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CheckUpdate(varargin)
 % Compare commit SHA hash on disk with latest version online
+%
 hWin = msgbox('Checking for a newer version of Spiky...', 'Spiky Update');
 try
     sResp = urlread('https://api.github.com/repos/pmknutsen/spiky/commits');
@@ -411,19 +500,22 @@ function SetAmplitudeUnit(varargin)
 % Set the voltage amplitude unit on a per-channel basis.
 % SetAmplitudeUnit(S)
 %   sets a common unit S for all channels
-%
+% 
 % SetAmplitudeUnit(S, C)
 %   sets the voltage unit S for channel C
-%
+% 
 % where     S is
 %               'v'  (volts)
 %               'mv' (millivolts)
 %               'uv' (microvolts)
+%
 [FV, ~] = GetStruct;
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanRight(varargin)
+% 
+%
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 vChild = findobj(get(findobj('Tag', 'Spiky'), 'children'), 'Type', 'axes'); % axes handles
@@ -434,6 +526,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanLeft(varargin)
+% 
+%
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 vChild = findobj(get(findobj('Tag', 'Spiky') ,'children'), 'Type', 'axes'); % axes handles
@@ -444,6 +538,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomReset(varargin)
+%
+%
 [FV, ~] = GetStruct;
 if ~isfield(FV, 'tData') return, end
 FV.vXlim = [];
@@ -457,6 +553,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomIn(varargin)
+%
+%
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 vChild = findobj(get(findobj('Tag', 'Spiky'), 'children'), 'Type', 'axes'); % axes handles
@@ -467,6 +565,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomOut(varargin)
+%
+%
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 vChild = findobj(get(findobj('Tag', 'Spiky') ,'children'), 'Type', 'axes'); % axes handles
@@ -477,6 +577,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomRange(varargin)
+%
+%
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 if FV.bPanOn, pan off, end
@@ -515,6 +617,8 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomRangeUpdateLine(varargin)
 % Callback to update display of zoom indicator during horizontal zoom
+%
+
 global pnt1
 pnt2 = get(gca, 'CurrentPoint'); % button down detected
 hLine = findobj('Tag', 'SpikyXZoomIndicator');
@@ -551,6 +655,7 @@ global g_bBatchMode
 % electrode. Note that the selected electrode must contain at least 3
 % channels (i.e. be a tri-trode, tetrode or more. Stereotrodes and
 % individual electrodes cannot be cleaned!)
+%
 if ~g_bBatchMode
     if isfield(FV, 'tExperimentVariables')
         if isfield(FV, 'sVariable')
@@ -674,6 +779,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SaveResults(varargin)
 % Save trial settings
+%
 global g_bMergeMode g_hSpike_Viewer
 if ~CheckDataLoaded, return, end
 sPointer = get(g_hSpike_Viewer,'Pointer');
@@ -694,7 +800,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function OpenSettings(varargin)
 % OpenSettings loads data and settings from an SPB files.
-
+%
 persistent p_bAlwaysUseDuplicate
 if isempty(p_bAlwaysUseDuplicate) p_bAlwaysUseDuplicate = 0; end
 if ~CheckDataLoaded, return, end
@@ -781,6 +887,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function AutoloadNewFiles(varargin)
+%
 [FV, hWin] = GetStruct;
 if ~isfield(FV, 'sDirectory')
     warndlg('You must first select the directory that should be monitored in File->Open Directory', 'Spiky')
@@ -792,6 +899,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetFilterChannels(varargin)
 % Select channels that should be filtered
+%
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 global g_hSpike_Viewer g_vSelCh
@@ -885,7 +993,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FilterOptions(varargin)
 % Set the low and high pass frequencies of filtered channels
-%
+% 
 % FilterOptions() opens a table to enter parameters manually
 %
 [FV, ~] = GetStruct;
@@ -935,6 +1043,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetChannelCalculator(varargin)
+%
+
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct;
 [sCh, ~] = SelectChannelNumber(FV.csChannels);
@@ -958,6 +1068,12 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function vCont = ChannelCalculator(vCont, sCh)
+% Apply custom calculation to channel data.
+% 
+% Usage:
+%   ChannelCalculator(V, C) where V is the vector data and C is the channel
+%   name.
+%
 [FV, hWin] = GetStruct;
 
 if ~isfield(FV, 'tChannelCalculator'), return; end
@@ -992,6 +1108,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetDirectory(varargin)
 % Set the current directory
+%
 FV = SetFVDefaults(); % initialize FV with default settings
 global g_bBatchMode
 
@@ -1030,6 +1147,8 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetDirectoryTree(varargin)
 % Load list of all DAQ files from all descending directories below a top directory
+%
+
 % Set the top directory of the tree
 FV = SetFVDefaults();
 global g_hSpike_Viewer
@@ -1074,7 +1193,7 @@ function csExt = GetImportFilters(varargin)
 % Usage:
 %   GetImportFilters(), returns list of filters
 %   GetImportFilters('*.mat'), returns filter list with '*.mat' at top
-%
+% 
 % The second calling syntax can be used to select a default filter.
 %
 if ~isempty(varargin) sDef = varargin{1}; % default from input
@@ -1101,7 +1220,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function csExt = GetExportFilters()
-% Get list of import filters
+% Get list of import filters.
+%
 sDir = which(mfilename);
 tDir = dir([sDir(1:end-7) 'export']);
 csExt = {};
@@ -1118,6 +1238,7 @@ function [cPaths, cFiles] = GetFilePaths(sBaseDir, sSuffix)
 % Recursive search for .bin files from a selected directory
 % inputs: sSuffix    Find files this file extension (e.g. '.avi')
 %         sBaseDir   Base directory
+%
 cPaths = {};
 cFiles = {};
 tDirList = dir(sBaseDir);
@@ -1142,6 +1263,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function vTime = GetTime(nBeginTime, nEndTime, vCont, nFs)
 % Get time vectors for continuous 1- or 2-D data
+%
 if all(size(vCont) > 1) % 2D trace (e.g. spectrogram)
     nEndTime = nBeginTime + (size(vCont, 2))*(1/nFs);
     vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
@@ -1160,7 +1282,9 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewTrialData(varargin)
-% Update main window in GUI (channels and events)
+% Update main window in GUI (channels and events) with current data and
+% options.
+%
 
 % Make Spiky window current without raising it to the top
 hFig = findobj('Tag', 'Spiky');
@@ -1411,24 +1535,26 @@ for i = 1:length(FV.csDisplayChannels)
             hMenu = uicontextmenu;
             set(hMenu, 'userdata', mUserData, 'Tag', [sCh '-' num2str(vUnits(nU))]);
             set(hMenu, 'Tag', [sCh '-' num2str(vUnits(nU))]);
-            hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh);
-            hItems(end+1) = uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
-            hItems(end+1) = uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
-            hItems(end+1) = uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
-            hItems(end+1) = uimenu(hMenu, 'Label', '&Replace Values', 'Callback', @ReplaceValues, 'Tag', sCh);
-            hItems(end+1) = uimenu(hMenu, 'Label', 'Show &Markers', 'Callback', 'set( get(gcbo, ''userdata''), ''marker'', ''o'')', 'userdata', hLin, 'Separator', 'on');
-            hItems(end+1) = uimenu(hMenu, 'Label', 'Meas&ure', 'Callback', @MeasureLine, 'Tag', sCh);
-            hItems(end+1) = uimenu(hMenu, 'Label', 'Digiti&ze Channel (Manual)', 'Callback', @DigitizeChannel, 'Tag', sCh);
-            hItems(end+1) = uimenu(hMenu, 'Label', '&Properties', 'Separator', 'on', 'Callback', @ChannelProperties, 'Tag', sCh);
-            hItems(end+1) = uimenu(hMenu, 'Label', '&Set Electrode Position', 'Callback', @SetElectrodePosition, 'Tag', sCh);
-            hItems(end+1) = uimenu(hMenu, 'Label', '&Set Receptive Field', 'Callback', @SetReceptiveField, 'Tag', sCh);
+            uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh);
+            uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
+            uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
+            uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
+            uimenu(hMenu, 'Label', '&Replace Values', 'Callback', @ReplaceValues, 'Tag', sCh);
+            uimenu(hMenu, 'Label', 'Show &Markers', 'Callback', 'set( get(gcbo, ''userdata''), ''marker'', ''o'')', 'userdata', hLin, 'Separator', 'on');
+            uimenu(hMenu, 'Label', 'Meas&ure', 'Callback', @MeasureLine, 'Tag', sCh);
+            uimenu(hMenu, 'Label', 'Digiti&ze Channel (Manual)', 'Callback', @DigitizeChannel, 'Tag', sCh);
+            uimenu(hMenu, 'Label', '&Properties', 'Separator', 'on', 'Callback', @ChannelProperties, 'Tag', sCh);
+            uimenu(hMenu, 'Label', '&Set Electrode Position', 'Callback', @SetElectrodePosition, 'Tag', sCh);
+            uimenu(hMenu, 'Label', '&Set Receptive Field', 'Callback', @SetReceptiveField, 'Tag', sCh);
             set(hLin, 'uicontextmenu', hMenu)
             
             csUnits{end+1} = num2str(vUnits(nU));
         end
     else % plot continuous trace
         if length(find(size(vCont)>1)) == 1
-            if ~exist('nContTrace', 'var'); nContTrace = 1; end
+            if ~exist('nContTrace', 'var')
+                nContTrace = 1;
+            end
             nContTrace = nContTrace + 1;
             hLin = plot(hSubplots(end), vTime, vCont, 'color', FV.mColors(nContTrace,:));
         else
@@ -1454,20 +1580,21 @@ for i = 1:length(FV.csDisplayChannels)
             set(hMenu, 'userdata', [vTimeAllTrace(:) vContAllTrace(:)], 'Tag', sCh);
         end
         set(hMenu, 'Tag', sCh);
-        hItems(1) = uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh);
-        hItems(end+1) = uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Move Up', 'Callback', {@ChangeDisplayOrder, sCh, 1});
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Move Down', 'Callback', {@ChangeDisplayOrder, sCh, -1});
-        hItems(end+1) = uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
-        hItems(end+1) = uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
-        hItems(end+1) = uimenu(hMenu, 'Label', '&Replace Values', 'Callback', @ReplaceValues, 'Tag', sCh);
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Show &Markers', 'Callback', 'set( get(gcbo, ''userdata''), ''marker'', ''o'')', 'userdata', hLin, 'Separator', 'on');
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Meas&ure', 'Callback', @MeasureLine, 'Tag', sCh);
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Digiti&ze Channel', 'Callback', @DigitizeChannelAuto, 'Tag', sCh, 'Separator', 'on');
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Digitize Manually', 'Callback', @DigitizeChannel, 'Tag', sCh);
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Digitize Crossing', 'Callback', @DigitizeChannelCrossing, 'Tag', sCh);
-        hItems(end+1) = uimenu(hMenu, 'Label', '&Properties', 'Separator', 'on', 'Callback', @ChannelProperties, 'Tag', sCh);
-        hItems(end+1) = uimenu(hMenu, 'Label', 'Delete Channel', 'Callback', {@DeleteChannel, sCh}, 'Tag', sCh);
+        CreateAnalysisMenu(hMenu, 'continuous', 'Analysis')
+        uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh, 'Separator', 'on');
+        uimenu(hMenu, 'Label', '&Hide', 'Callback', @SelectChannels, 'Tag', sCh);
+        uimenu(hMenu, 'Label', 'Move Up', 'Callback', {@ChangeDisplayOrder, sCh, 1});
+        uimenu(hMenu, 'Label', 'Move Down', 'Callback', {@ChangeDisplayOrder, sCh, -1});
+        uimenu(hMenu, 'Label', '&Delete Section', 'Callback', @DeleteSection, 'Tag', sCh, 'Separator', 'on');
+        uimenu(hMenu, 'Label', '&Shift Time', 'Callback', @ShiftBeginTime, 'Tag', sCh);
+        uimenu(hMenu, 'Label', '&Replace Values', 'Callback', @ReplaceValues, 'Tag', sCh);
+        uimenu(hMenu, 'Label', 'Show &Markers', 'Callback', 'set( get(gcbo, ''userdata''), ''marker'', ''o'')', 'userdata', hLin, 'Separator', 'on');
+        uimenu(hMenu, 'Label', 'Meas&ure', 'Callback', @MeasureLine, 'Tag', sCh);
+        uimenu(hMenu, 'Label', 'Digiti&ze Channel', 'Callback', @DigitizeChannelAuto, 'Tag', sCh, 'Separator', 'on');
+        uimenu(hMenu, 'Label', 'Digitize Manually', 'Callback', @DigitizeChannel, 'Tag', sCh);
+        uimenu(hMenu, 'Label', 'Digitize Crossing', 'Callback', @DigitizeChannelCrossing, 'Tag', sCh);
+        uimenu(hMenu, 'Label', '&Properties', 'Separator', 'on', 'Callback', @ChannelProperties, 'Tag', sCh);
+        uimenu(hMenu, 'Label', 'Delete Channel', 'Callback', {@DeleteChannel, sCh}, 'Tag', sCh, 'Separator', 'on');
         set(hLin, 'uicontextmenu', hMenu)
     end
     
@@ -1492,7 +1619,8 @@ for i = 1:length(FV.csDisplayChannels)
         nX_s = vTime(1); nX_e = vTime(end);
         set(hSubplots(end), 'xlim', [nX_s nX_e]);
     end
-    % Plot threshold line(s)
+    
+    % Plot spike threshold line(s)
     hCntxtMenu  = uicontextmenu;
     if isfield(FV.tSpikeThresholdsPos, sCh) && ~FV.bPlotRasters % positive
         nThresh = FV.tSpikeThresholdsPos.(sCh);
@@ -1523,6 +1651,18 @@ for i = 1:length(FV.csDisplayChannels)
         end
     end
 
+    % Plot threshold line for event detection (if set for channel)
+    if isfield(FV, 'tEventThresholds')
+        nInd = find(strcmp(sCh, {FV.tEventThresholds.sChannel}));
+        if ~isempty(nInd)
+            nThresh = FV.tEventThresholds(nInd).nThreshold;
+            hold on;
+            hThresh = plot([vTime(1) vTime(end)], [nThresh nThresh], ':'); hold off
+            ThemeObject(hThresh)
+            set(hThresh, 'color', FV.mColors(1,:))
+        end
+    end
+    
     uimenu(hCntxtMenu, 'Label', 'Delete', 'Callback', @RemoveSpikeThreshold)
     uimenu(hCntxtMenu, 'Label', 'Copy', 'Callback', @CopyPasteThreshold)
     uimenu(hCntxtMenu, 'Label', 'Paste', 'Callback', @CopyPasteThreshold)
@@ -1904,7 +2044,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ThemeObject(hObj)
 % Update properties of object based on currently selected theme.
-%
+% 
 % Usage:
 %   ThemeObject(H) where H is an object handle
 %
@@ -2178,15 +2318,16 @@ if length(csDisplayChannels) == 1
 else
     if isempty(csDisplayChannels), return, end
     hFig = figure;
+    nFigWidth = 300;
     nCL = length(csDisplayChannels)*25+35;
     vHW = get(g_hSpike_Viewer, 'position');
-    set(hFig, 'position', [vHW(1)+40 (vHW(2)+vHW(4)-nCL-50) 220 nCL+25], 'menu', 'none', 'Name', 'Select channels', 'NumberTitle', 'off')
+    set(hFig, 'position', [vHW(1)+40 (vHW(2)+vHW(4)-nCL-50) nFigWidth nCL+25], 'menu', 'none', 'Name', 'Select channels', 'NumberTitle', 'off')
     for i = 1:length(csDisplayChannels)
         sBoxStr = sprintf('%s (%s)', csChannelDescriptions{i}, csDisplayChannels{i});
         if any(strcmp(FV.csDisplayChannels, csDisplayChannels{i}))
-            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 170 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 1);
+            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL nFigWidth-20 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 1);
         else
-            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 170 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 0);
+            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL nFigWidth-20 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 0);
         end
         nCL = nCL - 25;
     end
@@ -2493,15 +2634,16 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [FV, hWin] = GetStruct(varargin)
-% Fetch the FV structure from the Spiky GUI, or a sub-field of FV.
+% Fetch the FV structure from the Spiky GUI, or a sub-field of FV and the
+% handle of the Spiky GUI window.
+% 
+% Usage:
+%   [FV, hWin] = GetStruct()
+%   [tData, hWin] = GetStruct('tData'), returns FV.tData
 %
-%   FV = GetStruct()
-%   tData = GetStruct('tData'), returns FV.tData
-%
-global g_hSpike_Viewer
-hWin = g_hSpike_Viewer;
-if ishandle(g_hSpike_Viewer)
-    FV = get(g_hSpike_Viewer, 'UserData');
+hWin = GetGUIHandle();
+if ishandle(hWin)
+    FV = get(hWin, 'UserData');
 else
     FV = SetFVDefaults();
 end
@@ -2514,6 +2656,16 @@ if nargin == 1
         error(['The requested field ' varargin{1} ' is not a field in FV.']);
     end
 end
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function hWin = GetGUIHandle(varargin)
+% Get the handle of the Spiky GUI window
+% 
+% Usage:
+%   H = GetGUIHandle()
+%
+hWin = findobj('Tag', 'Spiky');
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2788,14 +2940,15 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function AboutSpiky(varargin)
+%
 cAboutText = { 'Maintainer:', ...
-    ' Per Magne Knutsen <pknutsen@ucsd.edu>', ...n
+    ' Per M Knutsen <pknutsen@ucsd.edu>', ...n
     ' Department of Physics', ...
     ' University of California, San Diego', ...
     ' 92122 La Jolla, USA', ...
     ' ', ...
     'Contributors:', ...
-    ' Per Magne Knutsen, UCSD', ...
+    ' Per M Knutsen, UCSD', ...
     ' Idan Steinberg, Weizmann Institute', ...
     ' Amir Monovitch, Weizmann Institute', ...
     ' ', ...
@@ -2811,6 +2964,12 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function bLoaded = CheckDataLoaded(varargin)
+% Check if data has been loaded into Spiky.
+% 
+% Usage:
+%   CheckDataLoaded()
+%   bLoaded = CheckDataLoaded()
+%
 [FV, hWin] = GetStruct;
 if ~isfield(FV, 'tData') % check data has been loaded
     uiwait(warndlg('No data has been loaded'))
@@ -2821,6 +2980,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetSpikeThreshold(varargin)
+%
 [FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 zoom off
@@ -2853,7 +3013,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [vContOut, varargout] = GetFilteredChannel(sCh, vCont, varargin)
 % Checks for filtering parameters and filters a channel if necessary
-%
+% 
 % Usage:
 %   vCont = GetFilteredChannel(sCh, vCont)
 %   [vCont, vTime] = GetFilteredChannel(sCh, vCont, 'decimate')
@@ -2861,10 +3021,11 @@ function [vContOut, varargout] = GetFilteredChannel(sCh, vCont, varargin)
 %    
 % This function is a higher-level call to FilterChannel() and can
 % optionally decimate. See usage.
-%
+% 
 % See:
 %   FilterChannel()
 %
+
 % Initialize outputs in case we abort early
 vContOut = vCont;
 if nargout > 1
@@ -2906,6 +3067,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveSpikeThreshold(sCh, sDir)
+%
 [FV, ~] = GetStruct;
 sTag = get(gco, 'Tag');
 sCh = sTag(1:end-4);
@@ -2931,6 +3093,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetThresholdManually(sCh, sDir)
+%
 [FV, hWin] = GetStruct;
 sTag = get(gco, 'Tag');
 sCh = sTag(1:end-4);
@@ -2955,6 +3118,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CopyPasteThreshold(sCh, sDir)
+%
 [FV, hWin] = GetStruct;
 sTag = get(gco, 'Tag');
 sCh = sTag(1:end-4);
@@ -2990,6 +3154,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function AutoDetectThresholds(varargin)
 % Automatically select 4 x STD as negative spike threshold
+%
 if ~CheckDataLoaded, return, end
 [FV,~] = GetStruct;
 
@@ -3087,13 +3252,17 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function tSpikes = GetWaveforms(vTrace, vThresh, nFS, nPreTrigMs, nPostTrigMs, nDeadTimeMs, nBeginTime)
-% vTrace        Continuous trace used for spike detection
-% vThresh       Threshold [NEG POS]
-% nFs           Sampling rate
-% nPreTrigMs    Time to keep before spike onset (ms)
-% nPostTrigMs   Time to keep after spike onset (ms)
-% nDeadTimeMs   Time after spike when no other spike can be detected (ms)
-% hWait         Absolute time of first sample (ms)
+% Extract waveforms (spikes) from a continuous signal.
+% 
+% Inputs:
+%   vTrace        Continuous trace used for spike detection
+%   vThresh       Threshold [NEG POS]
+%   nFs           Sampling rate
+%   nPreTrigMs    Time to keep before spike onset (ms)
+%   nPostTrigMs   Time to keep after spike onset (ms)
+%   nDeadTimeMs   Time after spike when no other spike can be detected (ms)
+%   hWait         Absolute time of first sample (ms)
+%
 
 nPreTrig = round(nPreTrigMs * (nFS/1000)); % pre-trig duration (datapoints; rounded)
 nPostTrig = round(nPostTrigMs * (nFS/1000)); % post-trig duration (datapoints; rounded)
@@ -3163,6 +3332,7 @@ function DejitterSpikes(varargin)
 % Dejitter all waveforms. If spikes are unsorted, attempt to dejitter in
 % bulk. TODO [[If spikes are already sorted, dejitter spikes instead on a
 % unit-by-unit basis]].
+%
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 csFieldnames = fieldnames(FV.tSpikes);
@@ -3255,6 +3425,8 @@ return
 function RemoveOutlierSpikes(varargin)
 % Remove waveforms that are considered outliers using K-means based outlier
 % detection algorithm
+%
+
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 csFieldnames = fieldnames(FV.tSpikes);
@@ -3280,6 +3452,8 @@ return
 function ShowAggregationTree(varargin)
 % Show overclustered assignments and results after joining clusters
 % TODO: Needs to be modified if users has joined/split clusters manually
+%
+
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct;
 % Select channel from list of sorted units
@@ -3306,8 +3480,9 @@ SetStruct(FV)
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check whether spikes have been sorted on at least one channel/electrode
 function bSorted = CheckIfSorted(varargin)
+% Check whether spikes have been sorted on at least one channel/electrode
+%
 [FV, ~] = GetStruct;
 % Select channel from list of sorted units
 csFieldnames = fieldnames(FV.tSpikes)';
@@ -3324,6 +3499,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowSpikeClusters(varargin)
+%
 [FV, ~] = GetStruct;
 % Select channel from list of sorted units
 csFieldnames = fieldnames(FV.tSpikes)';
@@ -3457,23 +3633,19 @@ for u = 1:nUnits % one row per unit
     %   3) ISI histogram
     hAx = axes('position', [nX+(p-1)*(nW/nCols)+nSpace nY nW/nCols-nSpace nH/3], 'parent', hCurrPanel);
     set(hAx, 'uicontextmenu', hMenu(end))
-    vTheseSpiketimes = DropDeadtimeSpikes((vSpiketimes(vIndx) ./ nFs)) .*1000 ;
+
     nMaxISI = 50; % ms
-    nSpkLen = length(find(diff(vTheseSpiketimes) <=50 ));
-    if nSpkLen > 2500, nStep = 0.25;
-    elseif nSpkLen > 500, nStep = 0.5;
-    else nStep = 1; end
-    vRange = 0:nStep:nMaxISI;
-    [vN, vX] = hist(diff(vTheseSpiketimes), [vRange vRange(end)+1]); % msec, linear scale
-    vN = vN(1:end-1); % spikes/bin
-    vX = vX(1:end-1);
+    vTheseSpiketimes = DropDeadtimeSpikes((vSpiketimes(vIndx) ./ nFs));
+    [vN, vX] = GetISIHistogram(vTheseSpiketimes, nMaxISI / 1000);
+    vX = vX .* 1000; % change from s to ms
     hBar = bar(vX, vN);
     ThemeObject(hBar)
     hold on
+    
     % Plot deadtime
     plot([FV.nDeadTimeMs FV.nDeadTimeMs], [0 max(vN)+10], 'r:')
     ThemeObject(hAx)
-    set(hAx, 'xtick', [0:10:vRange(end)], 'xlim', [0 nMaxISI/2], ...
+    set(hAx, 'xtick', [0:10:max(vX)], 'xlim', [0 nMaxISI/2], ...
         'ylim', [0 max(vN)+1])
     if p==1 ylabel('N'); end
     xlabel('ISI (ms)')
@@ -3482,10 +3654,38 @@ for u = 1:nUnits % one row per unit
 end
 return
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Get the ISI histogram of a spike-train
+%   GetISIHistogram(S, R) where S is spiketimes in seconds and R is
+%   the max range of the histogram, e.g. 0.05 s
+% 
+%   Returned results are in seconds.
+%
+function [vN, vT] = GetISIHistogram(vSpiketimes, nMaxRange)
+
+vSpiketimes = vSpiketimes .* 1000;  % change from s to ms
+nMaxRange = nMaxRange * 1000;       % change from s to ms
+
+% Decide what width to use for bars in histograms
+nSpkLen = length(find(diff(vSpiketimes) <=50 ));
+if nSpkLen > 2500, nStep = 0.25;
+elseif nSpkLen > 500, nStep = 0.5;
+else nStep = 1; end
+
+vRange = 0:nStep:nMaxRange;
+[vN, vT] = hist(diff(vSpiketimes), [vRange vRange(end)+1]); % msec, linear scale
+vN = vN(1:end-1); % spikes/bin
+vT = vT(1:end-1) ./ 1000; % change from ms to s
+
+return
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowOverlappingSpikeClusters(varargin)
 % Plot overlapping, color-coded unit/spike clusters from a single
 % electrode/multi-trode
+%
 if ~CheckDataLoaded, return, end
 [FV,hWin] = GetStruct;
 if ~isempty(varargin)
@@ -3548,26 +3748,33 @@ ThemeObject(hCtrl)
 
 % Calculate number of spikes to show per unit
 % The total number of displayed spikes should not exceed 5,000
+% If there are less than 5,000 spikes, then show all.
 nMaxSpikesTotal = 5000;
 nDisplaySpikesPercent = min([1 nMaxSpikesTotal / length(tSpikes.hierarchy.assigns)]); % percent spikes to show from each unit
 
-for u = 1:length(vUnits) % one row per unit
+nMaxDisplayUnits = 20; % max # of units to display
+for u = 1:min([length(vUnits) nMaxDisplayUnits]) % one row per unit
     % Line color
     if vUnits(u) == 0, mCol = [.2 .2 .2]; mColTxt = [.4 .4 .4]; % outliers
     else mCol = FV.mColors(u,:); mColTxt = FV.mColors(u,:); end
 
     if ~ishandle(hMainWin), return, end % exit if window was closed
+    
     % Create new line objects for this unit if none already exist
     sLineTag = num2str(vUnits(u));
     hLines = findobj(hAx, 'Tag', sLineTag);
     if isempty(hLines)
         vIndx = find(tSpikes.hierarchy.assigns == vUnits(u));
         vIndxKeep = randperm(length(vIndx));
+        
         % Calculate number of spikes to display
         nDisplaySpikesCount = round(nDisplaySpikesPercent * length(vIndx));
+        if nDisplaySpikesCount < 500
+            nDisplaySpikesCount = length(vIndx);
+        end
         vIndxKeep = unique(round(linspace(1, length(vIndx), nDisplaySpikesCount)));
         
-        % Always show the largets spikes
+        % Always show the largess spikes
         vSums = sum(abs(mWaveforms(vIndx,:)),2);
         vIndxKeep = [vIndxKeep find(vSums > nanmean(vSums)+(3*nanstd(vSums)))'];
         
@@ -3662,6 +3869,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ClusterControl(varargin)
+%
 [FV, ~] = GetStruct;
 persistent FV_this
 
@@ -3934,6 +4142,7 @@ return
 function ToggleWaveforms(varargin)
 % Toggle visibility of a selected group of waveforms in 'Cluster Control'
 % window
+%
 if ~isempty(varargin) hCallbackHandle = varargin{1};
 else hCallbackHandle = gco; end % callback handle
 sTag = get(hCallbackHandle, 'Tag'); % tag of all objects to toggle
@@ -4158,7 +4367,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewWaveforms(varargin)
 % View all waveforms (unsorted)
-%
+% 
 % Usage:
 %   ViewWaveforms()
 %
@@ -4225,6 +4434,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewWaveformPCs(varargin)
+%
 if ~CheckDataLoaded, return, end
 [FV,hWin] = GetStruct;
 % Select channel from list of sorted units
@@ -4266,6 +4476,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function sDescr = GetChannelDescription(sCh)
+% Get the descriptive string of a channel name.
+%
 % Descriptive string of channel sCh
 [FV, hWin] = GetStruct;
 sDescr = '';
@@ -4283,6 +4495,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function KeyboardMode(varargin)
+% Enter keyboard mode inside this function.
+%
 [FV, hWin] = GetStruct;
 clc
 sp_disp(sprintf('%s\n%s\n%s\n\t%s\n\t%s', ...
@@ -4299,6 +4513,7 @@ function AddTetrode(varargin)
 % Add a multi-trode (2, 3 or 4 wires)
 % AddTetrode(sCh1__2) will use the channel names supplied
 % AddTetrode() will ask user which channels to combine
+%
 if ~CheckDataLoaded, return, end
 global g_vElectrodes
 g_vElectrodes = [1 1 1 1];
@@ -4427,6 +4642,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveTetrode(varargin)
+%
 [FV, ~] = GetStruct;
 % Find which are stereo/tetrodes
 csFieldnames = fieldnames(FV.tSpikes);
@@ -4454,6 +4670,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FV = SetFVDefaults()
+%
 FV.sLoadedTrial = '';
 FV.csDisplayChannels = {};      % channels to be displayed (analogue, continuous)
 FV.csChannels = {};             % names of all channels in datafile
@@ -4481,7 +4698,8 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DistributeSettings(varargin)
 % Save the current settings as settings for all other files in current directory.
-% Overwrite settings of other files if they exist by default
+% Overwrite settings of other files if they exist by default.
+%
 [FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 global g_hSpike_Viewer
@@ -4531,7 +4749,8 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveSettings(varargin)
 % Save the current settings as settings for all other files in current directory.
-% Overwrite settings of other files if they exist by default
+% Overwrite settings of other files if they exist by default.
+%
 [FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 global g_hSpike_Viewer
@@ -4560,7 +4779,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CreateMergeFile(varargin)
 % Merge all open files into a common merge file.
-%
+% 
 % User can select which types of data to merge.
 %
 global g_hSpike_Viewer g_vSelCh
@@ -5010,7 +5229,7 @@ for c = find([bImported bFiltered bDisplayed])
         vTimeEnd = [tAll.(csOrder{c}).(cFields{nF}).timeend]; % file endtimes, sec
         vFs = [tAll.(csOrder{c}).(cFields{nF}).fs];
         if length(unique(vFs)) > 1
-            uiwait(warndlg('Failed importing channels. Sampling rate must be same across all files.'))
+            uiwait(warndlg(sprintf('Failed importing channel %s. Sampling rate must be same across all files.', cFields{nF})))
             continue
         end
         
@@ -5136,9 +5355,11 @@ save(FV.sLoadedTrial, 'FV', '-v7.3') % Save merged results to disk
 set(g_hSpike_Viewer, 'Name', sprintf('%s - Spiky', GetCurrentFile()))
 
 ViewTrialData();
-ChannelStatistics(); % show channel statistics
 
 % Check merge file for potential problems
+%
+% TODO
+%   If start times repeat, allow user to force trials to be sequential?
 vStart = FV.tData.DAQ_Start_Up; % start time duplicates
 if length(unique(vStart)) < length(vStart)
     uiwait(warndlg(sprintf('There is a potential problem with the merged files:\nThere are duplicates of file Start times')))
@@ -5148,28 +5369,29 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function StartMergeMode(varargin)
 % Initialize workspace for being in MERGE MODE
-% print message that we are in a MERGE MODE
-[FV,hWin] = GetStruct;
-global g_hSpike_Viewer g_bMergeMode
-figure(g_hSpike_Viewer)
+% print message that we are in a MERGE MODE.
+%
+[FV, hWin] = GetStruct;
+figure(hWin)
 g_bMergeMode = 1;
+
 % Update menu items
-set(findobj(g_hSpike_Viewer, 'Label', 'E&xit Merge Mode'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Set &Threshold...'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', '&Auto-Detect Thresholds...'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', '&Run Spike Detection'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', 'Add &Multitrode...'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', 'Remove Multitrode...'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', 'Set Max &Jitter...'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', 'Set Pre-Trigger...'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', 'Set Post-Trigger...'), 'Enable', 'off')
-%set(findobj(g_hSpike_Viewer, 'Label', 'Set Spike Deadtime...'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', '&Create Merge File'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', '&Distribute Settings'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', 'Show P&ower Spectral Densities'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', 'Digitize Channel'), 'Enable', 'off')
-set(findobj(g_hSpike_Viewer, 'Label', 'Digitize Manually'), 'Enable', 'off')
-hRaster = findobj(g_hSpike_Viewer, 'Label', 'Plot &Rasters');
+set(findobj(hWin, 'Label', 'E&xit Merge Mode'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Set &Threshold...'), 'Enable', 'off')
+set(findobj(hWin, 'Label', '&Auto-Detect Thresholds...'), 'Enable', 'off')
+set(findobj(hWin, 'Label', '&Run Spike Detection'), 'Enable', 'off')
+set(findobj(hWin, 'Label', 'Add &Multitrode...'), 'Enable', 'off')
+set(findobj(hWin, 'Label', 'Remove Multitrode...'), 'Enable', 'off')
+set(findobj(hWin, 'Label', 'Set Max &Jitter...'), 'Enable', 'off')
+set(findobj(hWin, 'Label', 'Set Pre-Trigger...'), 'Enable', 'off')
+set(findobj(hWin, 'Label', 'Set Post-Trigger...'), 'Enable', 'off')
+%set(findobj(hWin, 'Label', 'Set Spike Deadtime...'), 'Enable', 'off')
+set(findobj(hWin, 'Label', '&Create Merge File'), 'Enable', 'off')
+set(findobj(hWin, 'Label', '&Distribute Settings'), 'Enable', 'off')
+set(findobj(hWin, 'Label', 'Show P&ower Spectral Densities'), 'Enable', 'off')
+set(findobj(hWin, 'Label', 'Digitize Channel'), 'Enable', 'off')
+set(findobj(hWin, 'Label', 'Digitize Manually'), 'Enable', 'off')
+hRaster = findobj(hWin, 'Label', 'Plot &Rasters');
 set(hRaster, 'Enable', 'off', 'Checked', 'on')
 FV.bPlotRasters = 1;
 SetStruct(FV)
@@ -5177,30 +5399,34 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function StopMergeMode(varargin)
-% Clean up and exit from merge mode
-global g_hSpike_Viewer g_bMergeMode
+% Clean up and exit from merge mode.
+%
+[FV, hWin] = GetStruct;
+global g_bMergeMode
 g_bMergeMode = 0;
 % Update menu items
-set(findobj(g_hSpike_Viewer, 'Label', 'Set &Threshold...'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', '&Auto-Detect Thresholds...'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', '&Run Spike Detection'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Define &Multitrode...'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Set Max &Jitter...'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Set Pre-Trigger...'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Set Post-Trigger...'), 'Enable', 'on')
-%set(findobj(g_hSpike_Viewer, 'Label', 'Set Spike Deadtime...'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', '&Create Merge File'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', '&Distribute Settings'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Show P&ower Spectral Densities'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Digitize Channel'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Digitize Manually'), 'Enable', 'on')
-set(findobj(g_hSpike_Viewer, 'Label', 'Plot &Rasters'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Set &Threshold...'), 'Enable', 'on')
+set(findobj(hWin, 'Label', '&Auto-Detect Thresholds...'), 'Enable', 'on')
+set(findobj(hWin, 'Label', '&Run Spike Detection'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Define &Multitrode...'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Set Max &Jitter...'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Set Pre-Trigger...'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Set Post-Trigger...'), 'Enable', 'on')
+%set(findobj(hWin, 'Label', 'Set Spike Deadtime...'), 'Enable', 'on')
+set(findobj(hWin, 'Label', '&Create Merge File'), 'Enable', 'on')
+set(findobj(hWin, 'Label', '&Distribute Settings'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Show P&ower Spectral Densities'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Digitize Channel'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Digitize Manually'), 'Enable', 'on')
+set(findobj(hWin, 'Label', 'Plot &Rasters'), 'Enable', 'on')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function LoadMergeFile(varargin)
-% Load a file containing data of already merged files
+% Load a file containing data of already merged files.
+%
 [FV,hWin] = GetStruct;
+
 % Check if file path is given in function input
 if ~isempty(varargin{1}) && ischar(varargin{1}) && length(varargin) == 2
     sPath = varargin{1};
@@ -5267,8 +5493,10 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ChannelStatistics(varargin)
 % Show basic channel statistics, such as number of detected spikes
+% 
 % Format:
-% Channel_name  Fs  #spikes
+%   Channel_name  Fs  #spikes
+%
 [FV,hWin] = GetStruct;
 % iterate over thresholded channels
 csChannels = fieldnames(FV.tSpikes);
@@ -5354,17 +5582,17 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ExitSpiky(varargin)
 % Quit and exit Spiky
-[FV, ~] = GetStruct;
-global g_hSpike_Viewer
+[~, hWin] = GetStruct;
+
 % Check whether there are changes to be saved
-if ~isempty(strfind(get(g_hSpike_Viewer, 'Name'), '*'))
+if ~isempty(strfind(get(hWin, 'Name'), '*'))
     switch questdlg('Save changes to current file?', 'Spiky', 'Yes', 'No', 'Cancel', 'Yes')
         case 'Yes', SaveResults;
         case 'Cancel', return
     end
 end
 % Close Spiky windows
-delete(g_hSpike_Viewer)
+delete(hWin)
 CloseSpikyWindows
 % Clear global variables
 clear g_hSpike_Viewer g_bMergeMode
@@ -5646,7 +5874,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function varargout = DigitizeChannel(varargin)
 % Digitize a channel interactively or automatically.
-%
+% 
 % Usage:
 %  DigitizeChannel(h)
 %   or
@@ -5654,7 +5882,7 @@ function varargout = DigitizeChannel(varargin)
 %   where   h is a handle to any object that references the channel name in its Tag property
 %           'auto' indicates to automatically select a threshold
 %           'crossing' indicates to ....
-%
+% 
 %  DigitizeChannel(S, Y, FS, B, E)
 %   where   S is the signal
 %           Y the threshold
@@ -5662,6 +5890,8 @@ function varargout = DigitizeChannel(varargin)
 %           B the first sample to use (s)
 %           E the last sample to use (s)
 %
+
+[FV, hWin] = GetStruct;
 
 % Check if data and threshold was supplied with function inputs
 if length(varargin) == 5 && isnumeric(varargin{1})
@@ -5677,7 +5907,6 @@ end
 
 if bInteractive
     % Get data and threshold interactively
-    [FV, hWin] = GetStruct;
     if ~CheckDataLoaded, return, end
 
     % Select channel
@@ -5691,6 +5920,7 @@ if bInteractive
     nFs = FV.tData.([sTag '_KHz']) * 1000; % sampling frequency (Hz)
     nBeginTime = FV.tData.([sTag '_TimeBegin']); % start of sampling (sec)
     nEndTime = FV.tData.([sTag '_TimeEnd']); % start of sampling (sec)
+
     % Arbitrary channel operation
     vContData = ChannelCalculator(vContData, sTag);
 else
@@ -5726,8 +5956,28 @@ if ~isempty(vIndxHIGH) && ~isempty(vIndxLOW)
     
     % Subtract 1/2 timesample from indices; the mid-point is the best
     % estimate for when the signal actually changed state
-    vUpTimes = vUpTimes - ((1/nFs)/2);
-    vDownTimes = vDownTimes - ((1/nFs)/2);
+    vUpTimes = sort(vUpTimes - ((1/nFs)/2));
+    vDownTimes = sort(vDownTimes - ((1/nFs)/2));
+    
+    % Force signal to go DOWN at end of each file (if this is a merged file)
+    if isfield(FV, 'tData')
+        if isfield(FV.tData, 'FileEnd')
+            vDownTimes = sort([vDownTimes [FV.tData.FileEnd.Timestamp]]);
+        end
+    end
+    
+    % For each UP event, find first DOWN event that follows
+    nDownMatches = zeros(size(vUpTimes));
+    for u = 1:length(vUpTimes)
+        vDiff = vUpTimes(u) - vDownTimes;
+        vDiff(vDiff > 0) = nan;
+        
+        [~, nMaxI] = max(vDiff);
+        if ~isempty(nMaxI)
+            nDownMatches(u) = vDownTimes(nMaxI);
+        end
+    end
+    vDownTimes = nDownMatches;
 else
     vUpTimes = [];
     vDownTimes = [];
@@ -5748,7 +5998,12 @@ if bInteractive
     if ~isfield(FV, 'tEventThresholds')
         FV.tEventThresholds = struct([]);
         nIndx = 1;
-    else nIndx = length(FV.tEventThresholds) + 1; end
+    else
+        % Remove old thresholds
+        FV.tEventThresholds(strcmp(sTag, {FV.tEventThresholds.sChannel})) = [];
+        nIndx = length(FV.tEventThresholds) + 1;
+    end
+    
     FV.tEventThresholds(nIndx).sChannel = sTag;
     FV.tEventThresholds(nIndx).nThreshold = nY;
 
@@ -5764,12 +6019,12 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DuplicateChannel(varargin)
 % Duplicate a channel with options for resampling and filtering
-%
+% 
 % Usage:
 %   DuplicateChannel()
-%
+% 
 % Batch = Yes
-%
+% 
 [FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
@@ -6006,11 +6261,15 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function bResult = SpikyWaitbar(nStatus, nLen)
+% Create and display a custom waitbar in the toolbar of the Spiky GUI.
+% 
 % Usage: SpikyWaitbar(0, 20)    Initialize waitbar with length 20
 %        SpikyWaitbar(10, 20)   Waitbar reaches 10 of 20
 %        SpikyWaitbar(20, 20)   Waitbar reaches end and is destroyed
 %        SpikyWaitbar(0, 0)     Function returns current position (0 if no bar exists)
-% Function returns false if the Cancel button is pressed
+% 
+% Function returns false if the Cancel button is pressed.
+%
 global g_hSpike_Viewer
 persistent p_nStatus
 
@@ -6067,25 +6326,34 @@ if ~isempty(hCancelButton)
         bResult = false; % process running waitbar was cancelled
     end
 end
+drawnow % make sure toolbar is updated
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ChannelDescriptions(varargin)
-[FV, ~] = GetStruct;
+% Set descriptive strings and units for all channels interactively.
+% 
+% Usage:
+%   ChannelDescriptions()
+%
 if ~CheckDataLoaded, return, end
+[FV, hWin] = GetStruct;
 
-hFig = figure('closeRequestFcn', 'set(gcbf,''userdata'',1)');
-cColumnNames = {'Channel', 'Description'};
+hFig = figure('closeRequestFcn', 'set(gcbf,''userdata'',1)', 'visible', 'off');
+centerfig(hFig, hWin)
+set(hFig, 'visible', 'on')
+cColumnNames = {'Channel', 'Description', 'Unit'};
 cColumnFormat = {{'numeric' 'Adjustable'}, {'numeric' 'Adjustable'}};
-cColumnEditable =  [false true];
+cColumnEditable =  [false true true];
 
 % create list of selectable channels
 cFields = fieldnames(FV.tData);
-csDisplayChannels = {};
 cData = {};
 for i = 1:length(cFields)
     if ~isempty(strfind(cFields{i}, '_TimeBegin'))
-        cData{end+1, 1} = cFields{i}(1:end-10);
+        cData{end+1, 1} = cFields{i}(1:end-10); % channel name
+        
+        % Get channel description
         sDescr = '';
         if isfield(FV, 'tChannelDescriptions')
             if ~isfield(FV.tChannelDescriptions, 'sChannel'), nIndx = [];
@@ -6101,22 +6369,36 @@ for i = 1:length(cFields)
             sDescr = FV.tChannelDescriptions(nIndx).sDescription;
         end
         cData{end, 2} = sDescr;
+        
+        % Get channel unit
+        if isfield(FV.tData, [cData{end, 1} '_Unit'])
+            cData{end, 3} = FV.tData.([cData{end, 1} '_Unit']);
+        else
+            cData{end, 3} = '';
+        end
     end
 end
 
 ThemeObject(hFig)
 set(hFig, 'Name', 'Spiky Channel Descriptions', 'ToolBar', 'none', 'menuBar','none')
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, 'ColumnName', ...
-    cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{150, 377});
+    cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{150, 277, 100});
 waitfor(hFig, 'userdata') % wait for figure to be closed
 cData = get(hTable, 'data'); % modified data
 
+% Assign new descriptions
 if ~isfield(FV, 'tChannelDescriptions')
     FV.tChannelDescriptions = struct([]);
 end
 for c = 1:size(cData, 1)
     FV.tChannelDescriptions(c).sChannel = cData{c, 1};
     FV.tChannelDescriptions(c).sDescription = cData{c, 2};
+end
+
+% Assign new units
+for c = 1:size(cData, 1)
+    if isempty(cData{c, 3}), continue; end
+    FV.tData.([cData{c, 1} '_Unit']) = cData{c, 3};
 end
 
 delete(hFig)
@@ -6126,6 +6408,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ExperimentDescriptions(varargin)
+% Add, remove and edit custom file description variables
+%
 [FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
@@ -6166,6 +6450,10 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DeleteSortingData(varargin)
+% Remove all spike sorting results. All assignments of spikes into clusters
+% or outliers will be removed. Raw waveforms, or dejittered waveforms, are
+% not affected.
+%
 [FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
@@ -6193,7 +6481,9 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [vCont, FV] = AdjustChannelGain(FV, vCont, sCh) % mV
-% Adjust channel amplitude by specified gain. Returned gain is in units of mV
+% Adjust channel amplitude by specified gain. Returned gain is in units of
+% mV.
+%
 
 % Adjust gain of signal
 bIsGain = 0;
@@ -6227,8 +6517,11 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Get current GIT SHA1 hash (unique identifier of currently used commit)
 function sHash = GetGitHash
+% Get current GIT SHA1 hash (unique identifier of currently used commit).
+% The local SHA1 hash can be compared to other versions of Spiky to
+% determine if versions are the same or not.
+%
 
 % Set paths
 sWT_dir = which('spiky');
@@ -6255,8 +6548,9 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Merge selected channels
 function MergeChannels(varargin)
+% Merge selected channels
+%
 [FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 persistent p_sName
@@ -6336,8 +6630,10 @@ return
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Invert a selected channel
 function InvertChannel(varargin)
+% Select a continuous channel manually and invert it.
+%
+
 [FV, ~] = GetStruct;
 if ~CheckDataLoaded, return, end
 
@@ -6361,14 +6657,16 @@ function Undo(varargin)
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Redo previous action
 function Redo(varargin)
+% Redo previous action
+%
 spiky('BatchRedo([],''redo'')')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Toggle status of menu item (e.g. Grid, Normal Time etc)
 function ToggleStatus(varargin)
+% Toggle status of the current object (eg. Grid, Normal Time etc)
+%
 [FV, ~] = GetStruct;
 switch lower(get(gcbo,'Checked'))
     case 'on'
@@ -6383,8 +6681,9 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Shift BeginTime time of selected channel
 function ShiftBeginTime(varargin)
+% Shift the BeginTime time of selected channel
+%
 [FV, ~] = GetStruct;
 
 % Check that tag of handle references a known channel
@@ -6411,6 +6710,7 @@ function ReplaceValues(varargin)
 % Replace a particular value in selected channel. Note that the FROM value
 % is searched for after applying define (if any) math operations. The new
 % value is, however, inserted into the original data vector.
+%
 [FV, ~] = GetStruct;
 persistent p_cAns
 if isempty(p_cAns); p_cAns = {'' ''}; end
@@ -6441,8 +6741,9 @@ return
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Show info stored in DAQ file
 function ShowDAQInfo(varargin)
+% Show info stored in DAQ file
+%
 [FV, ~] = GetStruct;
 if isfield(FV, 'sLoadedTrial') % a trial is loaded
     sFilename = FV.sLoadedTrial;
@@ -6460,8 +6761,9 @@ warndlg('No DAQ file loaded or loaded file is not a DAQ (.daq) file.', 'Spiky')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Measure time between two positions along displayed channel
 function MeasureLine(varargin)
+% Measure time between two positions along displayed channel.
+%
 hObj = varargin{1}; % get calling object
 [FV, ~] = GetStruct;
 
@@ -6514,8 +6816,9 @@ hold off
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Show the number of UP/DOWN events on each channel
 function ShowEventStatistics(varargin)
+% Show the number of UP/DOWN events on each channel.
+%
 [FV, hWin] = GetStruct;
 % iterate over digital channels
 csChannels = FV.csDigitalChannels;
@@ -6560,9 +6863,10 @@ set(hFig, 'visible', 'on')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Delete section of selected channel. This function is only called by the context
-% menu which appears when right-clicking channel traces
 function DeleteSection(varargin)
+% Delete section of selected channel. This function is only called by the context
+% menu which appears when right-clicking channel traces.
+%
 [FV, ~] = GetStruct;
 
 sCh = get(gcbo, 'tag'); % channel name
@@ -6625,7 +6929,8 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ClassifyUnit(varargin)
 % Classify a selected unit. This function assumes that the calling object
-% (gcbo) identifies the channel and unit number in the UserData property
+% (gcbo) identifies the channel and unit number in the UserData property.
+%
 tUserData = get(gcbo, 'UserData');
 [FV, ~] = GetStruct;
 
@@ -6657,8 +6962,11 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetElectrodePosition(varargin)
 % Set and store the electrode position used during the experiment.
+%
+
 sCh = get(gcbo, 'tag');
 [FV, ~] = GetStruct;
+
 % Get input from user
 nElecIndx = find(strcmp({FV.tChannelDescriptions.sChannel}, sCh));
 if isfield(FV.tChannelDescriptions(nElecIndx), 'nAPPos')
@@ -6682,9 +6990,11 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetReceptiveField(varargin)
-% Set and store the electrode position used during the experiment.
+% Set receptive field properties (as a string) of a selected unit.
+%
 [FV, ~] = GetStruct;
 sCh = get(gcbo, 'tag');
+
 % Get unit number
 sChUnit = get(get(gcbo, 'parent'), 'tag');
 nIndx = findstr(sChUnit, '-');
@@ -6728,6 +7038,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function BatchRedo(varargin)
 % Set and store the electrode position used during the experiment.
+%
 global g_hSpike_Viewer g_bBatchMode
 persistent sLastAction
 sAction = varargin{2};
@@ -6797,11 +7108,14 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function sp_disp(sStr)
+% Display a string on the command line.
+%
 disp(sprintf('%s Spiky says: %s', datestr(now, 'HH:mm:ss'), sStr))
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RunBatchScript(varargin)
+%
 RunScript('batch')
 SaveResults();
 BatchRedo([], 'redo')
@@ -6809,6 +7123,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RunScript(varargin)
+% Run a user-define analysis script.
+%
 [FV, ~] = GetStruct;
 global g_bBatchMode
 
@@ -6856,6 +7172,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowVersion(varargin)
+% Display the current version of Spiky.
+%
 sWT_dir = fileparts(mfilename('fullpath'));
 sVERSIONPath = [sWT_dir filesep 'VERSION'];
 if ~exist(sVERSIONPath, 'file')
@@ -6870,6 +7188,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShowLicense(varargin)
+% Display the Spiky license.
+%
 [~, hWin] = GetStruct;
 sWT_dir = fileparts(mfilename('fullpath'));
 sLICENSEPath = [sWT_dir filesep 'LICENSE'];
@@ -6885,6 +7205,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function y = header(x, fontsize)
+%
 t = findobj(gcf, 'Tag', 'header');
 if isempty(t)
 	ax = gca;
@@ -6904,15 +7225,48 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [hPlot,hFill] = mean_error_plot(vMean, vError, vColor, vX)
-vMean = reshape(vMean, length(vMean), 1);
-vError = reshape(vError, length(vError), 1);
-if ~exist('vX', 'var'), vXt = (1:length(vError))';
-else vXt = vX'; end
+% THIS FUNCTION IS DEPRECATED. USE PlotMeanError
+[hPlot,hFill] = PlotMeanError(vMean, vError, vColor, vX);
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [hPlot,hFill] = PlotMeanError(vMean, vError, vColor, varargin)
+% Plot a mean and error as a solid line with a filled error region in the
+% current axes.
+% 
+% Usage:
+%   [HP, HF] = PlotMeanError(M, E, COL, XX)
+%   where   HP and HF are handles of the mean and error objects.
+%           M is the mean vector
+%           E is the error vector
+%           COL is the color of the error fill
+%           XX is the x-value vector
+%
+vMean = vMean(:);
+vError = vError(:);
+
+if nargin > 3
+    vXt = varargin{1}(:);
+else
+    vXt = (1:length(vError))';
+end
+
 vXb = flipud(vXt);
 vYt = vMean + vError;
 vYb = flipud(vMean - vError);
-hFill = fill([vXt;vXb], [vYt;vYb], vColor, 'EdgeColor', vColor); hold on;
-hPlot = plot(vXt, vMean, 'color', vColor, 'LineWidth', 1); hold off
+
+% Plot error fill
+hFill = fill([vXt;vXb], [vYt;vYb]', vColor);
+hold on;
+ThemeObject(hFill);
+set(hFill, 'facecolor', vColor, 'EdgeColor', vColor)
+
+% Plot average line
+hPlot = plot(vXt, vMean);
+ThemeObject(hPlot)
+set(hPlot, 'color', vColor, 'LineWidth', 1)
+hold off
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -6920,7 +7274,8 @@ function varargout = RunAnalysis(hObject, eventdata, sFun, sDir)
 % Run selected analysis function from GUI. This function ensures that any
 % outputs are captured from the analysis and stored as needed.
 % sDir is the analysis function directory, e.g. 'discrete' or 'continuous'
-% sFun is the analysis function name (.m not necessary)
+% sFun is the analysis function name (.m not necessary).
+%
 if ~CheckDataLoaded() return, end
 [FV, ~] = GetStruct;
 
@@ -6966,4 +7321,5 @@ FV.csChannels = unique([FV.csChannels cFields{1}]);
 FV.csDisplayChannels = unique([FV.csDisplayChannels cFields{1}]);
 SetStruct(FV)
 ViewTrialData()
+
 return
