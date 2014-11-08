@@ -20,7 +20,7 @@ and continuous data.
 
 Screenshot 1
 
-![Screenshot 1](https://github.com/pmknutsen/spiky/blob/master/themes/spiky_theme.png "Screenshot - Spiky theme")
+![Screenshot:](https://github.com/pmknutsen/spiky/blob/master/themes/spiky_theme.png "Screenshot - Spiky theme")
 
 ###Requirements
 Matlab 6.5 or higher (preferred) on Linux, Windows or Mac.
