@@ -12,11 +12,14 @@ sFile = Spiky.main.CheckFilename(sFile);
 [~, sFileOnly] = fileparts(sFile);
 
 % Check that Matlab version 13+ is running (HD5 read otherwise not supported)
+sVersion = version;
+
 tV = ver;
 iMat = strcmpi({tV.Name}, 'MATLAB');
-if str2num(tV(iMat).Version) < 8.0
-    sStr = sprintf('HDF5 import requires at least Matlab version 8.0 (R2012b). You are running version %s %s.', ...
-        tV(iMat).Version, tV(iMat).Release);
+
+if tV(iMat).Version < 8.0
+    sStr = sprintf('HDF5 import requires at least Matlab version 8.0 (R2013a). You are currently running version %s', tV(iMat).Version);
+    disp(sStr)
     FV.sImportError = sStr;
     return
 end

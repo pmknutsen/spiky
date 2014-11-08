@@ -12,6 +12,14 @@ p.axes.color = [.15 .15 .15];
 p.axes.xcolor = [.7 .7 .7];
 p.axes.ycolor = [.7 .7 .7];
 p.axes.tickdir = 'out';
+p.axes.fontsize = 8;
+p.axes.ticklength = [.005 .005];
+
+mGradient = uint8([ 20 20 50 50; ... % [B B T T] red
+    20 20 50 50; ... % green
+    20 20 50 50; ... % blue
+    255 255 255 255]);
+p.backdrop.face.ColorData = mGradient;
 
 % Figure properties
 p.figure.color = [.2 .2 .2];
@@ -25,14 +33,14 @@ p.text.color = [.7 .7 .7];
 p.line.color = [.8 .8 .8];
 
 % uicontrol (checkboxes etc)
-p.uicontrol.backgroundcolor = [.2 .2 .2];
+p.uicontrol.backgroundcolor = p.figure.color;
 p.uicontrol.foregroundColor = [1 1 1];
 
 % uipanel
-p.uipanel.backgroundcolor = [.2 .2 .2];
-p.uipanel.foregroundcolor = [.2 .2 .2];
-p.uipanel.highlightcolor  = [.2 .2 .2];
-p.uipanel.shadowcolor     = [.2 .2 .2];
+p.uipanel.backgroundcolor = p.figure.color;
+p.uipanel.foregroundcolor = p.figure.color;
+p.uipanel.highlightcolor  = p.figure.color;
+p.uipanel.shadowcolor     = p.figure.color;
 
 % hggroup (e.g. bar graphs)
 p.hggroup.facecolor = [.85 .85 .85];

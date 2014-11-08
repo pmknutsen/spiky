@@ -66,6 +66,9 @@ nContFs = FV.tData.([p_sContCh '_KHz']) * 1000; % Hz
 vCont = Spiky.main.ChannelCalculator(FV.tData.(p_sContCh), p_sContCh);
 vContBegin = FV.tData.([p_sContCh '_TimeBegin']);
 
+% Filter continuous signal
+vCont = Spiky.main.GetFilteredChannel(p_sContCh, vCont);
+
 % Check if signal is 1D or 2D
 if all(size(vCont) > 1); bIs2D = true;
 else bIs2D = false; end
@@ -255,7 +258,9 @@ else
 end
 
 % Initialize figure and plot
-hFig = figure('units', 'pixels', 'name', 'Spiky - Event Triggered Average');
+hFig = figure('units', 'pixels', 'name', 'Spiky - Event Triggered Average', 'visible', 'off');
+centerfig(hFig, Spiky.main.GetGUIHandle())
+set(hFig, 'visible', 'on')
 Spiky.main.ThemeObject(hFig);
 hAx = axes();
 if bIs2D
@@ -267,9 +272,9 @@ if bIs2D
     set(hMedianLine, 'visible', 'off', 'tag', 'ETAMedian');
     set(hMeanLine, 'visible', 'on', 'tag', 'ETAMean');
 else
-    [hMeanLine, hMeanErr] = Spiky.main.mean_error_plot(vMean, vErrMean, [0 0 1], vTime);
+    [hMeanLine, hMeanErr] = Spiky.main.PlotMeanError(vMean, vErrMean, [0 0.5 1], vTime);
     hold on
-    [hMedianLine, hMedianErr] = Spiky.main.mean_error_plot(vMedian, vErrMedian, [0 1 0], vTime);
+    [hMedianLine, hMedianErr] = Spiky.main.PlotMeanError(vMedian, vErrMedian, [0.5 1 0], vTime);
     set([hMedianLine, hMedianErr], 'visible', 'off', 'tag', 'ETAMedian');
     set([hMeanLine, hMeanErr], 'visible', 'on', 'tag', 'ETAMean');
 
@@ -304,7 +309,7 @@ if ~bIs2D
     % baseline: If p_nPre window is negative (i.e. AFTER stimulus), estimate
     % baseline from the 0.1 s pre-stim window by default.
     if p_nPre <= 0, nBaseL = mean(mAllBaseline(:));
-    else, nBaseL = mean(vMean(vTime < 0)); end
+    else nBaseL = mean(vMean(vTime < 0)); end
     
     % find peak
     [nMax, nMaxIndx] = max(vMeanPostStim);
@@ -325,9 +330,8 @@ if ~bIs2D
 end
 
 % Axes properties
-axis tight
 Spiky.main.ThemeObject(hAx);
-set(hAx, 'xlim', [-p_nPre p_nPost])
+set(hAx, 'xlim', [-p_nPre p_nPost], 'ylim', [min(vMean)*.95 max(vMean)*1.05])
 xlabel('Time (s)')
 if bIs2D sYStr = FV.tData.([p_sContCh '_Unit']);
 else sYStr = 'Intensity'; end

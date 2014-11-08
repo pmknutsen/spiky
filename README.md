@@ -16,10 +16,10 @@ and continuous data.
 - Merging across data files
 - Batch processing
 - Matlab API
-- Extendible through scripting
+- Customizable extensions
 
 ###Requirements
-Matlab 6.5 (recommended) or higher on Linux, Windows or Mac.
+Matlab 6.5 or higher (preferred) on Linux, Windows or Mac.
 
 ###Install
 Synchronize the master branch with `git`, or download the latest '.zip' archive (see ZIP
@@ -27,7 +27,7 @@ button above) and unpack to a local location. Add all sub-folders to the Matlab 
 `spiky` to start.
 
 ###API
-Spiky is accessible from the command line or your own functions and scripts via a global
+Spiky is accessible from the command line or your own functions and extensions via a global
 structure containing function handles to all Spiky routines.
 
 ###Documentation
@@ -39,7 +39,7 @@ https://github.com/pmknutsen/spiky/issues
 ##Data Formats
 Import:
 - Matlab Data Acquisition Toolbox (.daq)
-- Hierarchical Data Format (.hd5)
+- Hierarchical Data Format (.hd5; requires R2012b or higher)
 - Matlab vectors (.mat)
 
 Export:
@@ -59,3 +59,13 @@ Discrete:
 - Peristimulus time histogram (PSTH)
 - Spike triggered average (STA)
 - Temporal distribution
+
+##Extensions
+Additional code can be added to extend Spiky functionality. Extensions can be placed in
+the `/extensions` folder, or their filenames prefixed with `spiky_` and be located
+anywhere in the Matlab search path. See the file `/extensions/Sample_Extension.m` for
+details.
+
+
+
+

@@ -51,9 +51,15 @@ if isempty(p_mSpecBands) || ~g_bBatchMode
     end
     cPrompt = {'Spectral bands [min max]. One band per line.'};
     cAns = inputdlg(cPrompt,'Options', 5, {num2str(p_mSpecBands)});
-    if isempty(cAns), return, end
+    if isempty(cAns)
+        tSig = [];
+        return
+    end
     p_mSpecBands = str2num(cAns{1}); % hz
 end
+
+% Spectral bands need to be integers
+p_mSpecBands = round(p_mSpecBands);
 
 % Iterate over frequency bands
 for fb = 1:size(p_mSpecBands, 1)
@@ -74,6 +80,9 @@ for fb = 1:size(p_mSpecBands, 1)
     tSig.([sPreFix '_TimeBegin']) = nTimeBegin;
     tSig.([sPreFix '_TimeEnd']) = nTimeEnd;
     tSig.([sPreFix '_Unit']) = 'Power';
+    
+    % TODO Create a Properties field with the spectrogram parameters
+    
 end
 
 return
