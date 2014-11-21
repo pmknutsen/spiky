@@ -42,18 +42,20 @@ function varargout = spiky(varargin)
 % 
 
 % Run local function if called from outside
-if nargin > 0
-    if strcmp(varargin{1}, 'GetGitHash')
-        varargout{1} = eval(varargin{1});
-    else
-        try
-            varargout{1} = eval(varargin{1});
-        catch
-            eval(varargin{1});
-        end
-    end
-    return
-end
+% TODO Remove this section. It was used before function handles were passed
+% in the Spiky global structure
+%if nargin > 0
+%    if strcmp(varargin{1}, 'GetGitHash')
+%        varargout{1} = eval(varargin{1});
+%    else
+%        try
+%            varargout{1} = eval(varargin{1});
+%        catch MException
+%            eval(varargin{1});
+%        end
+%    end
+%    return
+%end
 
 % Abort if Spiky is already running
 hPlot = findobj('Tag', 'Spiky');
@@ -66,7 +68,7 @@ clc
 disp('Spiky - Spike-sorting and analysis in Matlab')
 disp('Copyright (C) 2005-2014 Per M Knutsen <pmknutsen@gmail.com>')
 disp('This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are')
-disp(sprintf('are welcome to redistribute it under certain conditions; see LICENSE for details.\n'))
+fprintf('are welcome to redistribute it under certain conditions; see LICENSE for details.\n')
 
 % Set path to spike-sorting software
 disp('Initializing paths...')
@@ -136,9 +138,9 @@ end
 % Make Spiky available immediately in base workspace
 evalin('base', 'global Spiky')
 
-disp(sprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n'))
-disp(sprintf('To view a function help entry use Spiky.help(). For example:\n\tSpiky.help(''ZoomReset'')\n\tSpiky.help(Spiky.main.ZoomReset)'))
-disp(sprintf('\n'))
+fprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n')
+fprintf('To view a function help entry use Spiky.help(). For example:\n\tSpiky.help(''ZoomReset'')\n\tSpiky.help(Spiky.main.ZoomReset)')
+fprintf('\n')
 
 global g_hSpike_Viewer
 g_hSpike_Viewer = figure;
@@ -341,8 +343,6 @@ function CreateAnalysisMenu(hParent, sType, varargin)
 % 'discrete'.
 %
 
-[FV, hWin] = GetStruct();
-
 % Load list of continuous analysis functions
 sSpikyPath = which('spiky');
 sContPath = CheckFilename([sSpikyPath(1:end-7) '/analysis/' sType '/' ]);
@@ -391,6 +391,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetAmplitudeUnit(varargin)
+% ** NOT IMPLEMENTED IN THIS VERSION **
 % Set the voltage amplitude unit on a per-channel basis.
 % SetAmplitudeUnit(S)
 %   sets a common unit S for all channels
@@ -403,12 +404,12 @@ function SetAmplitudeUnit(varargin)
 %               'mv' (millivolts)
 %               'uv' (microvolts)
 %
-[FV, ~] = GetStruct();
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanRight(varargin)
-% 
+% Pan the displayed data range towards right
 %
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct();
@@ -420,7 +421,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanLeft(varargin)
-% 
+% Pan the displayed data range towards left
 %
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct();
@@ -432,7 +433,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomReset(varargin)
-%
+% Reset all zoom levels so the entire data range is shown
 %
 [FV, ~] = GetStruct();
 if ~isfield(FV, 'tData') return, end
@@ -447,7 +448,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomIn(varargin)
-%
+% Increase horizontal zoom by 25%
 %
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct();
@@ -459,7 +460,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomOut(varargin)
-%
+% Decrease horizontal zoom by 25%
 %
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct();
@@ -471,7 +472,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomRange(varargin)
-% 
+% Select a horizontal zoom range manually
 %
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct();
@@ -543,6 +544,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PCACleaning(varargin)
+% 
+%
 if ~CheckDataLoaded, return, end
 [FV, hWin] = GetStruct();
 global g_bBatchMode
@@ -677,11 +680,11 @@ function SaveResults(varargin)
 % 
 % Usage:    SaveResults()
 %
-global g_bMergeMode g_hSpike_Viewer
+global g_hSpike_Viewer
 if ~CheckDataLoaded, return, end
 sPointer = get(g_hSpike_Viewer,'Pointer');
 set(g_hSpike_Viewer,'Pointer','watch')
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 sPath = [FV.sLoadedTrial(1:end-4) '.spb'];
 save(sPath, 'FV', '-v7.3')
 
@@ -695,9 +698,11 @@ function OpenSettings(varargin)
 % OpenSettings loads data and settings from an SPB file
 %
 persistent p_bAlwaysUseDuplicate
-if isempty(p_bAlwaysUseDuplicate) p_bAlwaysUseDuplicate = 0; end
+if isempty(p_bAlwaysUseDuplicate)
+    p_bAlwaysUseDuplicate = 0;
+end
 if ~CheckDataLoaded, return, end
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 tData = FV.tData; % original raw data and paths
 sDirectory = FV.sDirectory;
 sLoadedTrial = FV.sLoadedTrial;
@@ -780,8 +785,9 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function AutoloadNewFiles(varargin)
+% ** NOT IMPLEMENTED IN THIS VERSION **
 %
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 if ~isfield(FV, 'sDirectory')
     warndlg('You must first select the directory that should be monitored in File->Open Directory', 'Spiky')
 else
@@ -791,7 +797,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetFilterChannels(varargin)
-% Select channels that should be filtered
+% Interactively select which channels should be filtered
 %
 if ~CheckDataLoaded, return, end
 [FV, ~] = GetStruct();
@@ -939,10 +945,11 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetChannelCalculator(varargin)
+% 
 %
 
 if ~CheckDataLoaded, return, end
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 [sCh, ~] = SelectChannelNumber(FV.csChannels);
 
 if ~isfield(FV, 'tChannelCalculator')
@@ -951,13 +958,15 @@ if ~isfield(FV, 'tChannelCalculator')
 else
     if isfield(FV.tChannelCalculator, sCh)
         sEval = FV.tChannelCalculator.(sCh);
-    else sEval = ''; end
+    else
+        sEval = '';
+    end
 end
 cAnswer = inputdlg(['Enter a string that will be evaluated every time this channel is used. ' ...
                     'Note that not all operations currently support channel calculations. ' ...
                     'Substitute signal vector with ''a'' in your string:'], ...
                     'Channel Calculator', 3, {sEval});
-if isempty(cAnswer) return; end % cancel button pressed
+if isempty(cAnswer), return; end % cancel button pressed
 FV.tChannelCalculator(1).(sCh) = cAnswer{1};
 SetStruct(FV); ViewTrialData();
 return
@@ -970,7 +979,7 @@ function vCont = ChannelCalculator(vCont, sCh)
 %   ChannelCalculator(V, C) where V is the vector data and C is the channel
 %   name.
 %
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 
 if ~isfield(FV, 'tChannelCalculator'), return; end
 if ~isfield(FV.tChannelCalculator, sCh), return; end
@@ -997,7 +1006,9 @@ if length(a) ~= length(vCont)
     sErr = sprintf('An error occurred when evaluating the expression ''%s'' for channel %s:\nSize of matrix after evaluation must be same as before.', sEval, sCh);
     waitfor(warndlg(sErr, 'Spiky'))
     return
-else vCont = a; end
+else
+    vCont = a;
+end
 
 return
 
@@ -1100,11 +1111,29 @@ function csExt = GetImportFilters(varargin)
 % Usage:
 %   GetImportFilters(), returns list of filters
 %   GetImportFilters('*.mat'), returns filter list with '*.mat' at top
+%   GetImportFilters(DIR) returns filter list with an extension found in
+%   the directory DIR placed at top
 % 
-% The second calling syntax can be used to select a default filter.
+% The second calling syntax can be used to select a default filter. The
+% third syntax is useful when default should match a file type on disk.
 %
-if ~isempty(varargin) sDef = varargin{1}; % default from input
-else sDef = []; end
+if ~isempty(varargin)
+    if exist(varargin{1}, 'dir')
+        % Choose default file types from selected directory
+        tDir = dir(varargin{1});
+        cExt = cell(length(tDir), 1);
+        for f = 1:length(tDir)
+            [~, ~, cExt{f}] = fileparts(tDir(f).name);
+            cExt{f} = ['*', cExt{f}];
+        end
+        cDef = unique(cExt);
+    else
+        sDef = varargin{1}; % default from input
+    end
+else
+    sDef = []; % no default
+end
+
 sDir = which(mfilename);
 tDir = dir([sDir(1:end-7) 'import']);
 csExt = {};
@@ -1116,7 +1145,15 @@ for i = 3:length(tDir)
     sDescr = eval(['help(''' tDir(i).name ''')']);
     csExt{end,2} = [sDescr(2:end-1) ' (' csExt{end,1} ')'];
 end
-% Reorder if a default filter was specified
+
+% Remove invalid defaults
+if exist('cDef', 'var')
+    [~, iExt] = union(cDef, csExt(:,1) );
+    cDef(iExt) = [];
+    sDef = cDef{1};
+end
+
+% Re-order if a default filter was specified
 if ~isempty(sDef)
     iDef = strcmp(csExt(:, 1), sDef);
     if any(iDef)
@@ -2371,6 +2408,11 @@ function OpenFile(varargin)
 % function is called from all menu items in the GUI and is a higher-level function
 % than LoadTrial. Generally, OpenFile is the only function that calls LoadTrial.
 % 
+% OpenFile() is called from the GUI (File->Open or the Open button in the
+% toolbar)
+% 
+% TODO Ignore first input when empty
+% 
 % Usage:
 %   OpenFile([], -1)    Load previous file in current list
 %   OpenFile([], 0)     Load next file in current list
@@ -2380,6 +2422,7 @@ function OpenFile(varargin)
 %
 if StopAcceleratorRepeat(), return; end
 [FV, hWin] = GetStruct();
+
 global g_hSpike_Viewer g_bBatchMode;
 persistent p_bNeverApply;
 
@@ -2390,8 +2433,9 @@ end
 
 % Decide which file to load next
 if isempty(varargin{2})
+    % Interactively choose a file to open
     if isfield(FV, 'sDirectory')
-        [sFile, sPath] = uigetfile(GetImportFilters, 'Select data file', CheckFilename([FV.sDirectory '\']));
+        [sFile, sPath] = uigetfile(GetImportFilters(FV.sDirectory), 'Select data file', CheckFilename([FV.sDirectory '\']));
     else
         [sFile, sPath] = uigetfile(GetImportFilters, 'Select data file');
         set(g_hSpike_Viewer, 'UserData', FV);
@@ -4448,18 +4492,62 @@ set(hLeg, 'color', 'none', 'textcolor', 'w', 'location', 'northeast')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function csDescr = GetChannelDescription(cCh)
+function SetTimeMarker(nT)
+% Display a vertical time marker in all axis
+%
+% This function can be useful for external scripts that need to display, in
+% the GUI, the time at which a signal is analysed.
+%
+% Usage:
+%   SetTimeMarker(T) where T is the absolute time in seconds.
+%
+
+% Get axes handles
+hGUI = GetGUIHandle();
+hAx = findobj(hGUI, 'type', 'axes');
+
+% If there are fewer markers than axes, then remove all
+hMarkers = findobj(hAx, 'tag', 'SpikyTimeMarker');
+if length(hMarkers) < length(hAx)
+    delete(hMarkers)
+end
+
+% Create markers if they don't exist
+if isempty(hMarkers)
+    % Iterate over axes
+    for ax = 1:length(hAx)
+        hold(hAx(ax), 'on')
+        hLin = plot(hAx(ax), [nT nT], get(hAx(ax), 'ylim'));
+        set(hLin, 'YDataSource', 'get(get(gcbo,''parent''), ''ylim'')', ...
+            'color', 'r', 'linewidth', 2, 'linestyle', '-', ...
+            'tag', 'SpikyTimeMarker')
+        %refreshdata
+    end
+else
+    % Otherwise update the markers
+    set(hMarkers, 'xdata', [nT nT])
+end
+
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function csDescr = GetChannelDescription(varargin)
 % Get the descriptive string of a channel name.
 % 
 % Usage:
 %   GetChannelDescription(S) where S is a string
 %   GetChannelDescription(C) where C is a cell of strings
 % 
-% The function returns a cell or string depending on the inputs S or C.
+% The function returns a cell or string as a function of C or S,
+% respectively.
 %
 
 [FV, ~] = GetStruct();
-if ischar(cCh), cCh = {cCh}; end
+if ischar(varargin{1})
+    cCh = {varargin{1}};
+else
+    cCh = varargin{1};
+end
 
 csDescr = cell(1, length(cCh));
 for iCs = 1:length(cCh)
@@ -4477,7 +4565,7 @@ for iCs = 1:length(cCh)
 end
 
 % If a single string was passed, return a string
-if length(csDescr) == 1
+if ischar(varargin{1})
     csDescr = csDescr{1};
 end
 

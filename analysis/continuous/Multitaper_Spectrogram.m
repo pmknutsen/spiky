@@ -84,11 +84,15 @@ hMsg = waitbar(.2, 'Computing multitaper spectrogram...');
 % Step 1 - NaN segments are filled with mirror images adjacent data
 % Step 2 - Remaining NaNs (e.g. lone occurences, NaNs at start/end of
 %          vector) are interpolated
+%
+% Note that all interpolated values are replaced with NaNs after the
+% spectrogram has been computed. It is only necesary to replace the NaNs
+% here so that the spectrogram can be computed without errors.
 iNaN = isnan(vCont);
 iTurnsNaN = find([0;diff(iNaN)] == 1) - 1; % start indices of nan segments
 if ~isempty(iTurnsNaN)
     iNaNDone = find([0;diff(iNaN)] == -1); % end indices of nan segments
-    if isempty(iNaNDone) % do this if only indices at end are NaNs
+    if isempty(iNaNDone) % only indices at end are NaNs
         iNaNDone = length(vCont);
     else
         iNaNDone(iNaNDone <= iTurnsNaN(1)) = [];
@@ -106,10 +110,12 @@ if ~isempty(iTurnsNaN)
         end
     end
     
-    % Interpolate remaining NaNs
+    % Replace remaining NaNs with normally distributed random values with
+    % same mean and standard deviation as the signal
     iNaNb = isnan(vCont);
     if any(iNaNb)
-        vCont(iNaNb) = interp1(find(~iNaNb), vCont(~iNaNb), find(iNaNb), 'linear', 'extrap');
+        vCont = double(FV.tData.(p_sContCh)');
+        vCont(iNaNb) = normrnd(nanmean(vCont), nanstd(vCont), 1, length(find(iNaNb)));
     end
 end
 
@@ -118,7 +124,6 @@ end
 % frequencies are ignored.
 waitbar(.4, hMsg)
 nBegin = FV.tData.([p_sContCh '_TimeBegin']); % sampling start, sec
-nEnd = FV.tData.([p_sContCh '_TimeEnd']); % sampling end, sec
 nFs = FV.tData.([p_sContCh '_KHz']) * 1000; % sampling frequency Hz
 vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
 [vCont, ~, nFs] = Spiky.main.FilterChannel(vCont, vTime, nFs, (p_nMaxF*5), 0, 0, 'decimate');
@@ -150,8 +155,7 @@ if any(iNaN)
 end
 
 % Remove columns with only zeros, and the columns immediately adjacent
-% 
-iRemCols = find(all(~S, 2));
+iRemCols = find(all(S == 0, 2));
 iRemCols = [min(iRemCols) - 1; iRemCols; max(iRemCols) + 1];
 iRemCols(iRemCols < 1 | iRemCols > size(S, 1)) = [];
 S(iRemCols, :) = NaN;
