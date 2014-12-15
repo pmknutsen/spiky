@@ -137,7 +137,11 @@ uimenu(hGUI, 'Parent', hScripts, 'Label', 'Get Script Help...', 'Callback', Spik
 % Scripts are prefixed with spiky_ in the filename and can be placed
 % anywhere in the MatLab path
 sPath = path();
-csPath = regexp(sPath, ':', 'split');
+if ispc
+    csPath = regexp(sPath, ';', 'split');
+else
+    csPath = regexp(sPath, ':', 'split');
+end
 csScripts = {};
 for p = 1:length(csPath) % iterate over all directories in path
     if exist(csPath{p}, 'dir')
