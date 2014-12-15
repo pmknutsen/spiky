@@ -8,7 +8,6 @@ function FV = import_daq(sFile, FV)
 %
 
 global Spiky
-sFile = Spiky.main.CheckFilename(sFile);
 [~, sFileOnly] = fileparts(sFile);
 
 try

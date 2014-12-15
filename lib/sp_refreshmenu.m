@@ -28,10 +28,9 @@ uimenu(hGUI, 'Parent', hFile, 'Label', 'Open Settings...', 'Callback', Spiky.mai
 uimenu(hGUI, 'Parent', hFile, 'Label', 'Import...', 'Callback', Spiky.main.ImportFile, 'Accelerator', 'I');
 uimenu(hGUI, 'Parent', hFile, 'Label', '&Save', 'Callback', Spiky.main.SaveResults, 'separator', 'on', 'Accelerator', 'S');
 uimenu(hGUI, 'Parent', hFile, 'Label', '&Export...', 'Callback', Spiky.main.ExportData);
-uimenu(hGUI, 'Parent', hFile, 'Label', '&Publish to NEX', 'Callback', 'publish_spiky_data');
 hFileList = uimenu(hGUI, 'Parent', hFile, 'Label', 'Files', 'Tag', 'MenuFileList', 'separator', 'on'); % filelist
-uimenu(hGUI, 'Parent', hFile, 'Label', 'Previous...', 'Callback', 'spiky(''OpenFile([],-1)'');'); % previous
-uimenu(hGUI, 'Parent', hFile, 'Label', '&Next...', 'Callback', 'spiky(''OpenFile([],0)'');', 'Accelerator', 'N'); % next
+uimenu(hGUI, 'Parent', hFile, 'Label', 'Previous...', 'Callback', 'Spiky.main.OpenFile([],-1);'); % previous
+uimenu(hGUI, 'Parent', hFile, 'Label', '&Next...', 'Callback', 'Spiky.main.OpenFile([],0);', 'Accelerator', 'N'); % next
 hMerge  = uimenu(hGUI, 'Parent', hFile, 'Label', '&Merge');
 uimenu(hGUI, 'Parent', hMerge, 'Label', '&Distribute Settings', 'Callback', Spiky.main.DistributeSettings);
 uimenu(hGUI, 'Parent', hMerge, 'Label', '&Merge Files', 'Callback', Spiky.main.CreateMergeFile, 'Accelerator', 'M');
@@ -69,13 +68,13 @@ uimenu(hGUI, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'C
 
 % List of themes
 hThemes = uimenu(hGUI, 'Parent', hView, 'Label', '&Themes', 'separator', 'on');
-sDir = Spiky.main.CheckFilename([sSpikyPath(1:end-7) 'themes/']);
+sDir = [sSpikyPath(1:end-7) 'themes' filesep];
 tDir = dir(sDir);
 for th = 3:length(tDir)
     uimenu(hGUI, 'Parent', hThemes, 'Tag', 'Spiky_Menu_ShowTheme', 'Label', [tDir(th).name(1:end-2)], 'Callback', Spiky.main.SetTheme);
 end
 uimenu(hGUI, 'Parent', hView, 'Label', '&Refresh', 'Accelerator', 'R', ...
-    'Callback', Spiky.main.RefreshGUI);
+    'Callback', Spiky.main.GUIRefresh);
 
 % Channels menu
 hChannels = uimenu(hGUI, 'Label', '&Channels');
@@ -134,25 +133,33 @@ uimenu(hGUI, 'Parent', hScripts, 'Label', '&Run Script... (B)', 'Callback', Spik
 uimenu(hGUI, 'Parent', hScripts, 'Label', 'Run &Batch Script...', 'Callback', Spiky.main.RunBatchScript);
 uimenu(hGUI, 'Parent', hScripts, 'Label', 'Get Script Help...', 'Callback', Spiky.main.GetScriptHelp);
 
-% Get list of existing scripts in ./scripts directory
-sPath = Spiky.main.CheckFilename([sSpikyPath(1:end-7) 'scripts\']);
-tFiles = dir(sPath);
-bFirst = 1;
-for f = 1:length(tFiles)
-    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
-        sName = strrep(tFiles(f).name(1:end-2), '_', ' ');
-        vIndx = strfind(sName, ' ');
-        sName([1 vIndx+1]) = upper(sName([1 vIndx+1]));
-        if bFirst
-            uimenu(hGUI, 'Label', sName, 'Parent', hScripts, 'Callback', [sprintf('spiky(''RunScript(''''%s'''')'')', tFiles(f).name)], 'Separator', 'on');
-            bFirst = 0;
-        else
-            uimenu(hGUI, 'Label', sName, 'Parent', hScripts, 'Callback', [sprintf('spiky(''RunScript(''''%s'''')'')', tFiles(f).name)]);
+% Find scripts anywhere in Matlab path
+% Scripts are prefixed with spiky_ in the filename and can be placed
+% anywhere in the MatLab path
+sPath = path();
+csPath = regexp(sPath, ':', 'split');
+csScripts = {};
+for p = 1:length(csPath) % iterate over all directories in path
+    if exist(csPath{p}, 'dir')
+        tDir = dir([csPath{p} filesep 'spiky_*.m']);
+        if ~isempty(tDir)
+            csScripts = [csScripts {tDir.name}];
         end
     end
 end
 
-uimenu(hGUI, 'Parent', hTools, 'Label', '&Batch Redo', 'Callback', 'spiky(''BatchRedo([],''''redo'''')'');', 'Accelerator', 'B');
+% Create links to scripts in the Tools->Scripts menu
+for s = 1:length(csScripts)
+    sName = strrep(csScripts{s}(7:end-2), '_', ' ');
+    iSpace = strfind(sName, ' ');
+    sName([1 iSpace+1]) = upper(sName([1 iSpace+1])); % capitalize all words
+    hMenu = uimenu(hGUI, 'Label', sName, 'Parent', hScripts, 'Callback', [sprintf('Spiky.main.RunScript(''%s'')', csScripts{s})]);
+    if s == 1
+        set(hMenu, 'Separator', 'on')
+    end
+end
+
+uimenu(hGUI, 'Parent', hTools, 'Label', '&Batch Redo', 'Callback', 'Spiky.main.BatchRedo([],''redo'');', 'Accelerator', 'B');
 uimenu(hGUI, 'Parent', hTools, 'Label', '&Autoload New Files...', 'Callback', Spiky.main.AutoloadNewFiles, 'Separator', 'on');
 uimenu(hGUI, 'Parent', hTools, 'Label', '&Keyboard Mode...', 'Callback', Spiky.main.KeyboardMode, 'Accelerator', 'K');
 uimenu(hGUI, 'Parent', hTools, 'Label', '&Clear Persistent Variables', 'Callback', 'clear functions');

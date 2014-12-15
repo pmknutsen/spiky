@@ -25,8 +25,7 @@ p.text.color = [0 0 0];
 p.line.color = [.1 .1 .1];
 
 % uicontrol (checkboxes etc)
-p.uicontrol.backgroundcolor = [.8 .8 .8];
-p.uicontrol.foregroundColor = [0 0 0];
+p.uicontrol.backgroundcolor = [1 1 1];
 
 % uipanel
 p.uipanel.backgroundcolor = [.8 .8 .8];

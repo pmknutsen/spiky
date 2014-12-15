@@ -8,7 +8,6 @@ function FV = import_hd5(sFile, FV)
 %
 
 global Spiky
-sFile = Spiky.main.CheckFilename(sFile);
 [~, sFileOnly] = fileparts(sFile);
 
 % Check that Matlab version 13+ is running (HD5 read otherwise not supported)

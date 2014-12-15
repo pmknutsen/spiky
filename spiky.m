@@ -1,13 +1,9 @@
 function varargout = spiky(varargin)
-% Spiky AlphaMap .map/.mat browser and spike-sorter
+% SPIKY Analysis software for physiological and behavioral
 %
 % Usage:
 %   < spiky >
 %   Runs the Spiky GUI
-%
-%   < spiky(FUN) >
-%   Runs the internal function FUN in Spiky. Ex:
-%     spiky, e.g. spiky('LoadTrial(''A1807004.daq'')')
 %
 %   < spiky(FUN) >
 %   Runs the internal function FUN in Spiky. Ex:
@@ -40,22 +36,6 @@ function varargout = spiky(varargin)
 % You should have received a copy of the GNU General Public License
 % along with this program.  If not, see <http://www.gnu.org/licenses/>.
 % 
-
-% Run local function if called from outside
-% TODO Remove this section. It was used before function handles were passed
-% in the Spiky global structure
-%if nargin > 0
-%    if strcmp(varargin{1}, 'GetGitHash')
-%        varargout{1} = eval(varargin{1});
-%    else
-%        try
-%            varargout{1} = eval(varargin{1});
-%        catch MException
-%            eval(varargin{1});
-%        end
-%    end
-%    return
-%end
 
 % Abort if Spiky is already running
 hPlot = findobj('Tag', 'Spiky');
@@ -96,7 +76,7 @@ for i = 1:length(cSubs)
 end
 
 % Create handles to all /analysis/discrete functions
-sThisPath = CheckFilename([sPath '/analysis/discrete/']);
+sThisPath = [sPath filesep 'analysis' filesep 'discrete' filesep];
 tFiles = dir(sThisPath);
 for f = 1:length(tFiles)
     if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
@@ -106,7 +86,7 @@ for f = 1:length(tFiles)
 end
 
 % Create handles to all /analysis/discrete functions
-sThisPath = CheckFilename([sPath '/analysis/continuous/']);
+sThisPath = [sPath filesep 'analysis' filesep 'continuous' filesep];
 tFiles = dir(sThisPath);
 for f = 1:length(tFiles)
     if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
@@ -116,7 +96,7 @@ for f = 1:length(tFiles)
 end
 
 % Create handles to all /import
-sThisPath = CheckFilename([sPath '/import/']);
+sThisPath = [sPath filesep 'import' filesep];
 tFiles = dir(sThisPath);
 for f = 1:length(tFiles)
     if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
@@ -126,7 +106,7 @@ for f = 1:length(tFiles)
 end
 
 % Create handles to all /export
-sThisPath = CheckFilename([sPath '/export/']);
+sThisPath = [sPath filesep 'export' filesep];
 tFiles = dir(sThisPath);
 for f = 1:length(tFiles)
     if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
@@ -168,8 +148,8 @@ movegui(hGUI, 'center')
 set(hGUI, 'visible', 'on')
 
 % Create GUI toolbar and menu
-RefreshToolbar();
-RefreshMenu();
+GUIRefreshToolbar();
+GUIRefreshMenu();
 
 % Set Spiky to by default NOT be in MERGE MODE
 global g_bMergeMode g_bBatchMode
@@ -186,7 +166,7 @@ function GUIResize(varargin)
 
 % Refresh GUI when it is resized
 % Resizing the GUI in Linux has the effect of shuffling menu items around
-%RefreshGUI()
+%GUIRefresh()
 
 return
 
@@ -199,10 +179,11 @@ function GUIMouseMotion(varargin)
 hFig = GetGUIHandle();
 hTxt = findobj(hFig, 'Tag', 'AxesCursorLocationTip');
 if isempty(hTxt)
-    hTxt = uicontrol(hFig, 'Style', 'text', 'Position', [0 0 200 20], ...
-        'HorizontalAlignment', 'left', 'Tag', 'AxesCursorLocationTip');
-    ThemeObject(hTxt)
+    hTxt = uicontrol(hFig, 'Style', 'text', 'Position', [0 0 200 15], ...
+        'HorizontalAlignment', 'left', 'Tag', 'AxesCursorLocationTip', ...
+        'fontsize', 8);
 end
+ThemeObject(hTxt)
 
 % Get handle of axes cursor is above
 % Note that overobj() is an undocumented function and may changed in the
@@ -226,35 +207,35 @@ return
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function RefreshGUI(varargin)
-% Refresh GUI
+function GUIRefresh(varargin)
+% Refresh Spiky GUI
 %
 global g_bBatchMode
 
 hGUI = GetGUIHandle();
 ViewTrialData();
-RefreshToolbar();
-RefreshMenu();
+GUIRefreshToolbar();
+GUIRefreshMenu();
 g_bBatchMode = 0;
 
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function RefreshToolbar()
+function GUIRefreshToolbar()
 % Refresh toolbar in Spiky GUI
 % 
 % This is an alias function for sp_refreshtoolbar(). Usage is identical,
-% ie simply: RefreshToolbar()
+% ie simply: GUIRefreshToolbar()
 %
 sp_refreshtoolbar();
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function RefreshMenu()
+function GUIRefreshMenu()
 % Refresh menu in Spiky GUI
 % 
 % This is an alias function for sp_refreshmenu(). Usage is identical,
-% ie simply: RefreshMenu()
+% ie simply: GUIRefreshMenu()
 %
 sp_refreshmenu();
 return
@@ -278,7 +259,7 @@ else
 end
 
 % Strip .m from filename
-[sPath, sScript, sExt] = fileparts(sScript);
+[~, sScript, ~] = fileparts(sScript);
 
 % Get full path to script file
 sScriptPath = [sScriptPath sScript '.m'];
@@ -345,7 +326,7 @@ function CreateAnalysisMenu(hParent, sType, varargin)
 
 % Load list of continuous analysis functions
 sSpikyPath = which('spiky');
-sContPath = CheckFilename([sSpikyPath(1:end-7) '/analysis/' sType '/' ]);
+sContPath = [sSpikyPath(1:end-7) filesep 'analysis' filesep sType filesep ];
 tFiles = dir(sContPath);
 
 % Create menu with label
@@ -411,7 +392,7 @@ return
 function PanRight(varargin)
 % Pan the displayed data range towards right
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 vChild = findobj(get(findobj('Tag', 'Spiky'), 'children'), 'Type', 'axes'); % axes handles
 vX = get(vChild(end), 'xlim');
@@ -423,7 +404,7 @@ return
 function PanLeft(varargin)
 % Pan the displayed data range towards left
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 vChild = findobj(get(findobj('Tag', 'Spiky') ,'children'), 'Type', 'axes'); % axes handles
 vX = get(vChild(end), 'xlim');
@@ -450,7 +431,7 @@ return
 function ZoomIn(varargin)
 % Increase horizontal zoom by 25%
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 vChild = findobj(get(findobj('Tag', 'Spiky'), 'children'), 'Type', 'axes'); % axes handles
 vX = get(vChild(end), 'xlim');
@@ -462,7 +443,7 @@ return
 function ZoomOut(varargin)
 % Decrease horizontal zoom by 25%
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 vChild = findobj(get(findobj('Tag', 'Spiky') ,'children'), 'Type', 'axes'); % axes handles
 vX = get(vChild(end), 'xlim');
@@ -474,7 +455,7 @@ return
 function ZoomRange(varargin)
 % Select a horizontal zoom range manually
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 if FV.bPanOn, pan off, end
 hold on;
@@ -546,7 +527,7 @@ return
 function PCACleaning(varargin)
 % 
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, hWin] = GetStruct();
 global g_bBatchMode
 % Build a matrix containing the continuous data vectors of selected
@@ -681,7 +662,7 @@ function SaveResults(varargin)
 % Usage:    SaveResults()
 %
 global g_hSpike_Viewer
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 sPointer = get(g_hSpike_Viewer,'Pointer');
 set(g_hSpike_Viewer,'Pointer','watch')
 [FV, ~] = GetStruct();
@@ -701,7 +682,7 @@ persistent p_bAlwaysUseDuplicate
 if isempty(p_bAlwaysUseDuplicate)
     p_bAlwaysUseDuplicate = 0;
 end
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 tData = FV.tData; % original raw data and paths
 sDirectory = FV.sDirectory;
@@ -791,7 +772,7 @@ function AutoloadNewFiles(varargin)
 if ~isfield(FV, 'sDirectory')
     warndlg('You must first select the directory that should be monitored in File->Open Directory', 'Spiky')
 else
-    map_autoload(CheckFilename([FV.sDirectory '\']))
+    map_autoload([FV.sDirectory filesep])
 end
 return
 
@@ -799,7 +780,7 @@ return
 function SetFilterChannels(varargin)
 % Interactively select which channels should be filtered
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 global g_hSpike_Viewer g_vSelCh
 % create list of selectable channels
@@ -948,7 +929,7 @@ function SetChannelCalculator(varargin)
 % 
 %
 
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 [sCh, ~] = SelectChannelNumber(FV.csChannels);
 
@@ -1026,7 +1007,7 @@ global g_bBatchMode
 
 % Path to session directory (without last slash at end)
 if isfield(FV, 'sDirectory')
-    sDirectory = uigetdir(CheckFilename([FV.sDirectory '\']));
+    sDirectory = uigetdir([FV.sDirectory filesep]);
 else
     sDirectory = uigetdir;
 end
@@ -1034,7 +1015,7 @@ if sDirectory == 0, return, end
 cd(sDirectory)
 
 % Get list of DAQ files
-sFiles = dir(CheckFilename(sprintf('%s\\*.daq', sDirectory)));
+sFiles = dir(sprintf('%s%s*.daq', sDirectory, filesep));
 if isempty(sFiles)
     warndlg('No DAQ files were found in the chosen directory.', 'No files found')
     return
@@ -1046,8 +1027,8 @@ hFileListChildren = findobj(GetGUIHandle(), 'Parent', hFileList);
 delete(hFileListChildren)
 for f = 1:size(sFiles, 1)
     uimenu(GetGUIHandle(), 'Parent', hFileList, 'Label', sFiles(f).name, ...
-        'UserData', CheckFilename([sDirectory '\\' sFiles(f).name]), ...
-        'Callback', sprintf('spiky(''OpenFile([], %d)'');', f) );
+        'UserData', [sDirectory filesep sFiles(f).name], ...
+        'Callback', sprintf('Spiky.main.OpenFile([], %d);', f) );
 end
 
 % Update FV structure and refresh GUI
@@ -1069,7 +1050,7 @@ FV = SetFVDefaults();
 
 % Path to session directory (without last slash at end)
 if isfield(FV, 'sDirectory')
-    sDirectory = uigetdir(CheckFilename([FV.sDirectory '\']));
+    sDirectory = uigetdir([FV.sDirectory filesep]);
 else
     sDirectory = uigetdir;
 end
@@ -1092,8 +1073,8 @@ delete(hFileListChildren)
 % Update GUI
 for f = 1:length(cFiles)
     uimenu(GetGUIHandle(), 'Parent', hFileList, 'Label', cFiles{f}, ...
-        'UserData', CheckFilename([cPaths{f} '\\' cFiles{f}]), ...
-        'Callback', sprintf('spiky(''OpenFile([], %d)'');', f) );
+        'UserData', [cPaths{f} filesep cFiles{f}], ...
+        'Callback', sprintf('Spiky.main.OpenFile([], %d);', f) );
 end
 
 % Update FV structure and refresh GUI
@@ -1189,14 +1170,13 @@ tDirList = dir(sBaseDir);
 for t1 = 3:length(tDirList)
     if tDirList(t1).isdir % depth = 1
         % recursively call this function
-        sBaseDirRecurs = CheckFilename([sBaseDir '/' tDirList(t1).name]);
+        sBaseDirRecurs = [sBaseDir filesep tDirList(t1).name];
         [cPaths2, cFiles2] = GetFilePaths(sBaseDirRecurs, sSuffix);
         cPaths = {cPaths{:}, cPaths2{:}};
         cFiles = {cFiles{:}, cFiles2{:}};
     else
         % Add file names to paths cell
         if strcmp(tDirList(t1).name(end-3:end), sSuffix)
-            %sFilename = CheckFilename([sBaseDir '/' tDirList(t1).name]);
             cPaths{end+1} = sBaseDir;
             cFiles{length(cPaths)} = tDirList(t1).name;
         end
@@ -1207,12 +1187,23 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function vTime = GetTime(nBeginTime, nEndTime, vCont, nFs)
 % Get time vectors for continuous 1- or 2-D data
+% 
+% Usage:
+%   GetTime(BEGIN, END, CONT, FS)
+%
+%   where BEGIN is the start time, END is the end time (can be empty), CONT
+%   is the continuous signal (only its length is used) and FS is the
+%   sampling rate.
 %
 if all(size(vCont) > 1) % 2D trace (e.g. spectrogram)
     nEndTime = nBeginTime + (size(vCont, 2))*(1/nFs);
     vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
 else % 1D trace (voltage etc)
     % TODO: Why don't I always calculate vTime from nFs
+    % Compute end time if it is not provided
+    if isempty(nEndTime)
+        %length(vCont) nFs
+    end
     vTime = linspace(nBeginTime, nEndTime, length(vCont));
     % Check that time intervals == nFs; if not, then recalculate
     % vTime from nFs
@@ -1222,6 +1213,29 @@ else % 1D trace (voltage etc)
         vTime = vTime(1:length(vCont));
     end
 end
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function bResult = IsMergeMode(varargin)
+% Determing if Spiky is in merge mode or not
+%
+
+% Get global merge mode status (generally correct)
+global g_bMergeMode
+
+% Assume we're in merge mode if the loaded file is called MergeFile
+[FV, ~] = GetStruct();
+[~, sFile] = fileparts(FV.sLoadedTrial);
+if strcmpi(sFile, 'MergeFile')
+    g_bMergeMode = 1;
+end
+
+if isempty(g_bMergeMode)
+    g_bMergeMode = 0;
+end
+
+bResult = g_bMergeMode;
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1235,12 +1249,12 @@ hFig = findobj('Tag', 'Spiky');
 set(0, 'currentfigure', hFig)
 ThemeObject(hFig);
 
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 
 % Destroy waitbar unless we are in Merge or Batch mode
-global g_bMergeMode g_bBatchMode
-if ~g_bMergeMode && ~g_bBatchMode
+global g_bBatchMode
+if ~IsMergeMode() && ~g_bBatchMode
     SpikyWaitbar(1,1);
 end
 
@@ -1265,8 +1279,7 @@ end
 zoom(hFig, 'off')
 
 % Select channels
-if isempty(g_bMergeMode), g_bMergeMode = 0; end
-if isempty(FV.csDisplayChannels) && ~g_bMergeMode, SelectChannels; end
+if isempty(FV.csDisplayChannels) && ~IsMergeMode(), SelectChannels; end
 [FV, hWin] = GetStruct();
 
 % Check that all channel names exist in FV.csChannels
@@ -1315,19 +1328,24 @@ for i = 1:length(FV.csDisplayChannels)
         uiwait(warndlg(sprintf('Cannot display channel %s as it is not a vector.', sCh)))
         continue
     end
-
+    
     % Get channel description
     sYLabel = GetChannelDescription(sCh);
     if isempty(sYLabel), sYLabel = sCh; end
 
-    if ( ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh) ) || ~g_bMergeMode
+    if ( ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh) ) || ~IsMergeMode()
         [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % mV
         nContAllMinMax = [min(vCont(:)) max(vCont(:))];
-        [FV,hWin] = GetStruct(); % reload FV since channel gains may have changed in previous line
+        [FV, hWin] = GetStruct(); % reload FV since channel gains may have changed in previous line
         
         nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency (Hz)
         nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
-        nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
+        sEndField = [sCh '_TimeEnd'];
+        if isfield(FV.tData, sEndField)
+            nEndTime = FV.tData.(sEndField); % start of sampling (sec)
+        else
+            nEndTime = [];
+        end
         vTime = GetTime(nBeginTime, nEndTime, vCont, nFs);
 
         % Limit vector to FV.vXlim
@@ -1549,14 +1567,14 @@ for i = 1:length(FV.csDisplayChannels)
     else sUnit = 'mV'; end
     
     if FV.bPlotRasters && isfield(FV.tSpikes, sCh)
-        hLabel = ylabel(sYLabel{1});
+        hLabel = ylabel(sYLabel);
     else
         hLabel = ylabel(sprintf('%s (%s)', strrep(sYLabel, '_', ' '), sUnit));
     end
     set(hLabel, 'Interpreter', 'tex')
     ThemeObject(hSubplots(end))
     
-    if g_bMergeMode
+    if IsMergeMode()
         if isempty(FV.vXlim), axis(hSubplots(end), 'tight')
         else set(hSubplots(end), 'xlim', FV.vXlim); end
     else
@@ -1781,7 +1799,7 @@ if bShowDigitalEvents
     ThemeObject(hSubplots(end));
     set(hSubplots(end), 'Tag', 'Events')
     
-    if g_bMergeMode
+    if IsMergeMode()
         if isempty(FV.vXlim), axis tight
         else set(hSubplots(end), 'xlim', FV.vXlim); end
     else
@@ -1799,6 +1817,7 @@ if bShowDigitalEvents
     for c = 1:length(FV.csDigitalChannels)
         % Ignore DAQ_Start, DAQ_Stop and DAQ_Trigger (default fields generated by DA Toolbox)
         if any(strcmp(FV.csDigitalChannels(c), {'DAQ_Start', 'DAQ_Stop', 'DAQ_Trigger'}))
+            cYTickLabels{c} = '';
             continue
         end
         cYTickLabels{c} = GetChannelDescription(FV.csDigitalChannels{c});
@@ -2017,7 +2036,7 @@ if ~isfield(FV, 'CurrentTheme'); FV.CurrentTheme = 'spiky'; end
 if isempty(p) || ~strcmp(FV.CurrentTheme, p.theme)
     % Load selected theme properties
     sDir = which(mfilename);
-    sDir = CheckFilename([sDir(1:end-7) 'themes/']);
+    sDir = [sDir(1:end-7) 'themes' filesep];
     tDir = dir(sDir);
     tDir = tDir(3:end);
     if ~isfield(FV, 'CurrentTheme'); FV.CurrentTheme = 'spiky'; end
@@ -2255,7 +2274,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function csSelected = SelectChannels(varargin)
 % Select the channels that should be displayed in the GUI
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 
 % If a channel was specific in varargin{1}, then toggle this in csDisplayChannels,
@@ -2360,15 +2379,30 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ExportData(varargin)
+% Export data to a different file format
+% 
+% Usage:
+%   ExportData()  invokes a dialog for selecting output file and format
+%   ExportData(F) where F is the filename and filetype in a supported format
+%                 (see /export directory). Example:
+%                   ExportData('/mydir/myfile.mat')
+%
+if ~IsDataLoaded(), return; end
+
 [FV, ~] = GetStruct();
 
 sCurrFile = FV.sLoadedTrial;
 sCurrFile(strfind(sCurrFile, '.'):end) = [];
-[sFile, sPath] = uiputfile(GetExportFilters, 'Select file to write', CheckFilename([FV.sDirectory '\' sCurrFile]));
-if sFile == 0; return; end
+if isempty(varargin)
+    [sFile, sPath] = uiputfile(GetExportFilters(), 'Select file to write', [FV.sDirectory filesep sCurrFile]);
+    if sFile == 0; return; end
+else
+    [sPath sFile] = fileparts(varargin{1});
+end
 
 % Run export filter
 eval(sprintf('export_%s([sPath sFile], FV);', lower(sFile(end-2:end))))
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2435,7 +2469,7 @@ end
 if isempty(varargin{2})
     % Interactively choose a file to open
     if isfield(FV, 'sDirectory')
-        [sFile, sPath] = uigetfile(GetImportFilters(FV.sDirectory), 'Select data file', CheckFilename([FV.sDirectory '\']));
+        [sFile, sPath] = uigetfile(GetImportFilters(FV.sDirectory), 'Select data file', [FV.sDirectory filesep]);
     else
         [sFile, sPath] = uigetfile(GetImportFilters, 'Select data file');
         set(g_hSpike_Viewer, 'UserData', FV);
@@ -2522,8 +2556,7 @@ end
 SetStruct(FV, 'nosaveflag'); % update current path and colormap
 
 % Exit merge mode if applicable
-global g_bMergeMode
-if g_bMergeMode, StopMergeMode(); end
+if IsMergeMode(), StopMergeMode(); end
 
 % Check for defined multitrodes to keep
 csMultiTrodes = {};
@@ -2610,13 +2643,13 @@ persistent p_nDefFilter
 if isempty(varargin{2})
     csFilters = GetImportFilters(p_nDefFilter);
     if isfield(FV, 'sDirectory')
-        [sFile, sPath, nFiltIndx] = uigetfile(csFilters, 'Select data file', CheckFilename([FV.sDirectory '\']));
+        [sFile, sPath, nFiltIndx] = uigetfile(csFilters, 'Select data file', [FV.sDirectory filesep]);
     else
         [sFile, sPath, nFiltIndx] = uigetfile(csFilters, 'Select data file');
         set(g_hSpike_Viewer, 'UserData', FV);
     end
     if nFiltIndx == 0, return; end
-    p_nDefFilter = csFilters(nFiltIndx);
+    p_nDefFilter = csFilters{nFiltIndx};
 
     g_bBatchMode = false;
     if sFile == 0, return, end
@@ -2639,12 +2672,11 @@ else
 end
 
 % Exit merge mode if applicable
-global g_bMergeMode
-if g_bMergeMode, StopMergeMode(); end
+if IsMergeMode(), StopMergeMode(); end
 
 % Load and store new data
 LoadTrial(sNextTrial);
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 SetStruct(FV, 'nosaveflag');
 ViewTrialData();
 if ~g_bBatchMode, BatchRedo([], 'ImportFile([],[])'); end % set up batch job
@@ -2730,7 +2762,7 @@ return
 function SetGain(varargin)
 % Manually set gain of channels in dialog window.
 [FV, hWin] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 
 if isempty(FV.csChannels)
     waitfor(warndlg('There are no channels available. Cannot adjust gain.'))
@@ -2860,10 +2892,10 @@ function bResult = LoadTrial(snTrial)
 %
 % Syntax:   LoadTrial(snTrial) where snTrial is the string name of the file to load
 %
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 bResult = 0;
 
-sFile = CheckFilename(snTrial);
+sFile = snTrial;
 if ~exist(sFile, 'file')
     uiwait(warndlg('Data file does not exist'))
     bLoaded = 0;
@@ -2981,12 +3013,12 @@ msgbox(cAboutText, 'About Spiky')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function bLoaded = CheckDataLoaded(varargin)
+function bLoaded = IsDataLoaded(varargin)
 % Check if data has been loaded into Spiky.
 % 
 % Usage:
-%   CheckDataLoaded()
-%   bLoaded = CheckDataLoaded()
+%   IsDataLoaded()
+%   bLoaded = IsDataLoaded()
 %
 [FV, hWin] = GetStruct();
 if ~isfield(FV, 'tData') % check data has been loaded
@@ -3000,7 +3032,7 @@ return
 function SetSpikeThreshold(varargin)
 %
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 zoom off
 try
     [~, nY] = ginput(1);
@@ -3173,7 +3205,7 @@ return
 function AutoDetectThresholds(varargin)
 % Automatically select 4 x STD as negative spike threshold
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV,~] = GetStruct();
 
 % Select threshold to find thresholds on
@@ -3207,8 +3239,8 @@ function DetectSpikes(varargin)
 % threshold is also set, then the negative threshold crossing waveform need
 % to cross the positive threshold as well.
 %
-if ~CheckDataLoaded, return, end
-global g_bMergeMode
+if ~IsDataLoaded, return, end
+
 [FV, ~] = GetStruct();
 
 % Iterate across all channels with threshold lines(s)
@@ -3216,7 +3248,7 @@ csChNeg = fieldnames(FV.tSpikeThresholdsNeg);
 csChPos = fieldnames(FV.tSpikeThresholdsPos);
 csChUnique = unique([csChNeg;csChPos]);
 if length(csChUnique) > 1
-    if ~g_bMergeMode
+    if ~IsMergeMode()
         bResult = SpikyWaitbar(0, length(csChUnique));
     end
 end
@@ -3247,7 +3279,7 @@ for nCh = 1:length(csChUnique)
     FV.tSpikes.(sCh).dejittered = 0;
 
     if length(csChUnique) > 1
-        if ~g_bMergeMode
+        if ~IsMergeMode()
             bResult = SpikyWaitbar(nCh, length(csChUnique));
             if ~bResult
                 bResult = SpikyWaitbar(length(csChUnique), length(csChUnique));
@@ -3258,7 +3290,7 @@ for nCh = 1:length(csChUnique)
     
 end
 if length(csChUnique) > 1
-    if ~g_bMergeMode
+    if ~IsMergeMode()
         bResult = SpikyWaitbar(length(csChUnique), length(csChUnique));
     end
 end
@@ -3351,7 +3383,7 @@ function DejitterSpikes(varargin)
 % bulk. TODO [[If spikes are already sorted, dejitter spikes instead on a
 % unit-by-unit basis]].
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 csFieldnames = fieldnames(FV.tSpikes);
 if length(csFieldnames) > 1
@@ -3445,7 +3477,7 @@ function RemoveOutlierSpikes(varargin)
 % detection algorithm
 %
 
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 csFieldnames = fieldnames(FV.tSpikes);
 if length(csFieldnames) > 1,
@@ -3463,7 +3495,9 @@ end
 if length(csFieldnames) > 1, close(hWait), end
 SetStruct(FV)
 global g_bBatchMode
-if ~g_bBatchMode BatchRedo([], 'RemoveOutlierSpikes'); end
+if ~g_bBatchMode
+    BatchRedo([], 'RemoveOutlierSpikes');
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3472,7 +3506,7 @@ function ShowAggregationTree(varargin)
 % TODO: Needs to be modified if users has joined/split clusters manually
 %
 
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 % Select channel from list of sorted units
 csFieldnames = fieldnames(FV.tSpikes)';
@@ -3560,7 +3594,7 @@ end
 uicontrol(hMainWin, 'Style', 'popupmenu', 'units', 'normalized', ...
     'Position', [0 .95 .2 .05], 'String', ...
     csDescriptions, 'userdata', csFieldnames, 'callback', ...
-    'cUD=get(gcbo,''userdata'');nV=get(gcbo,''value'');close(gcf);spiky([''ShowSpikeClusters([],'' '''''''' cUD{nV} '''''''' '')''])')
+    'cUD=get(gcbo,''userdata'');nV=get(gcbo,''value'');close(gcf);Spiky.main.ShowSpikeClusters([],cUD{nV})')
 nGroup = 0;
 
 % Scale window width to number of columns
@@ -3704,7 +3738,7 @@ function ShowOverlappingSpikeClusters(varargin)
 % Plot overlapping, color-coded unit/spike clusters from a single
 % electrode/multi-trode
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV,hWin] = GetStruct();
 if ~isempty(varargin)
     if isnumeric(varargin{1}), sCh = '';
@@ -3877,7 +3911,7 @@ end
 uicontrol(hMainWin, 'Style', 'popupmenu', 'units', 'normalized', ...
     'Position', [0 .95 .2 .05], 'String', ...
     csDescriptions, 'userdata', csFieldnames, 'callback', ...
-    'cUD=get(gcbo,''userdata'');nV=get(gcbo,''value'');close(gcf);spiky([''ShowOverlappingSpikeClusters('' '''''''' cUD{nV} '''''''' '')''])')
+    'cUD=get(gcbo,''userdata'');nV=get(gcbo,''value'');close(gcf);Spiky.main.ShowOverlappingSpikeClusters('' '''''''' cUD{nV} '''''''' ''))')
 
 % Set the click Callback function
 hCursor = datacursormode(hMainWin);
@@ -4195,7 +4229,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SortSpikes(varargin)
 % Sort spikes on selected channel
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, hWin] = GetStruct();
 if isempty(FV.tSpikes)
     warndlg('You must first run spike detection.')
@@ -4248,7 +4282,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SortAllChannels(varargin)
 % Run spike sorting on all thresholded channels
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 bSortGood = 0;
 [FV, ~] = GetStruct();
 if isempty(FV.tSpikes)
@@ -4302,7 +4336,7 @@ function [sCh, bResult] = SelectChannelNumber(varargin)
 %       TIT  title of dialog
 %       DEF  default channel (string)
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 sCh = []; bResult = 0;
 [FV,hWin] = GetStruct();
 
@@ -4388,7 +4422,7 @@ function ViewWaveforms(varargin)
 % Usage:
 %   ViewWaveforms()
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 nSubplots = 0; % get number of channels for which spikes exist
 csFieldnames = fieldnames(FV.tSpikes);
@@ -4452,7 +4486,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ViewWaveformPCs(varargin)
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV,hWin] = GetStruct();
 % Select channel from list of sorted units
 csFieldnames = fieldnames(FV.tSpikes)';
@@ -4592,7 +4626,7 @@ function AddTetrode(varargin)
 % AddTetrode(sCh1__2) will use the channel names supplied
 % AddTetrode() will ask user which channels to combine
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 global g_vElectrodes
 g_vElectrodes = [1 1 1 1];
 [FV, hWin] = GetStruct();
@@ -4779,7 +4813,7 @@ function DistributeSettings(varargin)
 % Overwrite settings of other files if they exist by default.
 %
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 global g_hSpike_Viewer
 
 % Get current file list
@@ -4801,7 +4835,7 @@ for f = 1:length(csPaths)
     drawnow
 
     % set sLoadedTrial
-    sNewFile = CheckFilename(csPaths{f});
+    sNewFile = csPaths{f};
     if strcmp(sNewFile, sThisTrial), continue, end % dont overwrite already loaded trial
 
     % load current data and settings (if they exist)
@@ -4819,7 +4853,7 @@ for f = 1:length(csPaths)
     end
     FV.sLoadedTrial = sNewFile;
     % save settings (and imported fields)
-    save(CheckFilename([FV.sLoadedTrial(1:end-4) '.spb']), 'FV', '-v7.3')
+    save([FV.sLoadedTrial(1:end-4) '.spb'], 'FV', '-v7.3')
 end
 sp_disp(sprintf('Done distributing current settings to %d files in current directory', length(csPaths)))
 return
@@ -4830,7 +4864,7 @@ function RemoveSettings(varargin)
 % Overwrite settings of other files if they exist by default.
 %
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 global g_hSpike_Viewer
 
 % Warn that this action is irreversible
@@ -4849,7 +4883,7 @@ if ischar(csPaths), return; end % single file loaded
 SpikyWaitbar(0, length(csPaths));
 for f = 1:length(csPaths)
     SpikyWaitbar(f, length(csPaths));
-    delete(CheckFilename([csPaths{f}(1:end-4) '.spb']))
+    delete([csPaths{f}(1:end-4) '.spb'])
 end
 sp_disp(sprintf('Done deleting settings on %d loaded files.', length(csPaths)))
 return
@@ -4863,7 +4897,7 @@ function CreateMergeFile(varargin)
 global g_hSpike_Viewer g_vSelCh
 [FV, ~] = GetStruct();
 
-if ~CheckDataLoaded(), return, end
+if ~IsDataLoaded(), return, end
 
 % Ask user what data to merge
 hFig = figure;
@@ -4905,7 +4939,7 @@ if any(strcmpi(cMergeData, 'displayed channels')), bDisplayed = 1;
 else bDisplayed = 0; end
 
 % Ask whether to save over existing file if it exists
-sPath = CheckFilename([FV.sDirectory '\MergeFile.spb']);
+sPath = [FV.sDirectory filesep 'MergeFile.spb'];
 sAppendReplace = '';
 if exist(sPath, 'file')
     sAppendReplace = questdlg('Merge file already exists on disk. Do you want to replace this file or write/append the new merge data to it?', ...
@@ -4931,7 +4965,7 @@ if strcmpi(sAppendReplace, 'Append')
     % have been dejittered (in which case matrices wont merge readily).
     % Thus, whenever spikes are selected to be merged, they will always
     % replace ALL spikes in the merge structure, regardless.
-    FV_old = load(CheckFilename([FV_merge.sDirectory '\MergeFile.spb']), '-MAT');
+    FV_old = load([FV_merge.sDirectory filesep 'MergeFile.spb'], '-MAT');
     if bImported || bFiltered || bEvents
         FV_merge.tData = FV_old.FV.tData;
         FV_merge.csDisplayChannels = FV_old.FV.csDisplayChannels;
@@ -5417,7 +5451,7 @@ if strcmpi(sAppendReplace, 'Replace')
     FV = SetFVDefaults();
 elseif strcmpi(sAppendReplace, 'Append')
     % In Append mode, load and use as basis existing mergefile
-    FV_old = load(CheckFilename([FV_merge.sDirectory '\MergeFile.spb']), '-MAT');
+    FV_old = load([FV_merge.sDirectory filesep 'MergeFile.spb'], '-MAT');
     FV = FV_old.FV;
 end
 if bSpikes, FV.tSpikes = FV_merge.tSpikes; end
@@ -5427,7 +5461,7 @@ FV.csDisplayChannels = FV_merge.csDisplayChannels;
 FV.csDigitalChannels = FV_merge.csDigitalChannels;
 FV.tChannelDescriptions = FV_merge.tChannelDescriptions;
 FV.bPlotRasters = 1;
-FV.sLoadedTrial = CheckFilename([FV_merge.sDirectory '\MergeFile.spb']);
+FV.sLoadedTrial = [FV_merge.sDirectory filesep 'MergeFile.spb'];
 SetStruct(FV)
 save(FV.sLoadedTrial, 'FV', '-v7.3') % Save merged results to disk
 set(g_hSpike_Viewer, 'Name', sprintf('%s - Spiky', GetCurrentFile()))
@@ -5451,6 +5485,7 @@ function StartMergeMode(varargin)
 %
 [FV, hWin] = GetStruct();
 figure(hWin)
+global g_bMergeMode
 g_bMergeMode = 1;
 
 % Update menu items
@@ -5479,7 +5514,7 @@ return
 function StopMergeMode(varargin)
 % Clean up and exit from merge mode.
 %
-[FV, hWin] = GetStruct();
+[~, hWin] = GetStruct();
 global g_bMergeMode
 g_bMergeMode = 0;
 % Update menu items
@@ -5517,7 +5552,7 @@ end
 FV.sDirectory = sPath;
 % Load merge file
 StartMergeMode();
-sFilePath = CheckFilename([sPath sFile]);
+sFilePath = [sPath sFile];
 if exist(sFilePath, 'file') > 0
     load(sFilePath, 'FV', '-MAT');
     FV.sDirectory = sPath;
@@ -5594,7 +5629,7 @@ return
 function ZoomAmplitude(varargin)
 % Click on an axes and zoom vertically
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 global g_hSpike_Viewer % handle to Spiky window
 sPointer = get(g_hSpike_Viewer,'Pointer');
@@ -5624,7 +5659,7 @@ return
 function PlotRasters(varargin)
 % 
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 
 % Update menu item
@@ -5644,7 +5679,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PlotInstSpikeRate(varargin)
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 % update menu item
 global g_hSpike_Viewer % handle to Spiky window
@@ -5688,10 +5723,9 @@ function QuickSort(varargin)
 % giving an impression of the data. Some steps are skipped in Merge Mode. It assumes
 % thresholds has already been define.
 [FV, ~] = GetStruct();
-global g_bMergeMode
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 if ~isfield(FV, 'tData'), return, end % check data has been loaded
-if ~g_bMergeMode % skip spike detection if we're in Merge Mode
+if ~IsMergeMode() % skip spike detection if we're in Merge Mode
     DetectSpikes()
     if isempty(FV.tSpikeThresholdsNeg) % check thresholds have been set
         uiwait(warndlg('Threshold have not been defined. QuickSort! was aborted.', 'Spiky'))
@@ -5908,7 +5942,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function varargout = ChannelProperties(varargin)
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 sCh = get(varargin{1},'tag'); % channel name
 
@@ -6004,7 +6038,7 @@ end
 
 if bInteractive
     % Get data and threshold interactively
-    if ~CheckDataLoaded, return, end
+    if ~IsDataLoaded, return, end
 
     % Select channel
     if ~exist('nY')
@@ -6123,7 +6157,7 @@ function DuplicateChannel(varargin)
 % Batch = Yes
 % 
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 
 % Select channel and get resampling parameters interactively
 global g_bBatchMode
@@ -6195,7 +6229,7 @@ function DeleteChannel(varargin)
 % Delete a channel. If input arguments are provided, the first string
 % encountered will be the channel to delete.
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 
 sCh = '';
 if nargin > 0
@@ -6237,7 +6271,7 @@ return
 function UndigitizeChannel(varargin)
 % Undigitizes channels that were previously digitized through the GUI
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 
 [sCh, ~] = SelectChannelNumber(FV.csDigitalChannels);
 if isempty(sCh), return, end % no channel was selected (i.e. dialog was closed)
@@ -6258,7 +6292,7 @@ return
 function ModifyEventDuration(varargin)
 % Changes the duration of all Up-Down events on selected channel to set value
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 persistent p_nNewDur p_sCh
 global g_bBatchMode
 
@@ -6312,7 +6346,7 @@ function CreateVirtualEvent(varargin)
 %
 
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 
 hFig = figure('visible', 'off', 'position', [0 0 300 100], 'WindowStyle', 'modal');
 centerfig(hFig, GetGUIHandle())
@@ -6442,7 +6476,7 @@ function ModifyEventInterval(varargin)
 % Set a minimum interval between events on selected channel. Events that
 % occur after a preceding event at less than the minimum interval are deleted.
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 persistent p_nMinInt p_sCh
 global g_bBatchMode
 
@@ -6483,17 +6517,6 @@ FV.tData.([p_sCh '_Down']) = vDown;
 if ~g_bBatchMode; BatchRedo([], 'ModifyEventInterval'); end
 SetStruct(FV)
 ViewTrialData
-return
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function sFilename = CheckFilename(sFilename)
-if ispc
-    sFilename = strrep(sFilename, '/', '\');
-    sFilename = strrep(sFilename, '\\', '\');
-elseif isunix
-    sFilename = strrep(sFilename, '\', '/');
-    sFilename = strrep(sFilename, '//', '/');
-end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -6573,7 +6596,7 @@ function ChannelDescriptions(varargin)
 % Usage:
 %   ChannelDescriptions()
 %
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 [FV, hWin] = GetStruct();
 
 hFig = figure('closeRequestFcn', 'set(gcbf,''userdata'',1)', 'visible', 'off');
@@ -6648,7 +6671,7 @@ function ExperimentDescriptions(varargin)
 % Add, remove and edit custom file description variables
 %
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 
 hFig = figure('closeRequestFcn', 'set(gcbf,''userdata'',''closed'')');
 cColumnNames = {'Variable', 'Value'};
@@ -6692,7 +6715,7 @@ function DeleteSortingData(varargin)
 % not affected.
 %
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 
 sAns = questdlg('All sorting data, including assignment of spikes as outliers, will be removed. Waveforms and dejittering is not affected. Continue?', ...
     'Spiky', 'Yes', 'No', 'No');
@@ -6762,8 +6785,8 @@ function sHash = GetGitHash
 
 % Set paths
 sWT_dir = which('spiky');
-sGITPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, mfilename)-1) '.git/refs/heads/master']);
-sVERSIONPath = CheckFilename([sWT_dir(1:strfind(sWT_dir, mfilename)-1) 'VERSION']);
+sGITPath = [sWT_dir(1:strfind(sWT_dir, mfilename)-1) '.git' filesep 'refs' filesep 'heads' filesep 'master'];
+sVERSIONPath = [sWT_dir(1:strfind(sWT_dir, mfilename)-1) 'VERSION'];
 
 % Get build number from SVN entries files
 sHash = 'Unknown';
@@ -6789,7 +6812,7 @@ function MergeChannels(varargin)
 % Merge selected channels
 %
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 persistent p_sName
 if isempty(p_sName), p_sName = 'Merged'; end
 csCurrentCh = FV.csDisplayChannels;
@@ -6872,7 +6895,7 @@ function InvertChannel(varargin)
 %
 
 [FV, ~] = GetStruct();
-if ~CheckDataLoaded, return, end
+if ~IsDataLoaded, return, end
 
 % Select channel
 [sCh, ~] = SelectChannelNumber(FV.csChannels);
@@ -6897,7 +6920,7 @@ return
 function Redo(varargin)
 % Redo previous action
 %
-spiky('BatchRedo([],''redo'')')
+BatchRedo([], 'redo');
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -7420,40 +7443,38 @@ function RunScript(varargin)
 [FV, ~] = GetStruct();
 global g_bBatchMode
 
-% Get default path of ./scripts
-sPath = which('spiky');
-sPath = CheckFilename([sPath(1:end-7) 'scripts\']);
-
 % If the function to be run was not specified as in input, select file manually
 if length(varargin) ~= 1
-    [sFile, sPath] = uigetfile('*.m', 'Pick an M-file', sPath);
+    [sFile, ~] = uigetfile('*.m', 'Pick an M-file');
 elseif strcmpi(varargin{1}, 'batch')
     % Run script as batch job
 
     % Get script file
-    [sFile, sPath] = uigetfile('*.m', 'Pick an M-file', sPath);
+    [sFile, ~] = uigetfile('*.m', 'Pick an M-file');
     
     % Save script action in Batch Redo function
-    if ~g_bBatchMode BatchRedo([], sprintf('RunScript(''%s'')', sFile)); end
+    if ~g_bBatchMode
+        BatchRedo([], sprintf('RunScript(''%s'')', sFile));
+    end
     return
 else
     sFile = varargin{1};
 end
+if sFile == 0, return, end
 
-% The remainder of this function runs if a script is run for a single movie
+% The remainder of this function runs only if a script is run for one file
 
 % Save action for later global Redo
-if ~g_bBatchMode, BatchRedo([], sprintf('RunScript(''%s'')', sFile)); end
+if ~g_bBatchMode
+    BatchRedo([], sprintf('RunScript(''%s'')', sFile));
+end
 
-if sFile == 0, return, end
-sCurrDir = pwd;
-cd(sPath)
 FV.ScriptError = '';
 eval(['FV = ' sFile(1:end-2) '(FV);'])
 if ~isempty(FV.ScriptError)
     sp_disp(sprintf('In %s: %s', sFile(1:end-2), FV.ScriptError))
 end
-cd(sCurrDir)
+
 SetStruct(FV)
 
 % Execute termination commands from script
@@ -7568,7 +7589,7 @@ function varargout = RunAnalysis(hObject, eventdata, sFun, sDir)
 % sDir is the analysis function directory, e.g. 'discrete' or 'continuous'
 % sFun is the analysis function name (.m not necessary).
 %
-if ~CheckDataLoaded() return, end
+if ~IsDataLoaded() return, end
 [FV, ~] = GetStruct();
 
 % Save batch job

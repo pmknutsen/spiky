@@ -1,8 +1,8 @@
-function hToolbar = sp_refreshtoolbar()
+function hToolbar = sp_GUIRefreshToolbar()
 % Create or refresh toolbar in Spiky GUI
 % 
 % Usage:
-%   sp_refreshtoolbar()
+%   sp_GUIRefreshToolbar()
 %
 
 global Spiky;
