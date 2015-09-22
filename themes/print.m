@@ -16,7 +16,11 @@ p.axes.tickdir = 'out';
 % Figure properties
 p.figure.color = [1 1 1];
 p.figure.NumberTitle = 'off';
-p.figure.colormap = jet(2^12);
+if ispc
+    p.figure.colormap = jet(2^7);
+else
+    p.figure.colormap = jet(2^12);
+end
 
 % Text properties (e.g. figure titles)
 p.text.color = [0 0 0];

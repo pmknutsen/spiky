@@ -331,7 +331,7 @@ end
 
 % Axes properties
 Spiky.main.ThemeObject(hAx);
-set(hAx, 'xlim', [-p_nPre p_nPost], 'ylim', [min(vMean)*.95 max(vMean)*1.05])
+set(hAx, 'xlim', [-p_nPre p_nPost], 'ylim', [min(vMean)-abs(min(vMean)*.05) max(vMean)+abs(max(vMean)*.05)])
 xlabel('Time (s)')
 if bIs2D sYStr = FV.tData.([p_sContCh '_Unit']);
 else sYStr = 'Intensity'; end

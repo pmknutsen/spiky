@@ -6,7 +6,7 @@ function varargout = spiky(varargin)
 %   Runs the Spiky GUI
 %
 %   < spiky(FUN) >
-%   Runs the internal function FUN in Spiky. Ex:
+%   Runs the internal function FUN in Spiky. Ex:m
 %     spiky, e.g. spiky('LoadTrial(''A1807004.daq'')')
 %
 %   Alternative syntax for running subroutines:
@@ -702,8 +702,17 @@ if bSelect
     [sFile, sPath] = uigetfile(sPath, 'Select data file');
     sPath = [sPath sFile];
 end
-load(sPath, 'FV', '-MAT')
 
+try
+    load(sPath, 'FV', '-MAT')
+catch
+    [sLastMsg, ~] = lasterr();
+    % Check for 'corrupt' string in error message
+    if ~isempty(strfind(sLastMsg, 'corrupt'))
+        warndlg('Failed reading file. The file may be corrupt. Deleting it will remove this error.', 'Spiky')
+    end
+end
+    
 % If data already exists in tData, possibilities are;
 % 1) Fields are duplicates of those on disk (filtered, inverted, PCA cleaned etc)
 % 2) Additional fields to those on disk have previously been imported
@@ -1217,7 +1226,8 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function bResult = IsMergeMode(varargin)
-% Determing if Spiky is in merge mode or not
+% Determine merge mode. Return 1 if Spiky is currently running in merge
+% mode. Otherwise, returns 0.
 %
 
 % Get global merge mode status (generally correct)
@@ -1403,7 +1413,14 @@ for i = 1:length(FV.csDisplayChannels)
     hSubplots(end+1) = axes('position', [nXBase nSubY .91 (nSubHeight)+.01], 'tag', sCh, 'nextplot', 'ReplaceChildren');
     
     % Plot spike rasters
+    bShowSpikes = 0;
     if FV.bPlotRasters && isfield(FV.tSpikes, sCh)
+        if ~isempty(FV.tSpikes.(sCh).waveforms)
+            bShowSpikes = 1;
+        end
+    end
+    
+    if bShowSpikes
         tSpikes = FV.tSpikes.(sCh);
         nFs = tSpikes.Fs(1);
         nRow = 0;
@@ -1633,12 +1650,14 @@ for i = 1:length(FV.csDisplayChannels)
     % Plot spikes on top of continuous trace (only if rasters are not displayed)
     if isfield(FV.tSpikes, sCh) && ~FV.bPlotRasters
         vSpiketimes = FV.tSpikes.(sCh).spiketimes; % nFs resolution
-        vSpiketimes = vSpiketimes ./ nFs;
-        vSpiketimes(vSpiketimes < vTime(1) | vSpiketimes > vTime(end)) = [];
-        vVolts = repmat(nThresh, length(vSpiketimes), 1);
-        hold on; hDot = plot(hSubplots(end), vSpiketimes', vVolts', '.');        
-        ThemeObject(hDot);
-        set(hDot, 'ButtonDownFcn', @IdentifySpike)
+        if ~isempty(vSpiketimes)
+            vSpiketimes = vSpiketimes ./ nFs;
+            vSpiketimes(vSpiketimes < vTime(1) | vSpiketimes > vTime(end)) = [];
+            vVolts = repmat(nThresh, length(vSpiketimes), 1);
+            hold on; hDot = plot(hSubplots(end), vSpiketimes', vVolts', '.');
+            ThemeObject(hDot);
+            set(hDot, 'ButtonDownFcn', @IdentifySpike)
+        end
     end
     
     % Set Y axis limits
@@ -1831,7 +1850,7 @@ if bShowDigitalEvents
         if all(ishandle(hSubplots))
             % Remove underscore in Y labels
             cYTickLabels = strrep(cYTickLabels, '_', '');
-            set(hSubplots(end), 'ylim', [0.65 sum(~iIgnoreEvents)+.35], ...
+            set(hSubplots(end), 'ylim', [0.65 max([1, sum(~iIgnoreEvents)])+.35], ...
                 'ytick', 1:sum(~iIgnoreEvents), 'yticklabel', cYTickLabels(~iIgnoreEvents))
         end
     end
@@ -2032,7 +2051,9 @@ function ThemeObject(hObj, varargin)
 
 % Load properties only when theme changes
 persistent p
-if ~isfield(FV, 'CurrentTheme'); FV.CurrentTheme = 'spiky'; end
+if ~isfield(FV, 'CurrentTheme')
+    FV.CurrentTheme = 'spiky';
+end
 if isempty(p) || ~strcmp(FV.CurrentTheme, p.theme)
     % Load selected theme properties
     sDir = which(mfilename);
@@ -2223,6 +2244,12 @@ if isnan(nLoPass) || isnan(nHiPass) || (nHiPass >= nLoPass)
     return
 end
 
+% Interpolate NaN indices
+vNaNIndx = isnan(vCont);
+if ~all(vNaNIndx)
+    vCont(vNaNIndx) = interp1(find(~vNaNIndx), vCont(~vNaNIndx), find(vNaNIndx), 'linear', 'extrap');
+end
+
 % High pass filter
 if nHiPass > 0
     [b,a] = butter(3, nHiPass/(double(nFs)/2) , 'high'); % high-pass
@@ -2236,12 +2263,6 @@ if nLPPass < 1 && nLPPass > 0
     if length(vCont) > (3 * length(a))
         vCont  = single(filtfilt(b, a, double(vCont)));
     end
-end
-
-% Interpolate NaN indices
-vNaNIndx = isnan(vCont);
-if ~all(vNaNIndx)
-    vCont(vNaNIndx) = interp1(find(~vNaNIndx), vCont(~vNaNIndx), find(vNaNIndx), 'linear', 'extrap');
 end
 
 % Decimate signal (optional)
@@ -2716,6 +2737,9 @@ function hWin = GetGUIHandle(varargin)
 %   H = GetGUIHandle()
 %
 hWin = findobj('Tag', 'Spiky');
+if length(hWin) > 1
+    hWin = hWin(1);
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3227,7 +3251,26 @@ for nCh = 1:length(csSelected)
 end
 close(hWait)
 SetStruct(FV)
-ViewTrialData
+ViewTrialData()
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function RemoveThresholds(varargin)
+% Remove existing thresholds on all channels
+%
+if ~IsDataLoaded, return, end
+[FV,~] = GetStruct();
+
+if isfield(FV, 'tSpikeThresholdsPos')
+    FV.tSpikeThresholdsPos = struct([]);
+end
+if isfield(FV, 'tSpikeThresholdsNeg')
+    FV.tSpikeThresholdsNeg = struct([]);
+end
+
+SetStruct(FV)
+ViewTrialData()
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3674,8 +3717,8 @@ for u = 1:nUnits % one row per unit
     
     %   2) Plot 2D histogram of unit
     hHistAx = axes('position', [nX+(p-1)*(nW/nCols)+nSpace nY+nH/3 nW/nCols-nSpace nH/3], 'parent', hCurrPanel);
-    set(hHistAx, 'uicontextmenu', hMenu(end))    
-    hist2d(detrend(mWaveforms(vIndx,:)')',200);
+    set(hHistAx, 'uicontextmenu', hMenu(end))
+    hist2d(detrend(mWaveforms(vIndx, :)')', 200);
     ThemeObject(hHistAx)
     set(hHistAx, 'xtick', [], 'ytick', [])
     hTxt = text(0,0,'Detrended');
@@ -5019,10 +5062,17 @@ for f = 1:nLen
             AddTetrode([], csMultiTrodes{nCh})
         end
         SaveResults(); % save results to this file's .spb file
-        % get spikes from all thresholded channels
+        
+        % Get spikes from all thresholded channels
         csChannels = fieldnames(FV.tSpikes);
+        
         % Collect spiketime and associated information
         for nCh = 1:length(csChannels)
+            % Skip channels that have no spikes
+            if isempty(FV.tSpikes.(csChannels{nCh}).waveforms)
+                continue
+            end
+            
             % Check that sampling rate is equal to other file
             nFs1 = 1; nFs2 = 1;
             if isfield(FV_merge, 'tData')
@@ -5632,10 +5682,12 @@ function ZoomAmplitude(varargin)
 if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 global g_hSpike_Viewer % handle to Spiky window
-sPointer = get(g_hSpike_Viewer,'Pointer');
-set(g_hSpike_Viewer,'Pointer','crosshair')
+
+sPointer = get(g_hSpike_Viewer, 'Pointer');
+set(g_hSpike_Viewer, 'Pointer', 'crosshair')
 zoom off
-waitfor(g_hSpike_Viewer, 'CurrentPoint') % wait for user to click in figure
+set(g_hSpike_Viewer, 'WindowButtonDownFcn', 'set(gcbo, ''WindowButtonDownFcn'', [])')
+waitfor(g_hSpike_Viewer, 'WindowButtonDownFcn') % wait for user to click in figure
 hAx = gca;
 ThemeObject(hAx)
 zoom yon % zoom axis
@@ -7405,11 +7457,9 @@ if strcmp(sAction, 'redo')
         else
             sStr = sprintf('Batch job %s cancelled after file %d/%d', sLastAction, m, nFiles+1);
         end
+        ViewTrialData(); % refresh
         bWaitResult = SpikyWaitbar(nFiles+1,nFiles+1);
         sp_disp(sStr);
-        %    case 'No'       % Do nothing
-        %    case 'Cancel'   % Do nothing
-        %end
     end
 else % Record which action was last performed
     sLastAction = sAction;
@@ -7438,7 +7488,13 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RunScript(varargin)
-% Select and run a script interactively.
+% Select and run a Spiky script interactively.
+%
+%  Usage:
+%   RunScript()        select and run a script interactively
+%   RunScript('batch') select a script interactively and run as a batch job
+%                      on all files
+%   RunScript(S)       run the script S (on the Matlab path)
 %
 [FV, ~] = GetStruct();
 global g_bBatchMode
@@ -7476,6 +7532,7 @@ if ~isempty(FV.ScriptError)
 end
 
 SetStruct(FV)
+ViewTrialData()
 
 % Execute termination commands from script
 if isfield(FV, 'ScriptExitCommand')

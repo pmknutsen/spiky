@@ -69,8 +69,8 @@ uimenu(hGUI, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'C
 % List of themes
 hThemes = uimenu(hGUI, 'Parent', hView, 'Label', '&Themes', 'separator', 'on');
 sDir = [sSpikyPath(1:end-7) 'themes' filesep];
-tDir = dir(sDir);
-for th = 3:length(tDir)
+tDir = dir([sDir '*.m']);
+for th = 1:length(tDir)
     uimenu(hGUI, 'Parent', hThemes, 'Tag', 'Spiky_Menu_ShowTheme', 'Label', [tDir(th).name(1:end-2)], 'Callback', Spiky.main.SetTheme);
 end
 uimenu(hGUI, 'Parent', hView, 'Label', '&Refresh', 'Accelerator', 'R', ...
@@ -94,6 +94,7 @@ uimenu(hGUI, 'Parent', hChannels, 'Label', '&Channel Calculator...', 'Callback',
 hWaveforms  = uimenu(hGUI, 'Label', '&Spikes');
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set &Threshold...', 'Callback', Spiky.main.SetSpikeThreshold );
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Auto-Detect Thresholds', 'Callback', Spiky.main.AutoDetectThresholds );
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Remove Thresholds', 'Callback', Spiky.main.RemoveThresholds );
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Run Spike Detection (B)', 'Callback', Spiky.main.DetectSpikes, 'separator', 'on');
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Dejitter Spikes (B)', 'Callback', Spiky.main.DejitterSpikes);
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Remove &Outliers (B)', 'Callback', Spiky.main.RemoveOutlierSpikes);
