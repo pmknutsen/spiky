@@ -88,7 +88,7 @@ hMsg = waitbar(.2, 'Computing multitaper spectrogram...');
 % Note that all interpolated values are replaced with NaNs after the
 % spectrogram has been computed. It is only necesary to replace the NaNs
 % here so that the spectrogram can be computed without errors.
-iNaN = isnan(vCont);
+iNaN = isnan(vCont(:));
 iTurnsNaN = find([0;diff(iNaN)] == 1) - 1; % start indices of nan segments
 if ~isempty(iTurnsNaN)
     iNaNDone = find([0;diff(iNaN)] == -1); % end indices of nan segments
