@@ -656,6 +656,34 @@ figure(hWin)
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function NewExperimentVariable(sVarName, sVarValue)
+% Create a new experiment variable.
+% 
+% Values of existing variables are replaced.
+% 
+% Usage:    NewExperimentVariable(VARNAME, VARVALUE)
+%
+[FV, ~] = GetStruct();
+if ~isfield(FV, 'tExperimentVariables')
+    FV(1).tExperimentVariables = struct();
+end
+
+if ~isfield(FV.tExperimentVariables, 'sVariable')
+    nIndx = 1;
+else
+    nIndx = find(strcmp({FV.tExperimentVariables.sVariable}, sVarName));
+    if isempty(nIndx)
+        nIndx = length(FV.tExperimentVariables) + 1;
+    end
+end
+
+FV.tExperimentVariables(nIndx).sVariable = sVarName;
+FV.tExperimentVariables(nIndx).sValue = sVarValue;
+
+SetStruct(FV);
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SaveResults(varargin)
 % Save data to an SPB file in default path
 % 
@@ -1137,10 +1165,13 @@ for i = 3:length(tDir)
 end
 
 % Remove invalid defaults
+sDef = [];
 if exist('cDef', 'var')
     [~, iExt] = union(cDef, csExt(:,1) );
     cDef(iExt) = [];
-    sDef = cDef{1};
+    if ~isempty(cDef)
+        sDef = cDef{1};
+    end
 end
 
 % Re-order if a default filter was specified
@@ -1743,6 +1774,10 @@ if bShowDigitalEvents
         end
         iIgnoreEvents(nF) = 0;
         nY = nY + 1;
+
+        % Make sure events are arranged as a row index
+        vUpTimes = vUpTimes(:)';
+        vDownTimes = vDownTimes(:)';
         
         % NEW:
         % In previous versions, individual events were plotted with individual lines, like this:
@@ -1761,7 +1796,7 @@ if bShowDigitalEvents
         vIndices = reshape(vIndices', numel(vIndices), 1);
         % Rearrange indices
         vYs = repmat([nY nY NaN NaN], 1, length(vIndices)/4);
-
+        
         %if length(vIndices) > 100000000
         %    vPlotIndx = 1:round(length(vIndices)/1000):length(vIndices);
         %else
@@ -1839,7 +1874,11 @@ if bShowDigitalEvents
             cYTickLabels{c} = '';
             continue
         end
-        cYTickLabels{c} = GetChannelDescription(FV.csDigitalChannels{c});
+        sDescr = GetChannelDescription(FV.csDigitalChannels{c});
+        if isempty(sDescr)
+            sDescr = FV.csDigitalChannels{c};
+        end
+        cYTickLabels{c} = sDescr;
     end
 
     if isempty(cYTickLabels)
@@ -2194,18 +2233,20 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function PanMode(varargin)
 [FV, hWin] = GetStruct();
+hPan = pan(hWin);
 if FV.bPanOn
-    hPan = pan;
     set(hPan, 'enable', 'on', 'Motion', 'horizontal', 'ActionPostCallback', @UpdatePannedWindow)
-    linkaxes(findobj(get(GetGUIHandle(), 'children'), 'type', 'axes'), 'x')
 else
-    hPan = pan;
     try
         set(hPan, 'enable', 'off')
     catch
-        set(hWin, 'WindowButtonDownFcn', '')
+        [~, sMsgID] = lastwarn;
+        if ~strcmp(sMsgID, 'MATLAB:modes:mode:InvalidPropertySet')
+            set(hWin, 'WindowButtonDownFcn', '')
+        end
     end
 end
+linkaxes(findobj(get(GetGUIHandle(), 'children'), 'type', 'axes'), 'x')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3016,13 +3057,13 @@ return
 function AboutSpiky(varargin)
 %
 cAboutText = { 'Maintainer:', ...
-    ' Per M Knutsen <pknutsen@ucsd.edu>', ...n
-    ' Department of Physics', ...
-    ' University of California, San Diego', ...
-    ' 92122 La Jolla, USA', ...
+    ' Per M Knutsen <p.m.knutsen@medisin.uio.no>', ...n
+    ' Institute of Molecular Biology', ...
+    ' Department of Physiology', ...
+    ' University of Oslo, Norway', ...
     ' ', ...
     'Contributors:', ...
-    ' Per M Knutsen, UCSD', ...
+    ' Per M Knutsen, Weizmann Institute / UCSD / UiO', ...
     ' Idan Steinberg, Weizmann Institute', ...
     ' Amir Monovitch, Weizmann Institute', ...
     ' ', ...
@@ -6040,7 +6081,7 @@ if isfield(FV.tData, [sCh '_Properties'])
 end
 
 ShowTable(cData, {'Field' 'Value'}, {'' ''}, [0 0], [200 200], ...
-    'Channel Properties', [435 min([600 size(cData,1)*20])]);
+    'Channel Properties', [435 min([600 size(cData,1)*30])]);
 
 return
 
@@ -6658,7 +6699,7 @@ cColumnNames = {'Channel', 'Description', 'Unit'};
 cColumnFormat = {{'numeric' 'Adjustable'}, {'numeric' 'Adjustable'}};
 cColumnEditable =  [false true true];
 
-% create list of selectable channels
+% Create list of selectable channels
 cFields = fieldnames(FV.tData);
 cData = {};
 for i = 1:length(cFields)
