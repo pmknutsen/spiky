@@ -2928,7 +2928,7 @@ end
 
 % Run import filter
 iDot = strfind(sFile, '.');
-eval(sprintf('FV = import_%s(sFile, FV);', lower(sFile(iDot+1:end))))
+eval(sprintf('FV = import_%s(sFile, FV);', lower(sFile(iDot(end)+1:end))))
 
 % Check for errors that may have been reported during import
 if isfield(FV, 'sImportError')
