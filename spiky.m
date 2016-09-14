@@ -21,7 +21,7 @@ function varargout = spiky(varargin)
 %
 
 % Spiky - Spike sorting GUI for Matlab
-% Copyright (C) 2005-2014 Per M Knutsen <pmknutsen@gmail.com>
+% Copyright (C) 2005-2016 Per M Knutsen <p.m.knutsen@medisin.uio.no>
 % 
 % This program is free software: you can redistribute it and/or modify
 % it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@ end
 
 clc
 disp('Spiky - Spike-sorting and analysis in Matlab')
-disp('Copyright (C) 2005-2014 Per M Knutsen <pmknutsen@gmail.com>')
+disp('Copyright (C) 2005-2016 Per M Knutsen <p.m.knutsen@medisin.uio.no>')
 disp('This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are')
 fprintf('are welcome to redistribute it under certain conditions; see LICENSE for details.\n')
 
