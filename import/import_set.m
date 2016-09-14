@@ -9,14 +9,9 @@ function FV = import_set(sFile, FV)
 
 % Imports the following Axona files:
 %   EGF files (raw data)
+%   INP files (inputs/outputs)
 %
 %
-% TODO
-%   Import tetrode data
-%   Import digital I/O
-%   Get trial start times - solution may be to copy sig OUT to sig IN
-%   Get stimulus times
-
 
 global Spiky
 sPath = [pwd filesep];
