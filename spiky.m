@@ -133,7 +133,7 @@ ThemeObject([]); % set default line colors
 
 % Set GUI window properties
 vPos = get(hGUI, 'position');
-ThemeObject(hGUI, 'Name', 'Spiky', 'MenuBar','none', 'UserData', FV, ...
+ThemeObject(hGUI, 'Name', 'Spiky', 'MenuBar', 'none', 'UserData', FV, ...
     'Tag', 'Spiky', 'PaperOrientation', 'landscape', 'PaperUnits', 'normalized', ...
     'PaperPosition', [.05 .05 .9 .9], 'InvertHardcopy', 'off', ...
     'position', [vPos(1)-200 vPos(2)-50 vPos(3)+350 vPos(4)+100], ...
@@ -181,7 +181,7 @@ hTxt = findobj(hFig, 'Tag', 'AxesCursorLocationTip');
 if isempty(hTxt)
     hTxt = uicontrol(hFig, 'Style', 'text', 'Position', [0 0 200 15], ...
         'HorizontalAlignment', 'left', 'Tag', 'AxesCursorLocationTip', ...
-        'fontsize', 8);
+        'fontsize', 8, 'backgroundcolor', get(hFig, 'color'));
 end
 ThemeObject(hTxt)
 
@@ -200,7 +200,9 @@ else
     else
         sYFormat = '%.1f';
     end
-    set(hTxt(1), 'string', sprintf([' x = %.1f  y = ' sYFormat], vXY(1), vXY(2)))
+    sUnit = get(get(hAx, 'ylabel'), 'userdata');
+    set(hTxt(1), 'string', sprintf([' x = %.1f  y = ' sYFormat ' ' sUnit], vXY(1), vXY(2)), ...
+        'backgroundcolor', get(hFig, 'color'))
 end
 
 return
@@ -372,19 +374,48 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetAmplitudeUnit(varargin)
-% ** NOT IMPLEMENTED IN THIS VERSION **
 % Set the voltage amplitude unit on a per-channel basis.
 % SetAmplitudeUnit(S)
-%   sets a common unit S for all channels
+%   sets a common unit S for all channels with an undefined unit
+%   (i.e. channels where the unit is assumed to be volts)
 % 
 % SetAmplitudeUnit(S, C)
 %   sets the voltage unit S for channel C
 % 
-% where     S is
-%               'v'  (volts)
-%               'mv' (millivolts)
-%               'uv' (microvolts)
+% where     S can be:
+%               'V'  (volts)
+%               'mV' (millivolts)
+%               'uV' (microvolts)
 %
+
+if isobject(varargin{1})
+    sUnit = varargin{3};
+else
+    sUnit = varargin{1};
+end
+
+switch sUnit
+    case 'V',  nFactor = 1;
+    case 'mV', nFactor = 10^3;
+    case 'uV', nFactor = 10^6;
+    otherwise
+        sp_disp(sprintf('%s is an invalid unit', sUnit))
+        return
+end
+tAmplitudeUnit = struct('sUnit', sUnit, 'nFactor', nFactor);
+
+[FV, ~] = GetStruct();
+bReplot = 1;
+if strcmp(FV.tAmplitudeUnit.sUnit, tAmplitudeUnit.sUnit)
+    bReplot = 0;
+end
+
+FV.tAmplitudeUnit = tAmplitudeUnit;
+SetStruct(FV);
+
+if bReplot
+    ViewTrialData();
+end
 
 return
 
@@ -854,9 +885,9 @@ end
 for i = 1:length(csDisplayChannels)
     sBoxStr = sprintf('%s (%s)', csChannelDescriptions{i}, csDisplayChannels{i});
     if any(strcmp(csDisplayChannels{i}, csFiltCh))
-        uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 150 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 1);
+        uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 150 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 1);
     else
-        uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 150 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 0);
+        uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 150 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 0);
     end
     nCL = nCL - 25;
 end
@@ -935,6 +966,9 @@ cColumnEditable =  [false true true true];
 cData = {};
 for i = 1:length(FV.tFilteredChannels)
     cData{i, 1} = GetChannelDescription(FV.tFilteredChannels(i).sChannel);
+    if isempty(cData{i, 1})
+        cData{i, 1} = FV.tFilteredChannels(i).sChannel;
+    end
     cData{i, 2} = FV.tFilteredChannels(i).vBandpass(1);
     cData{i, 3} = FV.tFilteredChannels(i).vBandpass(2);
     cData{i, 4} = FV.tFilteredChannels(i).bRectify;
@@ -958,7 +992,7 @@ for i = 1:length(FV.tFilteredChannels)
 end
 
 SetStruct(FV)
-ViewTrialData
+ViewTrialData()
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1336,7 +1370,7 @@ FV.csChannels = unique(FV.csChannels);
 for i = 1:length(FV.csChannels)
     if isfield(FV.tData, FV.csChannels{i})
         vMinMax = [min(FV.tData.(FV.csChannels{i})) max(FV.tData.(FV.csChannels{i}))];
-        [vMinMax, FV] = AdjustChannelGain(FV, vMinMax, FV.csChannels{i}); % mV
+        [vMinMax, FV] = AdjustChannelGain(FV, vMinMax, FV.csChannels{i});
         if ~isfield(FV.tYlim, FV.csChannels{i})
             FV.tYlim(1).(FV.csChannels{i}) = vMinMax;
         end
@@ -1359,7 +1393,8 @@ hSubplots = [];
 bShowDigitalEvents = strcmp(get(findobj(hWin, 'Label', 'Show &Events'),'checked'), 'on');
 if isempty(FV.csDigitalChannels), bShowDigitalEvents = 0; end
 
-if bShowDigitalEvents nSubEventHeight = 0.2; % event axis is fixed height
+if bShowDigitalEvents
+    nSubEventHeight = 0.2; % event axis is fixed height
 else nSubEventHeight = 0; end
 
 for i = 1:length(FV.csDisplayChannels)
@@ -1375,9 +1410,9 @@ for i = 1:length(FV.csDisplayChannels)
     if isempty(sYLabel), sYLabel = sCh; end
 
     if ( ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh) ) || ~IsMergeMode()
-        [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % mV
+        [vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
         nContAllMinMax = [min(vCont(:)) max(vCont(:))];
-        [FV, hWin] = GetStruct(); % reload FV since channel gains may have changed in previous line
+        [FV, ~] = GetStruct(); % reload FV since channel gains may have changed in previous line
         
         nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency (Hz)
         nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
@@ -1425,7 +1460,7 @@ for i = 1:length(FV.csDisplayChannels)
         nLen = 20000;
         vShowIndx = unique(round(linspace(1,length(vTime),nLen)));
         
-        if size(vCont, 1) == 1
+        if any(size(vCont) == 1)
             vTimeAllTrace = vTime;
             vTime = vTime(vShowIndx);
             vContAllTrace = vCont;
@@ -1436,9 +1471,9 @@ for i = 1:length(FV.csDisplayChannels)
     % Continuous trace
     nSubs = length(FV.csDisplayChannels);
 
-    nYBase = .08; % lower boundary of bottom axis
+    nYBase = .06; % lower boundary of bottom axis
     nXBase = .07; % left-most boundary axes
-    nYSep = 0.01; % separation between events and top axis
+    nYSep = 0.008; % separation between events and top axis
     nSubHeight = (((1-nYBase-nYSep)-(nSubs*.02+nSubEventHeight)) / nSubs);
     nSubY = nYBase + (.02*(i-1)) + (nSubHeight*(i-1));
     hSubplots(end+1) = axes('position', [nXBase nSubY .91 (nSubHeight)+.01], 'tag', sCh, 'nextplot', 'ReplaceChildren');
@@ -1609,15 +1644,22 @@ for i = 1:length(FV.csDisplayChannels)
     end
     
     % Set axis labels
-    if i == 1, xlabel('Time (sec)'); end
+    if i == 1, xlabel(hSubplots(end), 'Time (sec)'); end
     if isfield(FV.tData, [sCh '_Unit'])
         sUnit = FV.tData.([sCh '_Unit']);
-    else sUnit = 'mV'; end
+    else
+        sUnit = FV.tAmplitudeUnit.sUnit;
+    end
     
     if FV.bPlotRasters && isfield(FV.tSpikes, sCh)
-        hLabel = ylabel(sYLabel);
+        hLabel = ylabel(hSubplots(end), hSubplots(end), sYLabel);
     else
-        hLabel = ylabel(sprintf('%s (%s)', strrep(sYLabel, '_', ' '), sUnit));
+        if isempty(sUnit)
+            hLabel = ylabel(sprintf('%s', strrep(sYLabel, '_', ' ')));
+        else
+            hLabel = ylabel(sprintf('%s (%s)', strrep(sYLabel, '_', ' '), sUnit));
+        end
+        set(hLabel, 'userdata', sUnit);
     end
     set(hLabel, 'Interpreter', 'tex')
     ThemeObject(hSubplots(end))
@@ -1958,13 +2000,15 @@ hSubplots(~ishandle(hSubplots)) = [];
 set(hSubplots(2:end), 'XTicklabel', [])
 
 % Re-arrange order of figure children such that top subplot is lowest
-hHandles = get(hFig,'children');
-hAxes = findobj(hHandles,'type','axes');
+% TODO Dont rearrange order of menu items...
+hHandles = get(hFig, 'children');
+hAxes = findobj(hHandles, 'type', 'axes');
+
 hOthers = setdiff(hHandles, hAxes);
 try % try here because sometimes returned handles arent axes after all...
     mPos = cell2mat(get(hAxes, 'position')); % axes positions
     [~, vOrder] = sort(mPos(:,2)); % order by Y position
-    set(hFig, 'children', [flipud(hOthers); hAxes(vOrder)])
+    set(hFig, 'children', [hOthers; hAxes(vOrder)])
 end
 
 SetStruct(FV, 'nosaveflag')
@@ -2146,6 +2190,7 @@ function CopyChannelToFig(varargin)
 sCh = get(gcbo, 'Tag');
 if ~isfield(FV.tData, sCh); return; end
 vCont = ChannelCalculator(FV.tData.(sCh), sCh);
+[vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
 nBegin = FV.tData.([sCh '_TimeBegin']); % sampling start, sec
 nEnd = FV.tData.([sCh '_TimeEnd']); % sampling end, sec
 nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency Hz
@@ -2170,11 +2215,11 @@ if all(size(vCont) > 1) % 2D
 else
     hLin = plot(vTime, vCont, 'k', 'linewidth', 1);
     xlabel('Time (s)')
-    ylabel('V (raw)')
+    ylabel(FV.tAmplitudeUnit.sUnit)
 end
 ThemeObject(hLin);
 ThemeObject(hAx)
-hTit = title(['Copy of ' sCh], 'interpreter', 'none');
+hTit = title(['Channel ' sCh], 'interpreter', 'none');
 ThemeObject(hTit)
 axis tight
 return
@@ -2394,15 +2439,15 @@ else
     for i = 1:length(csDisplayChannels)
         sBoxStr = sprintf('%s (%s)', csChannelDescriptions{i}, csDisplayChannels{i});
         if any(strcmp(FV.csDisplayChannels, csDisplayChannels{i}))
-            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL nFigWidth-20 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 1);
+            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL nFigWidth-20 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 1);
         else
-            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL nFigWidth-20 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 0);
+            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL nFigWidth-20 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 0);
         end
         nCL = nCL - 25;
     end
     % 'Select all' checkbox
     uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 170 20], 'String', 'Select all', ...
-        'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8], 'value', 0, 'callback', ...
+        'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 0, 'callback', ...
         'set(get(gcf,''children''),''value'', 1)');
     nCL = nCL - 25;
     uicontrol(hFig, 'Style', 'pushbutton', 'Position', [50 nCL 100 20], ...
@@ -2858,7 +2903,9 @@ for nCh = 1:length(FV.csChannels)
             if ~isempty(nIndx)
                 if ~isempty({FV.tChannelDescriptions(nIndx).sDescription})
                     sDescr = FV.tChannelDescriptions(nIndx).sDescription;
-                    sName = [sName ' (' sDescr ')'];
+                    if ~isempty(sDescr)
+                        sName = [sName ' (' sDescr ')'];
+                    end
                 end
             end
         end
@@ -2866,7 +2913,9 @@ for nCh = 1:length(FV.csChannels)
         FV.tChannelDescriptions = struct([]);
     end
 
-    uicontrol(hFig, 'Style', 'text', 'Position', [10 nCL 180 20], 'String', sName, 'HorizontalAlignment', 'left', 'backgroundcolor', [.8 .8 .8]);
+    uicontrol(hFig, 'Style', 'text', 'Position', [10 nCL 180 20], ...
+        'String', sName, 'HorizontalAlignment', 'left', ...
+        'backgroundcolor', get(hFig, 'color'));
     if isfield(FV.tGain, FV.csChannels{nCh})
         nGainThis = FV.tGain.(FV.csChannels{nCh});
     else nGainThis = 1; end
@@ -3107,7 +3156,7 @@ end
 zoom xon
 sTag = get(gca, 'Tag');
 vContData = FV.tData.(sTag);
-[vContData, FV] = AdjustChannelGain(FV, vContData, sTag); % Adjust gain (mV)
+[vContData, FV] = AdjustChannelGain(FV, vContData, sTag);
 vContData = GetFilteredChannel(sTag, vContData);
 
 nMed = median(vContData);
@@ -3281,7 +3330,7 @@ for nCh = 1:length(csSelected)
     hWait = waitbar(nCh/length(csSelected), hWait);
     sCh = csSelected{nCh};
     vCont = ChannelCalculator(FV.tData.(sCh), sCh);
-    [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % Adjust gain (mV)
+    [vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
 
     % Filter channel
     vCont = GetFilteredChannel(sCh, vCont);
@@ -3350,7 +3399,7 @@ for nCh = 1:length(csChUnique)
 
     % Filter continuous signal
     vCont = ChannelCalculator(FV.tData.(sCh), sCh);
-    [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % Adjust gain (mV)
+    [vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
     nFs = FV.tData.([sCh '_KHz']) * 1000; % channel sampling rate
     
     % Filter channel
@@ -4639,7 +4688,6 @@ if isempty(hMarkers)
         set(hLin, 'YDataSource', 'get(get(gcbo,''parent''), ''ylim'')', ...
             'color', 'r', 'linewidth', 2, 'linestyle', '-', ...
             'tag', 'SpikyTimeMarker')
-        %refreshdata
     end
 else
     % Otherwise update the markers
@@ -4866,6 +4914,7 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FV = SetFVDefaults()
+% Sets parameters in the FV structure to default values.
 %
 FV.sLoadedTrial = '';
 FV.csDisplayChannels = {};      % channels to be displayed (analogue, continuous)
@@ -4885,6 +4934,7 @@ FV.nDeadTimeMs = 0.01; % ms
 FV.bPlotRasters = 0;
 FV.bPanOn = 0;
 FV.nMaxCrossChannelSpikeJitter = 0.5; % maximal allowed spiketimmer jitter across electrodes (ms)
+FV.tAmplitudeUnit = struct('sUnit', 'uV', 'nFactor', 10^6);
 % Experiment variables
 FV.tExperimentVariables = struct([]);
 g_bBatchMode = false;
@@ -5279,7 +5329,7 @@ for f = 1:nLen
         csChannels = unique(csChannels);
         for nCh = 1:length(csChannels) % iterate over imported channels
             vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
-            [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh}); % Adjust gain (mV)
+            [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh});
             
             % Time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
@@ -5323,7 +5373,7 @@ for f = 1:nLen
             % Raw signal
             sCh = csChannels{nCh};
             vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
-            [vCont, FV] = AdjustChannelGain(FV, vCont, sCh); % Adjust gain (mV)
+            [vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
             
             % Time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
@@ -6833,9 +6883,10 @@ ViewTrialData()
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [vCont, FV] = AdjustChannelGain(FV, vCont, sCh) % mV
-% Adjust channel amplitude by specified gain. Returned gain is in units of
-% mV.
+function [vCont, FV] = AdjustChannelGain(FV, vCont, sCh)
+% Adjust channel amplitude by specified gain. The returned signal is by
+% default in microvolts, unless a different range (V or mV) has been
+% selected in View -> Amplitude Unit or via SetAmplitudeUnit()
 %
 
 % Adjust gain of signal
@@ -6863,9 +6914,9 @@ end
 
 vCont = vCont ./ nGain; % divide by gain
 
-% Multiply with 1000 so units to from V to mV
+% Scale to microvolts (or optionally to V or mV)
 if nGain ~= 1
-    vCont = vCont .* 1000; % mV
+    vCont = vCont .* FV.tAmplitudeUnit.nFactor;
 end
 return
 
@@ -6928,7 +6979,7 @@ vBegin = nan(1, length(csChannels));
 vEnd = nan(1, length(csChannels));
 for nCh = 1:length(csChannels) % iterate over imported channels
     vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
-    [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh}); % Adjust gain (mV)
+    [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh});
     
     % Time vector
     nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
