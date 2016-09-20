@@ -11,7 +11,7 @@ elseif nargin == 2
 end
 
 % check all required files are present
-[fileStruct, tetsAvailable] = list_and_check_DACQFiles( filepath,cellstr(filename) );
+[fileStruct, ~] = list_and_check_DACQFiles( filepath,cellstr(filename) );
 
 if numel(fileStruct) > 1
     % process headers
