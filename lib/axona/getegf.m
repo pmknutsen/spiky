@@ -42,8 +42,8 @@ if (Fs == 960)
   	eeg = decimate(eeg,2,100,'FIR');
     Fs = 480;
 elseif (Fs == 4800)
-    eeg = decimate(eeg,8,100,'FIR');
-    Fs = 600;
+    %eeg = decimate(eeg,8,100,'FIR');
+    %Fs = 600;
 else
    fclose(fid);
    error('Unknown sampling rate');
