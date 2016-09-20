@@ -34,14 +34,24 @@ if isfield(mtint, 'egf')
         sHeader = mtint.egf(i).header;
 
         % Get hardware channel
-        nEGFCh = key_value(sprintf('EEG_ch_%d', i), mtint.header, 'num', 'exact');
-        sChName = sprintf('EGF_%d', nEGFCh);
+        nHWCh = key_value('hw_channel', sHeader, 'num', 'exact');
+        sHWCh = sprintf('EGF_%d', nHWCh);
+
+        % Channel gain
+        nGain = key_value(sprintf('gain_ch_%d', nHWCh - 1), mtint.header, 'num', 'exact');
+        
+        % ADC fullscale value (mV)
+        nADCmv = key_value('ADC_fullscale_mv', mtint.header, 'num', 'exact');
+        
+        % Convert samples from bits to volts
+        % Note that gain is not accounted for (that's done in Spiky)
+        vEGF = vEGF / 32768 * nADCmv / 1000;
         
         % Channel description (if alternative channel name exists)
         if ~isfield(FV, 'tChannelDescriptions')
             FV.tChannelDescriptions = struct([]);
         end
-        FV.tChannelDescriptions(end+1).sChannel = sChName;
+        FV.tChannelDescriptions(end+1).sChannel = sHWCh;
         FV.tChannelDescriptions(end).sDescription = '';
         
         % Begin time is counted as the number of seconds elapsed since last midnight
@@ -53,14 +63,14 @@ if isfield(mtint, 'egf')
         vSecsSinceMidnight(end+1) = vSecSinceMidnight;
         
         % Save channel data
-        FV.tData(1).(sChName) = vEGF;
-        FV.tData.([sChName '_KHz']) = nFs / 1000; % kHz
-        FV.tData.([sChName '_KHz_Orig']) = nFs / 1000;
-        FV.tData.([sChName '_TimeBegin']) = vSecSinceMidnight;
-        FV.tData.([sChName '_TimeEnd']) = (length(vEGF) / nFs) + vSecSinceMidnight;
+        FV.tData(1).(sHWCh) = vEGF;
+        FV.tData.([sHWCh '_KHz']) = nFs / 1000; % kHz
+        FV.tData.([sHWCh '_KHz_Orig']) = nFs / 1000;
+        FV.tData.([sHWCh '_TimeBegin']) = vSecSinceMidnight;
+        FV.tData.([sHWCh '_TimeEnd']) = (length(vEGF) / nFs) + vSecSinceMidnight;
         
         % Get channel gain
-        FV.tGain(1).(sChName) = key_value(sprintf('gain_ch_%d', nEGFCh), mtint.header, 'num', 'exact');
+        FV.tGain(1).(sHWCh) = nGain;
     end
 else
     sStr = 'EGF (raw) data was not found in this dataset.';
