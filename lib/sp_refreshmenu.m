@@ -60,9 +60,9 @@ uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &Reset', 'Callback', Spiky.main.Zoo
 uimenu(hGUI, 'Parent', hView, 'Label', 'Pan', 'Callback', Spiky.main.PanWindow, 'Accelerator', 'L');
 uimenu(hGUI, 'Parent', hView, 'Label', '&Zoom Amplitude', 'Callback', Spiky.main.ZoomAmplitude, 'Accelerator', 'Y', 'separator', 'on');
 hAmpUnit = uimenu(hGUI, 'Parent', hView, 'Label', 'Amplitude Unit');
-uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Volts (V)', 'callback', {Spiky.main.SetAmplitudeUnit, 'v'});
-uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Millivolts (mV)', 'checked', 'on', 'callback', {Spiky.main.SetAmplitudeUnit, 'v'});
-uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Microvolts (ÂµV)', 'callback', {Spiky.main.SetAmplitudeUnit, 'v'});
+uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Volts (V)',  'callback', {Spiky.main.SetAmplitudeUnit, 'V'});
+uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Millivolts (mV)', 'callback', {Spiky.main.SetAmplitudeUnit, 'mV'});
+uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Microvolts (µV)', 'callback', {Spiky.main.SetAmplitudeUnit, 'uV'});
 uimenu(hGUI, 'Parent', hView, 'Label', '&Normal Time', 'Callback', Spiky.main.ToggleStatus, 'separator', 'on', 'Tag', 'ShowNormalTime', 'checked', 'on');
 uimenu(hGUI, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', Spiky.main.ToggleStatus, 'Checked', 'on');
 
