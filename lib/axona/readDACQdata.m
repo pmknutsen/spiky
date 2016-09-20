@@ -94,11 +94,20 @@ end
 egffilelist = dir([filepath,flnmroot, '.egf*']);
 % read them in and assign to structure
 for ifile = 1:numel(egffilelist)
-    [EGF,Fs] = getegf([filepath,egffilelist(ifile).name]);
+    [EGF,Fs] = getegf([filepath, egffilelist(ifile).name]);
     mtint.egf(ifile).EGF = EGF;
     mtint.egf(ifile).Fs = Fs;
     % get eeg header info
-    header = getDACQHeader ( [filepath,egffilelist(ifile).name], 'eeg' );
+    header = getDACQHeader([filepath,egffilelist(ifile).name], 'eeg' );
+
+    % Get file suffix (after .efg)
+    iS = strfind(egffilelist(ifile).name, '.egf');
+    sCh = egffilelist(ifile).name(iS+4:end);
+    if isempty(sCh)
+        header(end+1, 1:2) = {'hw_channel' '1'}; % ch 1 saved without a suffix
+    else
+        header(end+1, 1:2) = {'hw_channel' sCh};
+    end
     mtint.egf(ifile).header = header;
 end
 % ---------------- end read egf ---------------------
@@ -129,6 +138,9 @@ for ifile = 1:numel(inpfilelist)
             end
         end
     end
+    
+    % Workaround BUG
+    mInputs = mOutputs;
     
     for ch = 1:nValMax
         indx = mOutputs(:, 1) == ch;
