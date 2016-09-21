@@ -2002,14 +2002,17 @@ set(hSubplots(2:end), 'XTicklabel', [])
 % Re-arrange order of figure children such that top subplot is lowest
 % TODO Dont rearrange order of menu items...
 hHandles = get(hFig, 'children');
-hAxes = findobj(hHandles, 'type', 'axes');
-
-hOthers = setdiff(hHandles, hAxes);
-try % try here because sometimes returned handles arent axes after all...
-    mPos = cell2mat(get(hAxes, 'position')); % axes positions
-    [~, vOrder] = sort(mPos(:,2)); % order by Y position
-    set(hFig, 'children', [hOthers; hAxes(vOrder)])
+iAxes = [];
+for h = 1:length(hHandles)
+    if strcmp(get(hHandles(h), 'type'), 'axes')
+        iAxes(end+1) = h;
+    end
 end
+
+mPos = cell2mat(get(hHandles(iAxes), 'position')); % axes positions
+[~, iOrder] = sort(mPos(:,2)); % order by Y position
+hHandles(iAxes) = hHandles(iAxes(iOrder));
+set(hFig, 'children', hHandles)
 
 SetStruct(FV, 'nosaveflag')
 PanMode()
