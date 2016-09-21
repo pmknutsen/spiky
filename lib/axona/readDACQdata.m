@@ -139,19 +139,19 @@ for ifile = 1:numel(inpfilelist)
         end
     end
     
-    % Workaround BUG
-    mInputs = mOutputs;
-    
     for ch = 1:nValMax
+        % Remove non-state changing data and re-insert
+        
+        % Outputs
         indx = mOutputs(:, 1) == ch;
         mOutTemp = mOutputs(indx, :);
-        mInpTemp = mInputs(indx, :);
-
-        % Remove non-state changing data and re-insert
         indxkeep = [1; find(diff(mOutTemp(:, 3))) + 1];
         mOutputs(indx, :) = [];
         mOutputs = [mOutputs; mOutTemp(indxkeep, :)];
 
+        % Inputs
+        indx = mInputs(:, 1) == ch;
+        mInpTemp = mInputs(indx, :);
         indxkeep = [1; find(diff(mInpTemp(:, 3))) + 1];
         mInputs(indx, :) = [];
         mInputs = [mInputs; mInpTemp(indxkeep, :)];
