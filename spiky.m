@@ -1199,10 +1199,14 @@ for i = 3:length(tDir)
 end
 
 % Remove invalid defaults
-sDef = [];
 if exist('cDef', 'var')
-    [~, iExt] = union(cDef, csExt(:,1) );
-    cDef(iExt) = [];
+    iRem = [];
+    for e = 1:length(cDef)
+        if ~any(strcmp(csExt(:, 1), cDef{e}))
+            iRem(end+1) = e;
+        end
+    end
+    cDef(iRem) = [];
     if ~isempty(cDef)
         sDef = cDef{1};
     end
@@ -2579,7 +2583,15 @@ end
 if isempty(varargin{2})
     % Interactively choose a file to open
     if isfield(FV, 'sDirectory')
-        [sFile, sPath] = uigetfile(GetImportFilters(FV.sDirectory), 'Select data file', [FV.sDirectory filesep]);
+
+        % TODO Use extension of currently loaded file as default
+        if isfield(FV, 'sLoadedTrial')
+            [~, ~, sDefExt] = fileparts(FV.sLoadedTrial);
+            csExt = GetImportFilters(['*' sDefExt]);
+        else
+            csExt = GetImportFilters(FV.sDirectory);
+        end
+        [sFile, sPath] = uigetfile(csExt, 'Select data file', [FV.sDirectory filesep]);
     else
         [sFile, sPath] = uigetfile(GetImportFilters, 'Select data file');
         set(g_hSpike_Viewer, 'UserData', FV);
