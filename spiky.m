@@ -1661,7 +1661,7 @@ for i = 1:length(FV.csDisplayChannels)
         if isempty(sUnit)
             hLabel = ylabel(sprintf('%s', strrep(sYLabel, '_', ' ')));
         else
-            hLabel = ylabel(sprintf('%s (%s)', strrep(sYLabel, '_', ' '), sUnit));
+            hLabel = ylabel(sprintf('%s', strrep(sYLabel, '_', ' ')));
         end
         set(hLabel, 'userdata', sUnit);
     end
