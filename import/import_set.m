@@ -10,7 +10,7 @@ function FV = import_set(sFile, FV)
 % Imports the following Axona files:
 %   EGF files (raw data)
 %   INP files (inputs/outputs)
-%
+%   STM files (stimulus)        TODO!!!
 %
 
 global Spiky
@@ -87,11 +87,11 @@ if isfield(mtint, 'inp')
         mOutputs = mtint.inp(i).Outputs;
         
         % Parse inputs
-        inpch = unique(mInputs(:, 1));
+        inpch = unique(mInputs(:, 2));
         for inp = inpch'
             sTag = sprintf('INP_%d', inp);
-            vUpTimes = mInputs(mInputs(:, 1) == inp & mInputs(:, 3) == 1, 2) + vSecSinceMidnight;
-            vDownTimes = mInputs(mInputs(:, 1) == inp & mInputs(:, 3) == 0, 2) + vSecSinceMidnight;
+            vUpTimes = mInputs(mInputs(:, 2) == inp & mInputs(:, 3) == 1, 1) + vSecSinceMidnight;
+            vDownTimes = mInputs(mInputs(:, 2) == inp & mInputs(:, 3) == 0, 1) + vSecSinceMidnight;
             if isempty(vUpTimes) || isempty(vDownTimes), continue
             else
                 vDownTimes(vDownTimes <= vUpTimes(1)) = [];
@@ -105,11 +105,11 @@ if isfield(mtint, 'inp')
         end
 
         % Parse outputs
-        outpch = unique(mOutputs(:, 1));
+        outpch = unique(mOutputs(:, 2));
         for outp = outpch'
             sTag = sprintf('OUT_%d', outp);
-            vUpTimes = mOutputs(mOutputs(:, 1) == outp & mOutputs(:, 3) == 1, 2) + vSecSinceMidnight;
-            vDownTimes = mOutputs(mOutputs(:, 1) == outp & mOutputs(:, 3) == 0, 2) + vSecSinceMidnight;
+            vUpTimes = mOutputs(mOutputs(:, 2) == outp & mOutputs(:, 3) == 1, 1) + vSecSinceMidnight;
+            vDownTimes = mOutputs(mOutputs(:, 2) == outp & mOutputs(:, 3) == 0, 1) + vSecSinceMidnight;
             if isempty(vUpTimes) || isempty(vDownTimes), continue
             else
                 vDownTimes(vDownTimes <= vUpTimes(1)) = [];
