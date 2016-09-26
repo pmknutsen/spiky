@@ -112,6 +112,14 @@ for ifile = 1:numel(egffilelist)
 end
 % ---------------- end read egf ---------------------
 
+% ---------------- start read stm ---------------------
+% list all stm files
+%inpfilelist = dir([filepath,flnmroot, '.stm*']);
+% read them in and assign to structure
+%for ifile = 1:numel(inpfilelist)
+%    [ts, type, value, keyval, Fs] = getstm([filepath, inpfilelist(ifile).name]);
+%end
+
 
 % ---------------- start read inp ---------------------
 % list all inp files
@@ -122,52 +130,86 @@ for ifile = 1:numel(inpfilelist)
     % Parse input/output data as a matrix:
     %   [time channel value]
     % Channel can be input (e.g. I5) or output (O16)
-    %%
-    nValMax = max(value);
-    mInputs = [];
-    mOutputs = [];
-    for io = 1:length(value)
-        val = fliplr(dec2bin(value(io), 3));
-        if strcmp(type(io), 'I')
-            for ch = 1:nValMax
-                mInputs(end+1, 1:3) = [ch ts(io) str2num(val(ch))];
-            end
-        else
-            for ch = 1:nValMax
-                mOutputs(end+1, 1:3) = [ch ts(io) str2num(val(ch))];
-            end
+
+    %% Iterate over all events
+    % Create array with [timestamp channel state]
+    % (non-changing states will be filtered below)
+    mIO = [];
+    for t = 1:length(ts)
+        % Get status by channels
+        vStatus = fliplr(dec2bin(value(t), 16));
+
+        % Determine type (output = 0, input = 1)
+        switch type(t)
+            case 'O'
+                nType = 0;
+            case 'I'
+                nType = 1;
+            otherwise
+                nType = -1;
+        end
+        
+        % Iterate over all channels
+        for ch = 1:16
+            mIO = [mIO; ts(t) ch str2num(vStatus(ch)) nType];
         end
     end
     
-    for ch = 1:nValMax
-        % Remove non-state changing data and re-insert
-        
-        % Outputs
-        indx = mOutputs(:, 1) == ch;
-        mOutTemp = mOutputs(indx, :);
-        indxkeep = [1; find(diff(mOutTemp(:, 3))) + 1];
-        mOutputs(indx, :) = [];
-        mOutputs = [mOutputs; mOutTemp(indxkeep, :)];
+    % Remove events that occurred at time zero
+    mIO(mIO(:, 1) == 0, :) = [];
 
+    % Assign inputs and outputs
+    mOutputs = mIO(mIO(:, 4) == 0, :);
+    mInputs = mIO(mIO(:, 4) == 1, :);
+    %%
+    
+    % Remove channels that are never enabled
+    for ch = 1:16
+        % Outputs
+        iCh = mOutputs(:, 2) == ch;
+        if ~any(mOutputs(iCh, 3))
+            mOutputs(iCh, :) = [];
+        end
         % Inputs
-        indx = mInputs(:, 1) == ch;
-        mInpTemp = mInputs(indx, :);
-        indxkeep = [1; find(diff(mInpTemp(:, 3))) + 1];
-        mInputs(indx, :) = [];
-        mInputs = [mInputs; mInpTemp(indxkeep, :)];
+        iCh = mInputs(:, 2) == ch;
+        if ~any(mInputs(iCh, 3))
+            mInputs(iCh, :) = [];
+        end
+    end
+    
+    % Remove non-changing states, channel by channel
+    for ch = 1:16
+        % Outputs
+        iIndx = mOutputs(:, 2) == ch;
+        if any(iIndx)
+            mOutTemp = mOutputs(iIndx, :);
+            indxkeep = [1; find(diff(mOutTemp(:, 3))) + 1];
+            mOutputs(iIndx, :) = [];
+            mOutputs = [mOutputs; mOutTemp(indxkeep, :)];
+        end
+        
+        % Inputs
+        iIndx = mInputs(:, 2) == ch;
+        if any(iIndx)
+            mInpTemp = mInputs(iIndx, :);
+            indxkeep = [1; find(diff(mInpTemp(:, 3))) + 1];
+            mInputs(iIndx, :) = [];
+            mInputs = [mInputs; mInpTemp(indxkeep, :)];
+        end
     end
     
     % Sort in temporal order
-    [~, indxord] = sort(mOutputs(:, 2));
+    [~, indxord] = sort(mOutputs(:, 1));
     mOutputs = mOutputs(indxord, :);
-    [~, indxord] = sort(mInputs(:, 2));
+    [~, indxord] = sort(mInputs(:, 1));
     mInputs = mInputs(indxord, :);
-
+    
+    %%
     mtint.inp(ifile).Outputs = mOutputs;
     mtint.inp(ifile).Inputs = mInputs;
     mtint.inp(ifile).Fs = Fs;
 
-    % get eeg header info
+    % get inp header info
     header = getDACQHeader ( [filepath,egffilelist(ifile).name], 'inp' );
     mtint.inp(ifile).header = header;
 end
