@@ -18,27 +18,31 @@ end
 nosamples = sscanf(textstring,'%*s %u');
 nosamples = nosamples + 1;  % bug in dacqUSB means number is one too few
 fseek(fid,10,0);
-vals = fread(fid,nosamples*7);
+vals = fread(fid, nosamples*7);
 fclose(fid);% finish file i/o
 
-vals = reshape(vals,[7,nosamples]);
-ts = zeros(nosamples,1);
+vals = reshape(vals,[7, nosamples]);
+ts = zeros(nosamples, 1);
 for i = 1:numel(ts)
     if ispc
-        ts(i,1) = swapbytes(typecast(uint8(vals(1:4,i)),'uint32'));
+        ts(i,1) = swapbytes(typecast(uint8(vals(1:4, i)), 'uint32'));
     elseif isunix
-        ts(i,1) = typecast(uint8(vals(1:4,i)),'uint32');
+        ts(i,1) = typecast(uint8(vals(1:4, i)), 'uint32');
     end
 end
 ts = ts./Fs; % convert ts into seconds
 type = char(vals(5,:)); % either "I" digital input, "K" keypress, "O" digital output or "V" video sync pulse
-value = zeros(nosamples,1);
-for i = 1:numel(value)
-    if ispc
+value = zeros(nosamples, 1);
+
+if ispc
+    for i = 1:numel(value)
         value(i,1) = swapbytes(typecast(uint8(vals(6:7,i)),'uint16'));
-    elseif isunix
+    end
+elseif isunix
+    for i = 1:numel(value)
         value(i,1) = typecast(uint8(vals(6:7,i)),'uint16');
-    end    
+    end
 end
 keyval = char(vals(7,:)); % only valid if type is "K", and then is ASCII value of pressed key
 
+return
