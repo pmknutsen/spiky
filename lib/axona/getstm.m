@@ -1,4 +1,4 @@
-function [ts,type,value,keyval] = getstm(datafile)
+function [ts,type,value,keyval,Fs] = getstm(datafile)
 % Read Axona .stm file
 %
 % Robin Hayman <r.hayman@ucl.ac.uk>
@@ -32,14 +32,22 @@ vals = fread(fid, nosamples*4);
 fclose(fid); % finish file i/o
 
 vals = reshape(vals, [4, nosamples]);
-ts = zeros(nosamples,1);
-for i = 1:numel(ts)
-    if ispc
-        ts(i,1) = swapbytes(typecast(uint8(vals(1:4,i)),'uint32'));
-    elseif isunix
-        ts(i,1) = typecast(uint8(vals(1:4,i)),'uint32');
+%%
+ts = zeros(nosamples, 1);
+tic
+if ispc
+    for i = 1:numel(ts)
+        ts(i,1) = swapbytes(typecast(uint8(vals(1:4, i)), 'uint32'));
+    end
+elseif isunix
+    for i = 1:numel(ts)
+        ts(i,1) = typecast(uint8(vals(1:4, i)), 'uint32');
     end
 end
+toc
+%%
+
+
 ts = ts ./ Fs; % convert ts into seconds
 
 % Post process
