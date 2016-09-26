@@ -1663,7 +1663,9 @@ for i = 1:length(FV.csDisplayChannels)
         else
             hLabel = ylabel(sprintf('%s', strrep(sYLabel, '_', ' ')));
         end
-        set(hLabel, 'userdata', sUnit);
+        set(hLabel, 'userdata', sUnit, ...
+            'units', 'normalized', ...
+            'position', [-.03 0.5 0]);
     end
     set(hLabel, 'Interpreter', 'tex')
     ThemeObject(hSubplots(end))
