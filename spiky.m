@@ -48,7 +48,7 @@ clc
 disp('Spiky - Spike-sorting and analysis in Matlab')
 disp('Copyright (C) 2005-2016 Per M Knutsen <p.m.knutsen@medisin.uio.no>')
 disp('This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are')
-fprintf('are welcome to redistribute it under certain conditions; see LICENSE for details.\n')
+fprintf('are welcome to redistribute it under certain conditions; see LICENSE for details.\n\n')
 
 % Set path to spike-sorting software
 disp('Initializing paths...')
@@ -118,9 +118,10 @@ end
 % Make Spiky available immediately in base workspace
 evalin('base', 'global Spiky')
 
-fprintf('\nNote on use:\nYou can run Spiky routines directly with syntax Spiky.SUB() (where Spiky is global).\n')
-fprintf('To view a function help entry use Spiky.help(). For example:\n\tSpiky.help(''ZoomReset'')\n\tSpiky.help(Spiky.main.ZoomReset)')
-fprintf('\n')
+fprintf('\nSpiky API:\nTo interface with Spiky from your own code, load the global variable Spiky.\n')
+fprintf('Functions are called with the syntax Spiky.[function](). Example:\n\n')
+fprintf('\tglobal Spiky;Spiky.help(''ZoomReset'')\n\tSpiky.main.ZoomReset().\n\n')
+fprintf('To access the documentation of API function use Spiky.help([function]).\n\n')
 
 global g_hSpike_Viewer
 g_hSpike_Viewer = figure;
@@ -1475,12 +1476,16 @@ for i = 1:length(FV.csDisplayChannels)
     % Continuous trace
     nSubs = length(FV.csDisplayChannels);
 
+    % Create axis
     nYBase = .06; % lower boundary of bottom axis
     nXBase = .07; % left-most boundary axes
     nYSep = 0.008; % separation between events and top axis
     nSubHeight = (((1-nYBase-nYSep)-(nSubs*.02+nSubEventHeight)) / nSubs);
     nSubY = nYBase + (.02*(i-1)) + (nSubHeight*(i-1));
-    hSubplots(end+1) = axes('position', [nXBase nSubY .91 (nSubHeight)+.01], 'tag', sCh, 'nextplot', 'ReplaceChildren');
+    hSubplots(end+1) = axes('position', [nXBase nSubY .91 (nSubHeight)+.02], ...
+        'tag', sCh, ...
+        'nextplot', 'ReplaceChildren');
+    set(hSubplots(end), 'ticklength', [.002 .002], 'tickdir', 'in');
     
     % Plot spike rasters
     bShowSpikes = 0;
@@ -3891,7 +3896,8 @@ function ShowOverlappingSpikeClusters(varargin)
 if ~IsDataLoaded, return, end
 [FV,hWin] = GetStruct();
 if ~isempty(varargin)
-    if isnumeric(varargin{1}), sCh = '';
+    if isobject(varargin{1}), sCh = '';
+    elseif isnumeric(varargin{1}), sCh = '';
     else sCh = varargin{1}; end
 else sCh = ''; end
 
@@ -4071,7 +4077,11 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ClusterControl(varargin)
+% UI for moving spikes between clusters, assign spikes as outliers manually
 %
+% Usage:
+%   ClusterControl()
+% 
 [FV, ~] = GetStruct();
 persistent FV_this
 
