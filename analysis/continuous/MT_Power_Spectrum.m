@@ -108,9 +108,12 @@ grid(hAx, 'on')
 
 hPw = plot(hAx, f, S);
 vCol = get(hPw, 'color');
+vColErr = min([1 1 1], vCol + .2);
+vColPw = max([0 0 0], vCol - .2);
 delete(hPw);
-hErr = fill([f fliplr(f)], [Serr(1,:) fliplr(Serr(2,:))], min([1 1 1], vCol + .2), 'edgecolor', 'none');
-hPw = plot(hAx, f, S, 'color', max([0 0 0], vCol - .2));
+hPw = plot(hAx, f, Serr, f, S);
+set(hPw(1:2), 'color',  vColErr)
+set(hPw(3), 'color',  vColPw)
 
 xlabel('Frequency (Hz)')
 ylabel('Spectral Power')
