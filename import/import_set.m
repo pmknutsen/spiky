@@ -1,4 +1,4 @@
-function FV = import_set(sFile, FV)
+function FV = import_set(sFile, ~)
 %Axona dataset
 
 % Open .set files in Spiky
@@ -35,7 +35,7 @@ if isfield(mtint, 'egf')
 
         % Get hardware channel
         nHWCh = key_value('hw_channel', sHeader, 'num', 'exact');
-        sHWCh = sprintf('EGF_%d', nHWCh);
+        sHWCh = sprintf('EGF_%02d', nHWCh);
 
         % Channel gain
         nGain = key_value(sprintf('gain_ch_%d', nHWCh - 1), mtint.header, 'num', 'exact');
@@ -57,9 +57,9 @@ if isfield(mtint, 'egf')
         % Begin time is counted as the number of seconds elapsed since last midnight
         sStartTime = key_value('trial_time', sHeader, 'string');
         csStartTime = strsplit(sStartTime, ':');
-        vHourToSec = str2num(csStartTime{1})*60*60;
-        vMinToSec = str2num(csStartTime{1})*60;
-        vSecSinceMidnight = vHourToSec + vMinToSec + str2num(csStartTime{3});
+        vHourToSec = str2double(csStartTime{1})*60*60;
+        vMinToSec = str2double(csStartTime{1})*60;
+        vSecSinceMidnight = vHourToSec + vMinToSec + str2double(csStartTime{3});
         vSecsSinceMidnight(end+1) = vSecSinceMidnight;
         
         % Save channel data
@@ -89,7 +89,7 @@ if isfield(mtint, 'inp')
         % Parse inputs
         inpch = unique(mInputs(:, 2));
         for inp = inpch'
-            sTag = sprintf('INP_%d', inp);
+            sTag = sprintf('INP_%02d', inp);
             vUpTimes = mInputs(mInputs(:, 2) == inp & mInputs(:, 3) == 1, 1) + vSecSinceMidnight;
             vDownTimes = mInputs(mInputs(:, 2) == inp & mInputs(:, 3) == 0, 1) + vSecSinceMidnight;
             if isempty(vUpTimes) || isempty(vDownTimes), continue
@@ -107,7 +107,7 @@ if isfield(mtint, 'inp')
         % Parse outputs
         outpch = unique(mOutputs(:, 2));
         for outp = outpch'
-            sTag = sprintf('OUT_%d', outp);
+            sTag = sprintf('OUT_%02d', inp);
             vUpTimes = mOutputs(mOutputs(:, 2) == outp & mOutputs(:, 3) == 1, 1) + vSecSinceMidnight;
             vDownTimes = mOutputs(mOutputs(:, 2) == outp & mOutputs(:, 3) == 0, 1) + vSecSinceMidnight;
             if isempty(vUpTimes) || isempty(vDownTimes), continue
