@@ -1402,8 +1402,9 @@ if bShowDigitalEvents
     nSubEventHeight = 0.2; % event axis is fixed height
 else nSubEventHeight = 0; end
 
+% Iterate over channels alphabetically
 for i = 1:length(FV.csDisplayChannels)
-    sCh = FV.csDisplayChannels{i};
+    sCh = FV.csDisplayChannels{end - i + 1};
     vCont = ChannelCalculator(FV.tData.(sCh), sCh); % continuous trace (V)
     if length(vCont) <= 1 && ~FV.bPlotRasters
         uiwait(warndlg(sprintf('Cannot display channel %s as it is not a vector.', sCh)))
@@ -1415,7 +1416,7 @@ for i = 1:length(FV.csDisplayChannels)
     if isempty(sYLabel), sYLabel = sCh; end
 
     if ( ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh) ) || ~IsMergeMode()
-        [vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
+        [vCont, ~] = AdjustChannelGain(FV, vCont, sCh);
         nContAllMinMax = [min(vCont(:)) max(vCont(:))];
         [FV, ~] = GetStruct(); % reload FV since channel gains may have changed in previous line
         
@@ -2011,7 +2012,6 @@ hSubplots(~ishandle(hSubplots)) = [];
 set(hSubplots(2:end), 'XTicklabel', [])
 
 % Re-arrange order of figure children such that top subplot is lowest
-% TODO Dont rearrange order of menu items...
 hHandles = get(hFig, 'children');
 iAxes = [];
 for h = 1:length(hHandles)
@@ -2021,7 +2021,7 @@ for h = 1:length(hHandles)
 end
 
 mPos = cell2mat(get(hHandles(iAxes), 'position')); % axes positions
-[~, iOrder] = sort(mPos(:,2)); % order by Y position
+[~, iOrder] = sort(mPos(:, 2)); % order by Y position
 hHandles(iAxes) = hHandles(iAxes(iOrder));
 set(hFig, 'children', hHandles)
 
