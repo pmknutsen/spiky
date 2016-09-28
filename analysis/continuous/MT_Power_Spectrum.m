@@ -1,4 +1,4 @@
-function tSig = MT_Spectrogram(FV)
+function MT_Spectrogram(FV)
 % Multi taper power spectrum using Chronux library functions
 %
 % Usage:
@@ -13,7 +13,6 @@ function tSig = MT_Spectrogram(FV)
 %
 
 global Spiky g_bBatchMode
-tSig = struct([]);
 
 persistent p_sContCh
 if isempty(p_sContCh) || ~g_bBatchMode
@@ -32,187 +31,96 @@ nDur = length(vCont) / nFs; % signal duration, s
 sDescr = Spiky.main.GetChannelDescription(p_sContCh);
 if isempty(sDescr); sDescr = p_sContCh; end
 
-keyboard
-
-% Get parameters interactively
-% We don't collect parameters when function in batch-mode (when known)
-persistent p_nMinF p_nMaxF p_nWinSize p_nWinStep p_nTW p_nD p_bRemLines
+% Get parameters interactively (pre/post times and stimulus delay)
+% We don't collect parameters when function is called with outputs or if we
+% are in batch-mode (assuming parameters are known, which they should be).
+persistent p_nMinF p_nMaxF p_nTW p_nD p_nP
 if isempty(p_nMinF) || ~g_bBatchMode
-    if isempty(p_nMinF)
-        % Estimate the lowest detectable frequency
-        p_nMinF = round((2.5 / nDur) * 1000)  / 1000;
-    end
-    if isempty(p_nMaxF)
-        % Estimate the highest detectable frequency
-        p_nMaxF = round((nFs / 2.5) * 100) / 100;
-    end
-    if isempty(p_nWinSize)
-        p_nWinSize = 1; % s
-    end
-    if isempty(p_nWinStep)
-        p_nWinStep = p_nWinSize / 4;
-    end
-    if isempty(p_nTW), p_nTW = 3; end
+    if isempty(p_nMinF), p_nMinF = 0.1; end
+    if isempty(p_nMaxF), p_nMaxF = 500; end
+    if isempty(p_nTW), p_nTW = 5; end
     if isempty(p_nD), p_nD = 1; end
-    if isempty(p_bRemLines), p_bRemLines = 0; end
+    if isempty(p_nP), p_nP = 0.05; end
     
-    cPrompt = {'Min frequency (Hz)', 'Max frequency (Hz)', 'Window size (s)', ...
-        'Window step (s)', 'Time-bandwidth product (TW; s*Hz)', 'Signal derivative', ...
-        'Remove line noise' };
-    cAnswer = inputdlg(cPrompt,'Options', 1, ...
-        {num2str(p_nMinF), num2str(p_nMaxF), num2str(p_nWinSize), num2str(p_nWinStep), ...
-        num2str(p_nTW), num2str(p_nD), num2str(p_bRemLines) });
+    cPrompt = {'Min frequency (Hz):', 'Max frequency (Hz):', 'Time-bandwidth product (TW; s*Hz):', ...
+        'Signal derivative:', 'Significance level:'};
+    cAnswer = inputdlg(cPrompt, 'Options', 1, ...
+        {num2str(p_nMinF), num2str(p_nMaxF), num2str(p_nTW), num2str(p_nD), num2str(p_nP)});
     if isempty(cAnswer), return, end
-    p_nMinF = str2double(cAnswer{1}); % hz
-    p_nMaxF = str2double(cAnswer{2}); % hz
-    p_nWinSize = str2double(cAnswer{3});
-    p_nWinStep = str2double(cAnswer{4});
-    p_nTW = str2double(cAnswer{5});
-    p_nD = str2double(cAnswer{6});
-    p_bRemLines = str2double(cAnswer{7});
+    p_nMinF = str2num(cAnswer{1}); % hz
+    p_nMaxF = str2num(cAnswer{2}); % hz
+    p_nTW = str2num(cAnswer{3});
+    p_nD = str2num(cAnswer{4});
+    p_nP = str2num(cAnswer{5});
 end
 
-% Derivative
-if p_nD > 0
-    vCont = diff(vCont, p_nD);
-end
+p_nP = max(0.001, min(1, p_nP));
+p_nMinF = max(0.01, p_nMinF);
+
+% mtspec parameters structure
+tParams.tapers   = [p_nTW p_nTW*2-1]; % [NW K]
+tParams.pad      = 2;
+tParams.err      = [2 p_nP];
+tParams.fpass    = [p_nMinF p_nMaxF];
+tParams.trialave = 1;
 
 % Initialize waitbar
 hMsg = waitbar(.2, 'Computing multitaper spectrogram...');
 
-% Interpolate (nearest) indices that contain NaNs
-% Step 1 - NaN segments are filled with mirror images adjacent data
-% Step 2 - Remaining NaNs (e.g. lone occurences, NaNs at start/end of
-%          vector) are interpolated
-%
-% Note that all interpolated values are replaced with NaNs after the
-% spectrogram has been computed. It is only necesary to replace the NaNs
-% here so that the spectrogram can be computed without errors.
-iNaN = isnan(vCont(:));
-iTurnsNaN = find([0;diff(iNaN)] == 1) - 1; % start indices of nan segments
-if ~isempty(iTurnsNaN)
-    iNaNDone = find([0;diff(iNaN)] == -1); % end indices of nan segments
-    if isempty(iNaNDone) % only indices at end are NaNs
-        iNaNDone = length(vCont);
-    else
-        iNaNDone(iNaNDone <= iTurnsNaN(1)) = [];
-    end
-
-    iNaNDone = iNaNDone(1:length(iTurnsNaN));
-    iTurnsNaN(iTurnsNaN > iNaNDone(end)) = [];
-    for i = 1:length(iTurnsNaN)
-        nL = ceil((iNaNDone(i)-iTurnsNaN(i)+1)/2); % why divide by 2?
-        if (iTurnsNaN(i)+nL <= length(vCont)) && (iTurnsNaN(i)-nL > 0)
-            vCont(iTurnsNaN(i):(iTurnsNaN(i)+nL)) = fliplr(vCont((iTurnsNaN(i)-nL):iTurnsNaN(i))');
-        end
-        if ((iNaNDone(i)-nL) > 0) && (iNaNDone(i)+nL <= length(vCont))
-            vCont((iNaNDone(i)-nL):iNaNDone(i)) = fliplr(vCont(iNaNDone(i):(iNaNDone(i)+nL))');
-        end
-    end
-    
-    % Replace remaining NaNs with normally distributed random values with
-    % same mean and standard deviation as the signal
-    iNaNb = isnan(vCont);
-    if any(iNaNb)
-        vCont = double(FV.tData.(p_sContCh)');
-        vCont(iNaNb) = normrnd(nanmean(vCont), nanstd(vCont), 1, length(find(iNaNb)));
-    end
-end
-
-% Low-pass filter and decimate signal to match user-defined frequency range
-% This speeds up the spectral analysis significantly, as out-of-band
-% frequencies are ignored.
-waitbar(.4, hMsg)
-nBegin = FV.tData.([p_sContCh '_TimeBegin']); % sampling start, sec
-nFs = FV.tData.([p_sContCh '_KHz']) * 1000; % sampling frequency Hz
-vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
-[vCont, ~, nFs] = Spiky.main.FilterChannel(vCont, vTime, nFs, (p_nMaxF*5), 0, 0, 'decimate');
-
-% Ensure window size and step (in samples) are integers, to avoid internal
-% rounding in mtspecgramc and temporal offset of spectrogram
-nWinSize = (round((p_nWinSize * nFs)/10) * 10) / nFs;
-nWinStep = (round((p_nWinStep * nFs)/10) * 10) / nFs;
-
-% Initialize mtspecgramc() parameters structure
-% TW - time-bandwidth product (i.e. sec * Hz),
-% K  - number of tapers
-tParams.tapers = [p_nTW p_nTW*2-1]; % [NW K]
-tParams.pad    = 2;
-tParams.Fs     = nFs;
-tParams.err    = 0; % make sure we don't compute error bars. too slow
-tParams.fpass  = [p_nMinF p_nMaxF];
-
-% Compute the multitaper spectrogram
-waitbar(.6, hMsg)
-[S, t, f] = mtspecgramc(vCont, [nWinSize nWinStep], tParams);
-
-% Remove values from spectrogram where data was a NaN
-waitbar(.8, hMsg)
-if any(iNaN)
-    iSNaN = interp1(t, 1:length(t), find(iNaN)./nFs, 'linear', 'extrap');
-    iSNaN = unique(round(iSNaN));
-    S(iSNaN, :) = NaN;
-end
-
-% Remove columns with only zeros, and the columns immediately adjacent
-iRemCols = find(all(S == 0, 2));
-iRemCols = [min(iRemCols) - 1; iRemCols; max(iRemCols) + 1];
-iRemCols(iRemCols < 1 | iRemCols > size(S, 1)) = [];
-S(iRemCols, :) = NaN;
-
-% Insert median value where spectrogram is zero
-S(S == 0) = median(S(:));
-
-% Detect and remove noise lines (optional)
-if p_bRemLines
-    vMeanPrime = diff(nanmean(S, 1));
-    nStd = nanstd(vMeanPrime);
-    iI = vMeanPrime < (nanmean(vMeanPrime)-3*nStd) | vMeanPrime > (nanmean(vMeanPrime)+3*nStd);
-    plot(vMeanPrime)
-    plot(iI)
-    iI = find(diff(iI) == 1);
-    iIon = iI(1:2:end) - 2;
-    iIoff = iI(2:2:end) + 2;
-    Sp = S;
-    for i = 1:min([length(iIon) length(iIoff)])
-        Sp(:, (iIon(i):iIoff(i))+3) = NaN;
-    end
-    S = Sp;
-end
-
-
-%% Subtract mean from spectrogram to remove lines
-% TODO
-% In presence of line noise, subtract lines by dividing/subtracting by mean
-% power at each frequency (correcting for variance might be ok too)
-%vMean = median(S, 1);
-%mMean = repmat(vMean, size(S, 1), 1);
-%mRes = S ./ mMean;
-%mRes = mRes - min(min(mRes));
-%subplot(2,1,1)
-%imagesc(log10(S'))
 %%
-
-% Create output structure
-sPreFix = [sDescr '_MtSpc'];
-tSig(1).(sPreFix) = log10(S)';
-nInt = unique(round(diff(t)*1000)/1000);
-tSig.([sPreFix '_KHz']) = (1/nInt(1)/1000);
-tSig.([sPreFix '_TimeBegin']) = FV.tData.([p_sContCh '_TimeBegin']) + t(1);
-tSig.([sPreFix '_TimeEnd']) = FV.tData.([p_sContCh '_TimeBegin']) + ((size(S, 1)+1) * nInt(1));
-tSig.([sPreFix '_Unit']) = 'Hz';
-tSig.([sPreFix '_Scale']) = f;
-
-% Create a Properties field to record spectrogram variables
-cVars = {'p_nMinF' 'p_nMaxF' 'p_nWinSize' 'p_nWinStep' 'p_nTW' 'p_nD' 'p_bRemLines'};
-tProps = struct('');
-for i = 1:length(cVars)
-    tProps(i).Var = cVars{i};
-    tProps(i).Descr = cPrompt{i};
-    tProps(i).Value = eval(cVars{i});
+% Decimate signal to match user-defined frequency range (speeds up spectral analysis)
+if length(vCont) > 10000
+    nR = floor(nFs / (p_nMaxF*2.5));
+    vCont = decimate(vCont, nR);
+    nFs = nFs/nR;
+    tParams.Fs = nFs;
 end
-tSig.([sPreFix '_Properties']) = tProps;
+waitbar(.4, hMsg)
+
+% Split signal into signals (for averaging)
+nSegLen = (1 / p_nMinF) * nFs * 2;
+nSegLen = min(length(vCont), nSegLen);
+nSegs = floor(length(vCont) / nSegLen);
+mS = [];
+mCont = [];
+for i = 1:nSegs
+    vRange = [(i-2)*nSegLen + nSegLen + 1 (i-1)*nSegLen + nSegLen];
+    mCont(:, i) = vCont(vRange(1):vRange(2));
+end
+waitbar(.6, hMsg)
+
+% Compute derivatives
+if p_nD > 0
+    mCont = diff(mCont, p_nD, 1);
+end
+[S, f, Serr] = mtspectrumc(mCont, tParams);
+waitbar(1, hMsg)
 close(hMsg);
 
-return
+%% Plot
+hFig = figure;
+set(hFig, 'name', 'Multitaper Spectra')
+Spiky.main.ThemeObject(hFig);
+hAx = axes('position', [.1 .125 .85 .8], 'xscale', 'li', 'yscale', 'log');
+Spiky.main.ThemeObject(hAx);
+hold(hAx, 'on')
 
+% Error bar estimate
+axes(hAx);
+box(hAx, 'on')
+grid(hAx, 'on')
+
+hPw = plot(hAx, f, S);
+vCol = get(hPw, 'color');
+delete(hPw);
+hErr = fill([f fliplr(f)], [Serr(1,:) fliplr(Serr(2,:))], min([1 1 1], vCol + .2), 'edgecolor', 'none');
+hPw = plot(hAx, f, S, 'color', max([0 0 0], vCol - .2));
+
+xlabel('Frequency (Hz)')
+ylabel('Spectral Power')
+hTit = title(sprintf('Multitaper Power Spectrum:  %s', p_sContCh), 'interpreter', 'none');
+Spiky.main.ThemeObject(hTit);
+
+%%
+
+return
