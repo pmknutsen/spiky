@@ -31,9 +31,7 @@ nDur = length(vCont) / nFs; % signal duration, s
 sDescr = Spiky.main.GetChannelDescription(p_sContCh);
 if isempty(sDescr); sDescr = p_sContCh; end
 
-% Get parameters interactively (pre/post times and stimulus delay)
-% We don't collect parameters when function is called with outputs or if we
-% are in batch-mode (assuming parameters are known, which they should be).
+% Get parameters interactively
 persistent p_nMinF p_nMaxF p_nTW p_nD p_nP
 if isempty(p_nMinF) || ~g_bBatchMode
     if isempty(p_nMinF), p_nMinF = 0.1; end
@@ -104,8 +102,6 @@ Spiky.main.ThemeObject(hFig);
 hAx = axes('position', [.1 .125 .85 .8], 'xscale', 'li', 'yscale', 'log');
 Spiky.main.ThemeObject(hAx);
 hold(hAx, 'on')
-
-% Error bar estimate
 axes(hAx);
 box(hAx, 'on')
 grid(hAx, 'on')
