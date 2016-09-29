@@ -74,6 +74,7 @@ xlabel('Frequency (Hz)')
 ylabel('Spectral Density (Hz^{-1})')
 hTit = title(sprintf('Welch Power Spectrum:  %s', p_sContCh), 'interpreter', 'none');
 Spiky.main.ThemeObject(hTit);
+Spiky.main.AttachAxisCrossHairs(hAx)
 
 %%
 
