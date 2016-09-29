@@ -79,6 +79,7 @@ end
 
 % Initialize waitbar
 hMsg = waitbar(.2, 'Computing multitaper spectrogram...');
+centerfig(hMsg, Spiky.main.GetGUIHandle());
 
 % Interpolate (nearest) indices that contain NaNs
 % Step 1 - NaN segments are filled with mirror images adjacent data
