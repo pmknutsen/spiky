@@ -1389,7 +1389,9 @@ end
 % Check that all DisplayChannels exist (and remove those that dont)
 vRemIndx = [];
 for i = 1:length(FV.csDisplayChannels)
-    if ~isfield(FV.tData, FV.csDisplayChannels{i}), vRemIndx = [vRemIndx i]; end
+    if ~isfield(FV.tData, FV.csDisplayChannels{i})
+        vRemIndx = [vRemIndx i];
+    end
 end
 FV.csDisplayChannels(vRemIndx) = [];
 SetStruct(FV, 'nosaveflag')
@@ -1486,7 +1488,6 @@ for i = 1:length(FV.csDisplayChannels)
     hSubplots(end+1) = axes('position', [nXBase nSubY .91 (nSubHeight)+.02], ...
         'tag', sCh, ...
         'nextplot', 'ReplaceChildren');
-    set(hSubplots(end), 'ticklength', [.002 .002], 'tickdir', 'in');
     
     % Plot spike rasters
     bShowSpikes = 0;
@@ -1580,8 +1581,6 @@ for i = 1:length(FV.csDisplayChannels)
                 vPos = get(hSubplots(end), 'position');
                 nSpikeHeight = vPos(4) / length(vUnits) / 2;
                 set(hSubplots(end), 'units', 'normalized')
-                
-                %nSpikeHeight = 100; % adjust this number to change height of spikes
                 hLin = plot(vIndices, vYs, 'linewidth', nSpikeHeight, 'color', mCol);
                 mUserData = [vIndices vYs'];
             end
@@ -1605,20 +1604,23 @@ for i = 1:length(FV.csDisplayChannels)
             
             csUnits{end+1} = num2str(vUnits(nU));
         end
-    else % plot continuous trace
+    else
         if length(find(size(vCont)>1)) == 1
+            % Plot a continuous trace
             if ~exist('nContTrace', 'var')
                 nContTrace = 1;
             end
             nContTrace = nContTrace + 1;
             hLin = plot(hSubplots(end), vTime, vCont, 'color', FV.mColors(nContTrace,:));
+            vY = [(floor(min(vCont) / 10) * 10 - 5) (ceil(max(vCont) / 10) * 10 + 5)];
         else
-            vY = [];
-            if isfield(FV.tData, [sCh '_Scale'])
-                vY = FV.tData.([sCh '_Scale']);
-            end
+            % Plot a 3D matrix (e.g. spectrogram)
             if length(vY) ~= size(vCont, 1)
                 vY = 1:size(vCont, 1);
+            elseif isfield(FV.tData, [sCh '_Scale'])
+                vY = FV.tData.([sCh '_Scale']);
+            else
+                vY = [];
             end
             
             % Insert the min/max values of the entire matrix into displayed
@@ -2395,6 +2397,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function csSelected = SelectChannels(varargin)
 % Select the channels that should be displayed in the GUI
+% 
 if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 
@@ -2412,7 +2415,7 @@ if ~isempty(varargin)
                 FV.csDisplayChannels(nIndx) = []; % remove
             end
             SetStruct(FV)
-            ViewTrialData
+            ViewTrialData();
             return
         end
     end
@@ -2440,6 +2443,11 @@ for i = 1:length(cFields)
         end
     end
 end
+
+% Sort alphabetically
+[csDisplayChannels, iOrder] = sort(csDisplayChannels);
+csChannelDescriptions = csChannelDescriptions(iOrder);
+
 global g_vSelCh;
 if length(csDisplayChannels) == 1
     g_vSelCh = 1;
