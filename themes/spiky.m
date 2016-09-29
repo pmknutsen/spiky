@@ -13,7 +13,7 @@ p.axes.xcolor = [.7 .7 .7];
 p.axes.ycolor = [.7 .7 .7];
 p.axes.tickdir = 'out';
 p.axes.fontsize = 8;
-p.axes.ticklength = [.005 .005];
+p.axes.ticklength = [.0025 .0025];
 
 mGradient = uint8([ 20 20 50 50; ... % [B B T T] red
     20 20 50 50; ... % green
