@@ -999,7 +999,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetChannelCalculator(varargin)
 % 
-%
+% 
 
 if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
@@ -1313,8 +1313,62 @@ end
 if isempty(g_bMergeMode)
     g_bMergeMode = 0;
 end
-
 bResult = g_bMergeMode;
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function AttachAxisCrossHairs(varargin)
+% Attach crosshairs callback to axis.
+%
+if nargin < 1
+    sp_disp('No axis handle provided.');
+    return;
+end
+if ~strcmp(get(varargin{1}, 'type'), 'axes')
+    sp_disp('Invalid handle. Must be axis.');
+    return;
+end
+hAx = varargin{1};
+set(get(hAx, 'parent'), 'WindowButtonMotionFcn', @UpdateAxisCrossHairs);
+
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function UpdateAxisCrossHairs(varargin)
+% Draw crosshairs on current axis.
+%
+
+% Get axis handle
+% Note: overobj() is an undocumented function
+hAx = overobj('axes');
+if isempty(hAx), return; end
+
+% Get current axis coordinates
+mPnt = get(hAx, 'CurrentPoint');
+vXY = mPnt(1, 1:2);
+
+% Get axis limits
+vXlim = get(hAx, 'xlim');
+vYlim = get(hAx, 'ylim');
+
+% Create or update crosshairs
+sTag = 'SpikyCrosshairs';
+hX = findobj(hAx, 'tag', sTag);
+bAxisHeld = ishold(hAx);
+if isempty(hX)
+    if ~bAxisHeld, hold(hAx, 'on'); end
+    hX = plot(hAx, vXlim, vXY([2 2]), vXY([1 1]), vYlim);
+    hX(end+1) = plot(hAx, vXY(1), vXY(2), 'ro');
+    if ~bAxisHeld, hold(hAx, 'off'); end
+    ThemeObject(hX(1:2), 'linestyle', '-.', 'tag', sTag);
+    set(hX(3), 'color', 'r', 'tag', sprintf('%sMarker', sTag));
+else
+    set(hX(1), 'xdata', vXlim, 'ydata', vXY([2 2]));
+    set(hX(2), 'xdata', vXY([1 1]), 'ydata', vYlim);
+    hMarker = findobj(hAx, 'tag', sprintf('%sMarker', sTag));
+    set(hMarker, 'xdata', vXY(1), 'ydata', vXY(2));
+end
 
 return
 
@@ -1401,7 +1455,7 @@ bShowDigitalEvents = strcmp(get(findobj(hWin, 'Label', 'Show &Events'),'checked'
 if isempty(FV.csDigitalChannels), bShowDigitalEvents = 0; end
 
 if bShowDigitalEvents
-    nSubEventHeight = 0.2; % event axis is fixed height
+    nSubEventHeight = 0.15; % event axis is fixed height
 else nSubEventHeight = 0; end
 
 % Iterate over channels alphabetically
@@ -1615,12 +1669,12 @@ for i = 1:length(FV.csDisplayChannels)
             vY = [(floor(min(vCont) / 10) * 10 - 5) (ceil(max(vCont) / 10) * 10 + 5)];
         else
             % Plot a 3D matrix (e.g. spectrogram)
+            vY = [];
             if length(vY) ~= size(vCont, 1)
                 vY = 1:size(vCont, 1);
-            elseif isfield(FV.tData, [sCh '_Scale'])
+            end
+            if isfield(FV.tData, [sCh '_Scale'])
                 vY = FV.tData.([sCh '_Scale']);
-            else
-                vY = [];
             end
             
             % Insert the min/max values of the entire matrix into displayed
@@ -2172,6 +2226,9 @@ end
 
 % Set object properties
 for nh = 1:length(hObj)
+    if ~isprop(hObj(nh), 'type') && ~isprop(hObj(nh), 'type')
+        return;
+    end
     sType = get(hObj(nh), 'type');
     if isfield(p, sType) && ishandle(hObj(nh))
         set(hObj(nh), p.(sType))
@@ -2193,7 +2250,9 @@ end
 % Set additional custom properties passed in varargin
 if nargin >= 3
     for pp = 1:2:length(varargin)
-        set(hObj(nh), varargin{pp}, varargin{pp+1})
+        for nh = 1:length(hObj)
+            set(hObj(nh), varargin{pp}, varargin{pp+1})
+        end
     end
 end
 
@@ -7798,7 +7857,8 @@ switch nargout(sFun)
 end
 cd(sCurrDir) % return to directory
 
-if ~exist('tSig', 'var') return; end
+if ~exist('tSig', 'var'), return; end
+if isempty(tSig), return; end
 
 % Validate new signal
 cFields = sort(fieldnames(tSig)); % shortest field listed first
