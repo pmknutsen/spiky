@@ -8,7 +8,7 @@
 % file for examples. The parent structure should be named p.
 
 % Axes properties
-p.axes.color = [.15 .15 .15];
+p.axes.color = [.2 .2 .2];
 p.axes.xcolor = [.7 .7 .7];
 p.axes.ycolor = [.7 .7 .7];
 p.axes.tickdir = 'out';
@@ -22,7 +22,7 @@ mGradient = uint8([ 20 20 50 50; ... % [B B T T] red
 p.backdrop.face.ColorData = mGradient;
 
 % Figure properties
-p.figure.color = [.2 .2 .2];
+p.figure.color = [.25 .25 .25];
 p.figure.NumberTitle = 'off';
 if ispc
     p.figure.colormap = jet(2^7);
