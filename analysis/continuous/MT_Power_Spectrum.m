@@ -120,6 +120,7 @@ ylabel('Spectral Power')
 hTit = title(sprintf('Multitaper Power Spectrum:  %s', p_sContCh), 'interpreter', 'none');
 Spiky.main.ThemeObject(hTit);
 
+Spiky.main.AttachAxisCrossHairs(hAx)
 %%
 
 return
