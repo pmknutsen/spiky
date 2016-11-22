@@ -2638,11 +2638,19 @@ if ~IsDataLoaded(), return; end
 
 sCurrFile = FV.sLoadedTrial;
 sCurrFile(strfind(sCurrFile, '.'):end) = [];
+
+% Validate input path
+if ~isempty(varargin)
+    if ~isstr(varargin{1})
+        varargin = [];
+    end
+end
+
 if isempty(varargin)
     [sFile, sPath] = uiputfile(GetExportFilters(), 'Select file to write', [FV.sDirectory filesep sCurrFile]);
     if sFile == 0; return; end
 else
-    [sPath sFile] = fileparts(varargin{1});
+    [sPath, sFile] = fileparts(varargin{1});
 end
 
 % Run export filter
