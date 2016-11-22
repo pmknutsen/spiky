@@ -93,7 +93,6 @@ if p_nD > 0
 end
 [S, f, Serr] = mtspectrumc(mCont, tParams);
 waitbar(1, hMsg)
-close(hMsg);
 
 %% Plot
 hFig = figure;

@@ -2086,6 +2086,51 @@ PanMode()
 set(GetGUIHandle(), 'WindowButtonMotionFcn', @GUIMouseMotion);
 return
 
+
+function nBeginTime = GetBeginTime()
+% Set the begin time of the experiment (absolute time, sec from midnight)
+% 
+% Usage:
+%   GetBeginTime()
+%
+[FV, ~] = GetStruct();
+csFieldnames = fieldnames(FV.tData);
+cMatch = regexpi(csFieldnames, '^*_TimeBegin$');
+vBeginTime = [];
+for i = 1:length(cMatch)
+    if ~isempty(cMatch{i})
+        vBeginTime(end+1) = FV.tData.(csFieldnames{i});
+    end
+end
+nBeginTime = mode(vBeginTime);
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function SetTimeMarker(nT)
+% Set position of the time marker
+% 
+% Usage:
+%   SetTimeMarker(T) where T is the time in seconds (in normal time)
+%
+hWin = GetGUIHandle();
+nT = nT + GetBeginTime();
+
+hMarkers = findobj(hWin, 'tag', 'timemarker');
+if isempty(hMarkers)
+    % Initialize time markers on all axes
+    hAx = findobj(hWin, 'type', 'axes');
+    for ax = 1:length(hAx)
+        hold(hAx(ax), 'on')
+        hLin = plot(hAx(ax), [nT nT], [-100 100], 'tag', 'timemarker', 'color', 'w');
+        ThemeObject(hLine);
+    end
+else
+    set(hMarkers, 'xdata', [nT nT]);
+end
+
+return
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [vUpTimes, vDownTimes] = GetEventPairs(csCh, varargin)
 % Get event pairs (up and down times) of a digital channel

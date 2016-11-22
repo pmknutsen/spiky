@@ -124,10 +124,10 @@ end
 % This speeds up the spectral analysis significantly, as out-of-band
 % frequencies are ignored.
 waitbar(.4, hMsg)
-nBegin = FV.tData.([p_sContCh '_TimeBegin']); % sampling start, sec
-nFs = FV.tData.([p_sContCh '_KHz']) * 1000; % sampling frequency Hz
-vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
-[vCont, ~, nFs] = Spiky.main.FilterChannel(vCont, vTime, nFs, (p_nMaxF*5), 0, 0, 'decimate');
+%nBegin = FV.tData.([p_sContCh '_TimeBegin']); % sampling start, sec
+%nFs = FV.tData.([p_sContCh '_KHz']) * 1000; % sampling frequency Hz
+%vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
+%[vCont, ~, nFs] = Spiky.main.FilterChannel(vCont, vTime, nFs, (p_nMaxF*5), 0, 0, 'decimate');
 
 % Ensure window size and step (in samples) are integers, to avoid internal
 % rounding in mtspecgramc and temporal offset of spectrogram
