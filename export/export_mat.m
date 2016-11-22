@@ -4,11 +4,9 @@ function FV = export_mat(sFile, FV)
 % Export data to .mat file. Each trace is exported as a vector.
 %
 % This function exports:
-%  Currently viewed continuous channels
-%  Analog channels are renamed to their descriptive names
-%
-% Todo:
-%  Export spike data
+%  Displayed continuous channels    (renamed to descriptive names)
+%  Displayed digital channels       (events)
+%  
 %
 
 global Spiky
@@ -19,6 +17,7 @@ global Spiky
 csFields = FV.csDisplayChannels;
 tSpikyExport = struct([]);
 
+% File descriptions
 if isfield(FV.tData, 'FileStart')
     tSpikyExport(1).FileStart = FV.tData.FileStart;
 end
@@ -32,6 +31,7 @@ if isfield(FV, 'sDirectory')
     tSpikyExport(1).OriginDir  = FV.sDirectory;
 end
 
+% Analog data
 for c = 1:length(csFields)
     csName = Spiky.main.GetChannelDescription(csFields{c});
     if isempty(csName)
@@ -48,6 +48,25 @@ for c = 1:length(csFields)
     end
 end
 
+% Digital data (events)
+csFields = FV.csDigitalChannels;
+for c = 1:length(csFields)
+    csName = Spiky.main.GetChannelDescription(csFields{c});
+    if isempty(csName)
+        csName = csFields{c};
+    end
+    if isfield(FV.tData, [csFields{c} '_Up'])
+        tSpikyExport.([csName '_Up']) = FV.tData.([csFields{c} '_Up']);
+    end
+    if isfield(FV.tData, [csFields{c} '_Down'])
+        tSpikyExport.([csName '_Down']) = FV.tData.([csFields{c} '_Down']);
+    end
+    if isfield(FV.tData, [csFields{c} '_KHz'])
+        tSpikyExport.([csName 'KHz']) = FV.tData.([csFields{c} '_KHz']);
+    end
+end
+
+% Save file to disk
 save(sFile, 'tSpikyExport')
 
 return
