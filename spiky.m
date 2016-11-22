@@ -2105,28 +2105,40 @@ end
 nBeginTime = mode(vBeginTime);
 return
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetTimeMarker(nT)
-% Set position of the time marker
-% 
-% Usage:
-%   SetTimeMarker(T) where T is the time in seconds (in normal time)
+% Display a vertical time marker in all axis
 %
-hWin = GetGUIHandle();
-nT = nT + GetBeginTime();
+% This function can be useful for external scripts that need to display, in
+% the GUI, the time at which a signal is analysed.
+%
+% Usage:
+%   SetTimeMarker(T) where T is the absolute time in seconds.
+%
 
-hMarkers = findobj(hWin, 'tag', 'timemarker');
+% Get axes handles
+hGUI = GetGUIHandle();
+hAx = findobj(hGUI, 'type', 'axes');
+
+% If there are fewer markers than axes, then remove all
+hMarkers = findobj(hAx, 'tag', 'SpikyTimeMarker');
+if length(hMarkers) < length(hAx)
+    delete(hMarkers)
+end
+
+% Create markers if they don't exist
 if isempty(hMarkers)
-    % Initialize time markers on all axes
-    hAx = findobj(hWin, 'type', 'axes');
+    % Iterate over axes
     for ax = 1:length(hAx)
         hold(hAx(ax), 'on')
-        hLin = plot(hAx(ax), [nT nT], [-100 100], 'tag', 'timemarker', 'color', 'w');
-        ThemeObject(hLine);
+        hLin = plot(hAx(ax), [nT nT], get(hAx(ax), 'ylim'));
+        set(hLin, 'YDataSource', 'get(get(gcbo,''parent''), ''ylim'')', ...
+            'color', 'r', 'linewidth', 2, 'linestyle', '-', ...
+            'tag', 'SpikyTimeMarker')
     end
 else
-    set(hMarkers, 'xdata', [nT nT]);
+    % Otherwise update the markers
+    set(hMarkers, 'xdata', [nT nT])
 end
 
 return
@@ -4795,44 +4807,6 @@ set(hHeader, 'interpreter', 'none')
 % set colors on legend
 hLeg = findobj(hFig, 'type', 'axes', 'Tag', 'legend');
 set(hLeg, 'color', 'none', 'textcolor', 'w', 'location', 'northeast')
-return
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function SetTimeMarker(nT)
-% Display a vertical time marker in all axis
-%
-% This function can be useful for external scripts that need to display, in
-% the GUI, the time at which a signal is analysed.
-%
-% Usage:
-%   SetTimeMarker(T) where T is the absolute time in seconds.
-%
-
-% Get axes handles
-hGUI = GetGUIHandle();
-hAx = findobj(hGUI, 'type', 'axes');
-
-% If there are fewer markers than axes, then remove all
-hMarkers = findobj(hAx, 'tag', 'SpikyTimeMarker');
-if length(hMarkers) < length(hAx)
-    delete(hMarkers)
-end
-
-% Create markers if they don't exist
-if isempty(hMarkers)
-    % Iterate over axes
-    for ax = 1:length(hAx)
-        hold(hAx(ax), 'on')
-        hLin = plot(hAx(ax), [nT nT], get(hAx(ax), 'ylim'));
-        set(hLin, 'YDataSource', 'get(get(gcbo,''parent''), ''ylim'')', ...
-            'color', 'r', 'linewidth', 2, 'linestyle', '-', ...
-            'tag', 'SpikyTimeMarker')
-    end
-else
-    % Otherwise update the markers
-    set(hMarkers, 'xdata', [nT nT])
-end
-
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
