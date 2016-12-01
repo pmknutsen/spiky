@@ -121,7 +121,7 @@ evalin('base', 'global Spiky')
 fprintf('\nSpiky API:\nTo interface with Spiky from your own code, load the global variable Spiky.\n')
 fprintf('Functions are called with the syntax Spiky.[function](). Example:\n\n')
 fprintf('\tglobal Spiky;Spiky.help(''ZoomReset'')\n\tSpiky.main.ZoomReset().\n\n')
-fprintf('To access the documentation of API function use Spiky.help([function]).\n\n')
+fprintf('To access the documentation of API calls use Spiky.help([function]).\n\n')
 
 global g_hSpike_Viewer
 g_hSpike_Viewer = figure;
@@ -465,10 +465,20 @@ function ZoomIn(varargin)
 %
 if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
-vChild = findobj(get(findobj('Tag', 'Spiky'), 'children'), 'Type', 'axes'); % axes handles
-vX = get(vChild(end), 'xlim');
+vX = GetXLim();
 FV.vXlim = [mean(vX)-(diff(vX)/4) mean(vX)+(diff(vX)/4)];
 SetStruct(FV); ViewTrialData
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function vXLim = GetXLim(varargin)
+% Get current x-axis limits
+%
+% Usage:
+%   vXLim = GetXLim()
+%
+vChild = findobj(get(findobj('Tag', 'Spiky'), 'children'), 'Type', 'axes'); % axes handles
+vXLim = get(vChild(end), 'xlim');
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2086,7 +2096,7 @@ PanMode()
 set(GetGUIHandle(), 'WindowButtonMotionFcn', @GUIMouseMotion);
 return
 
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function nBeginTime = GetBeginTime()
 % Set the begin time of the experiment (absolute time, sec from midnight)
 % 
@@ -2107,38 +2117,37 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetTimeMarker(nT)
-% Display a vertical time marker in all axis
-%
+% Set position of the time marker
+% 
 % This function can be useful for external scripts that need to display, in
 % the GUI, the time at which a signal is analysed.
 %
 % Usage:
-%   SetTimeMarker(T) where T is the absolute time in seconds.
+%   SetTimeMarker(T) where T is the time in seconds (in normal time)
 %
+hWin = GetGUIHandle();
+nT = nT + GetBeginTime();
 
-% Get axes handles
-hGUI = GetGUIHandle();
-hAx = findobj(hGUI, 'type', 'axes');
+hMarkers = findobj(hWin, 'tag', 'SpikyTimeMarker');
+hAx = findobj(hWin, 'type', 'axes');
 
 % If there are fewer markers than axes, then remove all
-hMarkers = findobj(hAx, 'tag', 'SpikyTimeMarker');
 if length(hMarkers) < length(hAx)
     delete(hMarkers)
 end
 
-% Create markers if they don't exist
 if isempty(hMarkers)
-    % Iterate over axes
+    % Initialize time markers on all axes
     for ax = 1:length(hAx)
         hold(hAx(ax), 'on')
         hLin = plot(hAx(ax), [nT nT], get(hAx(ax), 'ylim'));
         set(hLin, 'YDataSource', 'get(get(gcbo,''parent''), ''ylim'')', ...
             'color', 'r', 'linewidth', 2, 'linestyle', '-', ...
             'tag', 'SpikyTimeMarker')
+        %ThemeObject(hLine);
     end
 else
-    % Otherwise update the markers
-    set(hMarkers, 'xdata', [nT nT])
+    set(hMarkers, 'xdata', [nT nT]);
 end
 
 return
@@ -2190,8 +2199,11 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Get display width of events and spikes (based on time displayed interval)
 function nW = GetEventWidth(vXlim)
+% Get display width of events and spikes (based on time displayed interval)
+% 
+% Usage:
+%
 if diff(vXlim) < 1
     nW = 0.001;
 elseif diff(vXlim) < 5
@@ -2214,8 +2226,11 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Change the display order of axes in main window
 function ChangeDisplayOrder(hObject, eventdata, sCh, nMove)
+% Change the display order of axes in main window
+% 
+% Usage:
+%
 [FV, ~] = GetStruct();
 iCurr = find(strcmp(FV.csDisplayChannels, sCh));
 iMove = iCurr + nMove;
@@ -2233,6 +2248,9 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetTheme(hObject, varargin)
 % Select theme to use
+% 
+% Usage:
+%
 [FV, ~] = GetStruct();
 switch get(hObject, 'selected')
     case 'on'
@@ -2255,7 +2273,6 @@ function ThemeObject(hObj, varargin)
 %   ThemeObject(H, 'PropertyName', 'PropertyValue')
 % 
 %   where H is a graphics object handle
-% 
 %
 [FV, ~] = GetStruct();
 
@@ -2438,7 +2455,7 @@ SetStruct(FV); ViewTrialData
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, sOption)
+function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, sOption, varargin)
 % Bandpass vector.
 %
 % Usage:
@@ -2486,8 +2503,12 @@ end
 % Decimate signal (optional)
 switch lower(sOption)
     case 'decimate'
-        % decimate (i.e. resample signal)
-        nNewFs = nLoPass * 2.5;
+        % Decimation factor
+        if isempty(varargin)
+            nNewFs = nLoPass * 2.5;
+        else
+            nNewFs = nLoPass * varargin{1};
+        end        
         nStep = ceil(nFs / nNewFs);
         nNewFs = nFs/nStep; % new Fs must be an integer
         if ~isempty(vTime)
