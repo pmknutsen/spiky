@@ -52,3 +52,9 @@ p.hggroup.edgecolor = [.85 .85 .85];
 
 % colors on lines
 p.colors = distinguishable_colors(100, p.axes.color);
+
+% legends
+p.legend.color = 'none';
+p.legend.textcolor = p.text.color;
+p.legend.interpreter = 'none';
+
