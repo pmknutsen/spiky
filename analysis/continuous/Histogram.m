@@ -1,13 +1,15 @@
 function Histogram(FV)
-%
+% Histogram of data points
 %
 global Spiky
 
-[sCh, ~] = Spiky.SelectChannelNumber(FV.csChannels);
+[sCh, ~] = Spiky.main.SelectChannelNumber(FV.csChannels);
 
-hFig = figure('color', [.2 .2 .2]);
-set(hFig, 'name', 'Spiky Histogram', 'NumberTitle', 'off');
 vData = FV.tData.(sCh);
+if isempty(vData), return; end
+
+hFig = figure('name', 'Spiky Histogram', 'NumberTitle', 'off');
+Spiky.main.ThemeObject(hFig)
 
 % Remove extreme outliers (0.025% off either edge)
 vData = sort(vData);
@@ -23,10 +25,20 @@ end
 
 hBar = bar(vX, vN);
 set(hBar, 'faceColor', vCol, 'edgeColor', vCol)
-set(hAx, 'Color', [.1 .1 .1], 'xcolor', [.6 .6 .6], 'ycolor', [.6 .6 .6], 'fontsize', 7)
-xlabel('V')
+Spiky.main.ThemeObject(hAx)
+
+
+% Get unit
+if isfield(FV.tData, [sCh '_Unit'])
+    sUnit = FV.tData.([sCh '_Unit']);
+else
+    sUnit = FV.tAmplitudeUnit.sUnit;
+end
+xlabel(sprintf('Sample value (%s)', sUnit))
 ylabel('Number of samples')
-hTit = title(sprintf('%s (%s)', FV.tChannelDescriptions(nCh).sDescription, sCh));
-set(hTit, 'FontSize', 8, 'FontWeight', 'bold', 'color', vCol, 'backgroundcolor', [.1 .1 .1], 'interpreter', 'none')
+
+hTit = title(sprintf('%s  %s', sCh, FV.tChannelDescriptions(nCh).sDescription));
+Spiky.main.ThemeObject(hTit, 'interpreter', 'none')
+axis(hAx, 'tight')
 
 return
