@@ -43,6 +43,9 @@ https://github.com/pmknutsen/spiky/issues
 ##Data Formats
 Import:
 - Matlab Data Acquisition Toolbox (.daq)
+- Open ePhys (.openephys)
+- Axona (.set)
+- Alpha Omega (.mat)
 - Hierarchical Data Format (.hd5; requires R2012b or higher)
 - Matlab vectors (.mat)
 
