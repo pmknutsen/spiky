@@ -168,7 +168,7 @@ if bIs2D
     vTime = linspace(0, (1/nContFs)*length(vCont), size(vCont, 2));
 else
     vTime = linspace(0, (1/nContFs)*length(vCont), length(vCont));
-    [vCont, ~, nContFs] = Spiky.main.FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'none');
+    [vCont, ~, nContFs] = Spiky.main.FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'decimate', 10);
 end
 
 % Convert unit to Intensity/s^-d
