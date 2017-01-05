@@ -2459,14 +2459,15 @@ function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiP
 % Bandpass vector.
 %
 % Usage:
-%   FilterChannel(C, T, Fs, LO, HI, R, OPT)
-%       where   C   signal to filter
-%               T   time vector (only required with 'decimate' option)
-%               Fs  sampling rate (Hz)
-%               LO  low-pass frequency (Hz)
-%               HI  high-pass frequency (Hz)
-%               R   1 = rectify, 0 = no rectify
-%               OPT 'decimate' or 'none'
+%   FilterChannel(C, T, Fs, LO, HI, R, OPT, [DF])
+%       where   C    signal to filter
+%               T    time vector (only required with 'decimate' option)
+%               Fs   sampling rate (Hz)
+%               LO   low-pass frequency (Hz)
+%               HI   high-pass frequency (Hz)
+%               R    1 = rectify, 0 = no rectify
+%               OPT  'decimate' or 'none'
+%               DF   Decimation factor (default 2.5; optional)
 %
 % See:
 %   GetFilteredChannel()
