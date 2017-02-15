@@ -137,7 +137,7 @@ vPos = get(hGUI, 'position');
 ThemeObject(hGUI, 'Name', 'Spiky', 'MenuBar', 'none', 'UserData', FV, ...
     'Tag', 'Spiky', 'PaperOrientation', 'landscape', 'PaperUnits', 'normalized', ...
     'PaperPosition', [.05 .05 .9 .9], 'InvertHardcopy', 'off', ...
-    'position', [vPos(1)-200 vPos(2)-50 vPos(3)+350 vPos(4)+100], ...
+    'position', [vPos(1)-200 vPos(2)-50 500 0], ...
     'closeRequestFcn', @ExitSpiky, 'visible', 'off', ...
     'WindowButtonMotionFcn', @GUIMouseMotion );
 
@@ -312,7 +312,6 @@ sExpr = '%[\r\n|\n|\r]';
 disp(sSpiky(nEnd:(nEnd+nStartC(1))))
 
 return
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CreateAnalysisMenu(hParent, sType, varargin)
@@ -944,7 +943,7 @@ SetStruct(FV)
 if any( isnan([FV.tFilteredChannels.vBandpass FV.tFilteredChannels.bRectify]) )
     FilterOptions(varargin)
 else
-    ViewTrialData
+    ViewTrialData();
 end
 
 return
@@ -1379,7 +1378,19 @@ else
     hMarker = findobj(hAx, 'tag', sprintf('%sMarker', sTag));
     set(hMarker, 'xdata', vXY(1), 'ydata', vXY(2));
 end
+return
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function MoveFigToScreen(hFig)
+% Move an off-screen figure to screen
+%
+vScreen = get(0, 'ScreenSize');
+vPos = get(hFig, 'position');
+nYpos = vPos(2) + vPos(4) + 20;
+if nYpos > vScreen(4)
+    vPos(2) = vScreen(4) - vPos(4) - 80;
+end
+set(hFig, 'position', vPos)
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1389,12 +1400,20 @@ function ViewTrialData(varargin)
 %
 
 % Make Spiky window current without raising it to the top
-hFig = findobj('Tag', 'Spiky');
+hFig = GetGUIHandle();
 set(0, 'currentfigure', hFig)
 ThemeObject(hFig);
 
 if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
+
+% If height of window is zero, then change to default width/height
+vPos = get(hFig, 'position');
+if vPos(4) == 0
+    vPos = [vPos(1)-200 vPos(2)-50 vPos(3)+350 500];
+    set(hFig, 'position', vPos)
+    MoveFigToScreen(hFig);
+end
 
 % Destroy waitbar unless we are in Merge or Batch mode
 global g_bBatchMode
@@ -7198,16 +7217,10 @@ ViewTrialData
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Global Undo
-% TODO
-function Undo(varargin)
-return
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function Redo(varargin)
-% Redo previous action
+function RedoScript(varargin)
+% Redo last run script
 %
-BatchRedo([], 'redo');
+BatchRedo([], 'redoscript');
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -7655,7 +7668,10 @@ if nFiles == 0 || strcmpi('MergeFile', sFile)
     end
 end
 
-if strcmp(sAction, 'redo')
+if strcmp(sAction, 'redoscript')
+    % Redo last recorded action ONCE on current file
+    eval(sLastAction)
+elseif strcmp(sAction, 'redo')
     % Redo last recorded BATCH action (B)
     if isempty(sLastAction) % Do nothing
         warndlg('There is no available action to run in batch mode. Note that only actions with the B suffix (e.g. in menus or buttons) can run as batch jobs. To start a batch job, you must first run one of the supported actions and then re-select Batch Redo from the menu.')
