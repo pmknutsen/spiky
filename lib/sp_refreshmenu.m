@@ -45,8 +45,6 @@ uimenu(hGUI, 'Parent', hFile, 'Label', 'E&xit Spiky', 'Callback', Spiky.main.Exi
 
 % Edit menu
 hEdit  = uimenu(hGUI, 'Label', '&Edit');
-uimenu(hGUI, 'Parent', hEdit, 'Label', '&Undo', 'Callback', Spiky.main.Undo, 'Accelerator', 'Z');
-uimenu(hGUI, 'Parent', hEdit, 'Label', '&Redo', 'Callback', Spiky.main.Redo, 'Accelerator', 'Y');
 uimenu(hGUI, 'Parent', hEdit, 'Label', '&DAQ Info', 'Callback', Spiky.main.ShowDAQInfo, 'separator', 'on');
 
 % View menu
@@ -132,6 +130,7 @@ hTools  = uimenu(hGUI, 'Label', '&Tools');
 hScripts = uimenu(hGUI, 'Parent', hTools, 'Label', 'Scripts');
 uimenu(hGUI, 'Parent', hScripts, 'Label', '&Run Script... (B)', 'Callback', Spiky.main.RunScript);
 uimenu(hGUI, 'Parent', hScripts, 'Label', 'Run &Batch Script...', 'Callback', Spiky.main.RunBatchScript);
+uimenu(hGUI, 'Parent', hScripts, 'Label', 'Redo &Script', 'Callback', Spiky.main.RedoScript, 'Accelerator', 'Y');
 uimenu(hGUI, 'Parent', hScripts, 'Label', 'Get Script Help...', 'Callback', Spiky.main.GetScriptHelp);
 
 % Find scripts anywhere in Matlab path
