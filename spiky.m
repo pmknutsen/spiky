@@ -3329,17 +3329,16 @@ function bLoaded = IsDataLoaded(varargin)
 %   IsDataLoaded()
 %   bLoaded = IsDataLoaded()
 %
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 if ~isfield(FV, 'tData') % check data has been loaded
-    uiwait(warndlg('No data has been loaded'))
     bLoaded = 0;
     return
-else bLoaded = 1; end % data has been loaded
+else bLoaded = 1; end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetSpikeThreshold(varargin)
-%
+% 
 [FV, ~] = GetStruct();
 if ~IsDataLoaded, return, end
 zoom off
