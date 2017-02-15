@@ -36,7 +36,7 @@ p.text.color = [.7 .7 .7];
 % Lines (typically requested only for high-contrast lines)
 p.line.color = [.8 .8 .8];
 
-% uicontrol (checkboxes etc)
+% uicontrol (checkboxes, dropdown menus etc)
 p.uicontrol.backgroundcolor = p.figure.color;
 p.uicontrol.foregroundColor = [1 1 1];
 
