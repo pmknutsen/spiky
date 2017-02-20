@@ -2,15 +2,14 @@ function FV = spiky_Experiment_Coordinator(FV)
 % Experiment coordinator
 %
 % Coordinates an experimental rig using Open Ephys and Arduino components.
-% Assumes the Arduino is fully programmed operating in autonomous mode.
+% Assumes the Arduino is fully programmed to run in autonomous mode.
 %
 % TODO:
-%   Set Open Ephys filename
-%   Monitor serial device in real-time and log to file
-%   Send commands to Arduino
-%   Automatically load saved Open Ephys files into Spiky
-%   Connect to Open Ephys
+%   Log arduino commands to file
 %
+
+% Set the number of software defined triggers
+SetGetSWTriggerNum(2);
 
 InitGUI();
 return
@@ -36,20 +35,25 @@ Spiky.main.ThemeObject(hWin)
 
 hMonPanel = uipanel('position', [0 0 0.4 1]);
 hCtrlPanel = uipanel('position', [.4 0 0.6 1]);
+Spiky.main.ThemeObject([hMonPanel hCtrlPanel]);
 
 % GUI elements
 hObj = [];
 hText = [];
 hFields = [];
+hButs = [];
 
 % List of serial ports
 tCOMInfo = instrhwinfo('serial');
-hObj(end+1) = uicontrol(hWin, 'Style', 'popupmenu', 'units', 'normalized', ...
-    'Position', [.5 .95 .5 .05], 'String', tCOMInfo.SerialPorts, ...
-    'tag', 'expcord_COMselection', 'parent', hMonPanel);
 hText(end+1) = uicontrol(hWin, 'Style', 'edit', 'units', 'normalized', ...
-    'Position', [0 0.95 0.5 .05], 'string', 'Arduino COM', ...
+    'Position', [0 0.95 0.3 .05], 'string', 'COM Log', ...
     'foregroundcolor', 'r', 'parent', hMonPanel);
+hObj(end+1) = uicontrol(hWin, 'Style', 'popupmenu', 'units', 'normalized', ...
+    'Position', [.3 .95 .4 .05], 'String', tCOMInfo.SerialPorts, ...
+    'tag', 'expcord_COMselection', 'parent', hMonPanel);
+hButs(end+1) = uicontrol(hWin, 'Style', 'pushbutton', 'units', 'normalized', ...
+    'string', 'Clear', 'callback', @ClearCOMLog, ...
+    'parent', hMonPanel, 'Position', [0.7 .95 .3 .05]);
 
 % Serial monitor
 hObj(end+1) = uicontrol(hWin, 'Style', 'edit', 'units', 'normalized', ...
@@ -59,20 +63,25 @@ hObj(end+1) = uicontrol(hWin, 'Style', 'edit', 'units', 'normalized', ...
 
 % Serial monitor counters
 hText(end+1) = uicontrol(hWin, 'Style', 'edit', 'parent', hMonPanel, ...
-    'units', 'normalized', 'Position', [0 .3 1 .05], ...
-    'string', 'Counters');
+    'units', 'normalized', 'Position', [0 .3 .7 .05], 'string', 'Counters');
+hButs(end+1) = uicontrol(hWin, 'Style', 'pushbutton', 'units', 'normalized', ...
+    'string', 'Reset', 'callback', {@GetSetCounters, struct()}, 'parent', hMonPanel, ...
+    'Position', [0.7 .3 .3 .05]);
 hObj(end+2) = uicontrol(hWin, 'Style', 'edit', 'units', 'normalized', ...
     'enable', 'inactive', 'max', 100, 'parent', hMonPanel, ...
     'Position', [0 .05 1 .25], 'tag', 'expcord_COMcounter', ...
     'horizontalalignment', 'left', 'fontsize', 8, 'fontname', 'courier');
 
-% Trigger
-hText(end+1) = uicontrol(hWin, 'Style', 'edit', 'parent', hMonPanel, ...
-    'units', 'normalized', 'Position', [0 0 .5 .05], ...
-    'string', 'SW Trigger');
-hObj(end+1) = uicontrol(hWin, 'Style', 'popupmenu', 'units', 'normalized', ...
-    'Position', [.5 0 .5 .05], 'tag', 'expcord_SWtrigger', 'string', 'None', ...
-    'callback', @SetGetSWTrigger, 'parent', hMonPanel);
+% Triggers
+vT = fliplr(1:SetGetSWTriggerNum());
+for t = vT
+    hText(end+1) = uicontrol(hWin, 'Style', 'edit', 'parent', hMonPanel, ...
+        'units', 'normalized', 'Position', [0 .05*(t-1) .5 .05], ...
+        'string', sprintf('SW Trigger %d', vT(t)));
+    hObj(end+1) = uicontrol(hWin, 'Style', 'popupmenu', 'units', 'normalized', ...
+        'Position', [.5 .05*(t-1) .5 .05], 'tag', sprintf('expcord_SWtrigger_%d', vT(t)), ...
+        'string', 'None', 'callback', @SetGetSWTrigger, 'parent', hMonPanel);
+end
 
 % Input fields
 uicontrol(hWin, 'Style', 'edit', 'units', 'normalized', ...
@@ -80,23 +89,44 @@ uicontrol(hWin, 'Style', 'edit', 'units', 'normalized', ...
 
 % Input fields
 tDefs = InputDefaults();
+nSpacer = 0;
+nD = 0;
 for d = 1:length(tDefs)
+    if isempty(tDefs(d).name)
+        nSpacer = nSpacer + .01;
+        continue;
+    end
+    nD = nD + 1;
     % Description
     hText(end+1) = uicontrol(hWin, 'Style', 'edit', 'parent', hCtrlPanel, ...
-        'units', 'normalized', 'Position', [0 1-(d*0.05) .4 .05], ...
+        'units', 'normalized', 'Position', [0 1-(nD*0.05)-nSpacer .4 .05], ...
         'string', tDefs(d).name);
     % Input field
     if isempty(tDefs(d).tooltip), tDefs(d).tooltip = ''; end
     hFields(end+1) = uicontrol(hWin, 'Style', 'edit', 'parent', hCtrlPanel, ...
-        'units', 'normalized', 'Position', [.4 1-(d*0.05) .6 .05], ...
+        'units', 'normalized', 'Position', [.4 1-(nD*0.05)-nSpacer .6 .05], ...
         'string', tDefs(d).default, 'tooltipString', tDefs(d).tooltip, ...
         'tag', sprintf('expcord_%s', TagifyString(tDefs(d).name)));
 end
 
+% Save/load settings buttons
+hButs = [];
+hButs(end+1) = uicontrol(hWin, 'Style', 'pushbutton', 'units', 'normalized', ...
+    'string', 'Load Defaults', 'callback', {@LoadSettings, 'default'}, ...
+    'parent', hCtrlPanel, 'Position', [0 1-((nD+1)*0.05)-nSpacer .25 .05]);
+hButs(end+1) = uicontrol(hWin, 'Style', 'pushbutton', 'units', 'normalized', ...
+    'string', 'Save As Default', 'callback', {@SaveSettings, 'default'}, ...
+    'parent', hCtrlPanel, 'Position', [.25 1-((nD+1)*0.05)-nSpacer .25 .05]);
+hButs(end+1) = uicontrol(hWin, 'Style', 'pushbutton', 'units', 'normalized', ...
+    'string', 'Load Settings', 'callback', @LoadSettings, ...
+    'parent', hCtrlPanel, 'Position', [.75 1-((nD+1)*0.05)-nSpacer .25 .05]);
+hButs(end+1) = uicontrol(hWin, 'Style', 'pushbutton', 'units', 'normalized', ...
+    'string', 'Save Settings', 'callback', @SaveSettings, ...
+    'parent', hCtrlPanel, 'Position', [.5 1-((nD+1)*0.05)-nSpacer .25 .05]);
+
 % Status buttons
 tDefs = struct();
-csButs = {'Arduino COM', 'OE Acquiring', 'OE Recording', 'SW Trigger', 'Running'};
-hButs = [];
+csButs = {'Arduino COM', 'COM Running', 'OE Acquiring', 'OE Recording', 'Save'};
 for b = 1:length(csButs)
     hButs(end+1) = uicontrol(hWin, 'Style', 'togglebutton', 'units', 'normalized', ...
         'backgroundcolor', 'r', 'string', csButs{b}, ...
@@ -104,8 +134,56 @@ for b = 1:length(csButs)
         'horizontalalignment', 'center', 'callback', @ButtonAction, ...
         'parent', hCtrlPanel, 'Position', [(b*.2)-.2 0 .2 .1]);
 end
-Spiky.main.ThemeObject(hObj)
+Spiky.main.ThemeObject([hObj hFields])
 Spiky.main.ThemeObject(hText, 'fontsize', 8, 'enable', 'inactive', 'fontweight', 'bold')
+LoadSettings('default');
+UpdateToggleButtons();
+return
+
+% Get the number of defined software triggers
+function nNumTrig = SetGetSWTriggerNum(varargin)
+global g_expCord_SWTrigNum
+if nargin > 0
+    g_expCord_SWTrigNum = varargin{1};
+end
+nNumTrig = g_expCord_SWTrigNum;
+return
+
+% Save settings (only edit fields are saved)
+function SaveSettings(varargin)
+if strcmpi(varargin{end}, 'default')
+    [sDir, ~] = fileparts(which(mfilename));
+    sFile = fullfile(sDir, 'expcord_default_settings.mat');
+end
+hEdit = findobj(GetWin(), 'style', 'edit');
+if exist('sFile')
+    save(sFile, 'hEdit');
+else
+    uisave({'hEdit'}, 'expcoord_settings');
+end
+return
+
+% Load settings
+function LoadSettings(varargin)
+if strcmpi(varargin{end}, 'default')
+    [sDir, ~] = fileparts(which(mfilename));
+    sFile = fullfile(sDir, 'expcord_default_settings.mat');
+end
+if ~exist('sFile')
+    [sFile, sPath] = uigetfile({'*.mat';'*.*'}, 'Load settings');
+    if ~sFile, return; end
+    sFile = fullfile(sPath, sFile);
+end
+if ~exist(sFile, 'file'), return; end
+load(sFile, 'hEdit')
+for h = 1:length(hEdit)
+    hObj = findobj(GetWin(), 'tag', hEdit(h).Tag);
+    if isprop(hObj, 'Max')
+        if hObj.Max == 1
+            hObj.String = hEdit(h).String;
+        end
+    end
+end
 return
 
 % Run an action on UI button press
@@ -120,13 +198,13 @@ switch sStr
         else
             DisconnectCOM();
         end
+    case 'COM Running'
+        StartStopArduinoProgram();
     case 'OE Acquiring'
         ToggleOEAcquisition();
     case 'OE Recording'
         ToggleOERecording();
-    case 'SW Trigger'
-        RunSWTrigger();
-    case 'Running'
+    case 'Save'
         StartStopExp(hObj);
     otherwise
         % undefined button
@@ -203,7 +281,7 @@ if nVal == 1
     
     sAppendText = get(findobj('tag', 'expcord_filenamepostfix'), 'string');
     if ~isempty(sAppendText)
-        sRecCmd = [sRecCmd ' PrependText=' sAppendText];
+        sRecCmd = [sRecCmd ' AppendText=' sAppendText];
     end
     SendOE(sRecCmd);
 else
@@ -218,40 +296,69 @@ IsOEAcquiring();
 IsOERecording();
 return
 
-% Start/Stop experiment
-function StartStopExp(hBut)
+% Start/stop the loaded program on the connected Arduino
+function StartStopArduinoProgram(varargin)
 hCOM = SetGetCOM();
-if get(hBut, 'Value')
-    % Start experiments
-    ToggleOEAcquisition(1); % start OE acquisition
+persistent p_bRunning
+if ~isobject(hCOM)
+    SetCOMStatus(0);
+    bStart = 0;
+else
+    % Toggle COM Running status when no input is provided
+    if nargin == 1
+        bStart = varargin{1};
+    else
+        if p_bRunning
+            bStart = 0;
+        else
+            bStart = 1;
+        end
+    end
+    if bStart
+        hObj = findobj(GetWin(), 'tag', TagifyString('expcord_Arduino start cmd'));
+        fwrite(hCOM, str2num(get(hObj, 'string')))
+        p_bRunning = 1;
+    else
+        hObj = findobj(GetWin(), 'tag', TagifyString('expcord_Arduino stop cmd'));
+        fwrite(hCOM, str2num(get(hObj, 'string')))
+        p_bRunning = 0;
+    end
+end
+% Set button status
+hBut = findobj(GetWin(), 'tag', TagifyString(sprintf('expcord_COM Running')));
+SetButtonStatus(hBut, bStart)
+return
 
+% Start/stop experiment
+function StartStopExp(hBut)
+if isobject(hBut)
+    bStart = get(hBut, 'Value');
+elseif isnumeric(hBut)
+    bStart = hBut;
+    hBut = findobj(GetWin(), 'string', 'Save', 'style', 'togglebutton');
+end
+if bStart
     % Clear COM log
     set(findobj('tag', 'expcord_COMmonitor'), 'string', '');
     set(findobj('tag', 'expcord_COMcounter'), 'string', '');
-    if isobject(hCOM)
-        fwrite(hCOM, 4) % SESSION_INIT
-    else
-        SetCOMStatus(0);
-    end
-    SetButtonStatus(hBut, 1)
-else
-    % Stop experiment
-    if isobject(hCOM)
-        fwrite(hCOM, 5) % SESSION_WAIT
-    else
-        SetCOMStatus(0);
-    end
-    SetButtonStatus(hBut, 0)
-    ToggleOEAcquisition(0); % stop OE acquisition
-end
-return
+    
+    % Start Open Ephys acquisition
+    ToggleOEAcquisition(1);
+    
+    % Start Open Ephys recording
+    ToggleOERecording(1);
 
-% Close all COM connection
-function DisconnectCOM()
-global Spiky
-delete(instrfindall) % if all fails, this cmd closes ALL connections
-Spiky.main.sp_disp('Close all COM connections')
-SetCOMStatus(0);
+    % Start program on COM
+    StartStopArduinoProgram(1);
+    
+else
+    % Stop program on COM
+    StartStopArduinoProgram(0);
+
+    % Stop Open Ephys recording
+    ToggleOEAcquisition(0);
+end
+SetButtonStatus(hBut, bStart)
 return
 
 % Open connection to COM port
@@ -275,6 +382,18 @@ catch
 end
 return
 
+% Close all COM connection
+function DisconnectCOM()
+global Spiky
+% Try to stop running program before disconnecting
+try
+    StartStopArduinoProgram(0);
+end
+delete(instrfindall) % if all fails, this cmd closes ALL connections
+Spiky.main.sp_disp('Close all COM connections')
+SetCOMStatus(0);
+return
+
 % Set the COM connection status indicator
 function SetCOMStatus(bStatus)
 hInd = findobj('tag', 'expcord_arduinocom');
@@ -292,8 +411,6 @@ return
 
 % Update the serial port monitor
 function UpdateCOMMonitor(varargin)
-% TODO  Print to log
-%       Limit display to 100 lines
 hCOM = varargin{end};
 sNewStr = regexprep(strtrim(fscanf(hCOM)), '\t', ' ');
 hMon = findobj('tag', 'expcord_COMmonitor');
@@ -310,48 +427,9 @@ set(hMon, 'string', flipud(csUpdStr))
 UpdateCOMCounters(sNewStr);
 return
 
-% Set or get software trigger string
-function sSWTrigger = SetGetSWTrigger(varargin)
-persistent p_sSWTrigger
-if nargin > 0
-    if isobject(varargin{1})
-        nVal = get(varargin{1}, 'value');
-        csStr = get(varargin{1}, 'string');
-        p_sSWTrigger = csStr{nVal};
-    else
-        p_sSWTrigger = varargin{1};
-    end
-end
-sSWTrigger = p_sSWTrigger;
-return
-
-% Check software trigger
-function CheckSWTrigger(sCmd)
-sTrig = SetGetSWTrigger();
-if strcmp(sTrig, sCmd)
-    RunSWTrigger();
-end
-return
-
-% Execute events that should run when a software trigger occurs
-function RunSWTrigger()
-hTrig = findobj('tag', 'expcord_swtrigger');
-SetButtonStatus(hTrig, 1);
-% Send custom command to Open Ephys
-sCmd = get(findobj('tag', TagifyString('expcord_Open Ephys SW Trigger Cmd')), 'string');
-if ~isempty(sCmd)
-    SendOE(sCmd);
-end
-pause(0.1)
-SetButtonStatus(hTrig, 0)
-return
-
 % Update COM counters
 function UpdateCOMCounters(sStr)
-persistent tCounters
-if isempty(tCounters)
-    tCounters = struct();
-end
+tCounters = GetSetCounters();
 
 % Parse the new string
 [cTokens, ~] = regexp(sStr, '(\d+).*\[(.*)\]', 'tokens', 'match');
@@ -364,6 +442,10 @@ sCmd = regexprep(sCmd, '[^\w'']', '_');
 if length(sCmd) < 2, return; end
 nDms = str2num(nDms);
 
+if all(ismember(sCmd, '0123456789+-.eEdD'))
+    sCmd = ['n' sCmd];
+end
+
 if isfield(tCounters, sCmd)
     tCounters(1).(sCmd)(1).nCount = tCounters(1).(sCmd).nCount + 1;
     tCounters(1).(sCmd)(1).vDms = [tCounters(1).(sCmd)(1).vDms nDms];
@@ -371,6 +453,9 @@ else
     tCounters(1).(sCmd).nCount = 1;
     tCounters(1).(sCmd).vDms = nDms;
 end
+
+GetSetCounters(tCounters); % save counters
+% Do not change counters after this point!
 
 % Construct text that goes into the counter monitor
 csFields = fieldnames(tCounters);
@@ -385,36 +470,158 @@ set(findobj('tag', 'expcord_COMcounter'), 'string', csStr)
 % Check software trigger(s)
 CheckSWTrigger(sCmd);
 
+% Check if Stop Saving counter should be triggered
+hStop = findobj(GetWin(), 'tag', TagifyString(sprintf('expcord_Stop saving when Counter')));
+sStop = get(hStop, 'string');
+if strcmpi(sCmd, sStop)
+    hCnt = findobj(GetWin(), 'tag', TagifyString(sprintf('expcord_exceeds')));
+    nCnt = str2num(get(hCnt, 'string'));
+    if tCounters.(sCmd).nCount > nCnt
+        StartStopExp(0);
+    end
+end
+
 % Update SW trigger selector
 csStrSW = ['None' csStrSW];
-hMenu = findobj('tag', 'expcord_SWtrigger');
-nVal = get(hMenu, 'value');
-if nVal > length(csStrSW)
-    nVal = length(csStrSW);
+for t = 1:2
+    hMenu = findobj('tag', sprintf('expcord_SWtrigger_%d', t));
+    nVal = get(hMenu, 'value');
+    if nVal > length(csStrSW)
+        nVal = length(csStrSW);
+    end
+    set(hMenu, 'value', nVal, 'string', csStrSW);
 end
-set(hMenu, 'value', nVal, 'string', csStrSW);
+return
+
+% Set or get current counter structure
+function tCounters = GetSetCounters(varargin)
+persistent p_tCounters
+if nargin > 0
+    if isstruct(varargin{end})
+        p_tCounters = varargin{end};
+    end
+end
+if isempty(p_tCounters)
+    p_tCounters = struct();
+end
+if isempty(fieldnames(p_tCounters))
+    set(findobj('tag', 'expcord_COMcounter'), 'string', '')
+end
+tCounters = p_tCounters;
+return
+
+% Set or get software trigger string
+function sSWTrigger = SetGetSWTrigger(varargin)
+sSWTrigger = ''; % default
+if nargin > 1
+    if isobject(varargin{1})
+        nVal = get(varargin{1}, 'value');
+        csStr = get(varargin{1}, 'string');
+        sTrigCh = get(varargin{1}, 'tag');
+        if iscell(csStr)
+            sStr = csStr{nVal};
+        else
+            sStr = csStr;
+        end
+        set(findobj(GetWin(), 'tag', sprintf('expcord_swtrigger%s', sTrigCh(end))), ...
+            'string', sStr);
+    end
+elseif nargin == 1
+    if isnumeric(varargin{1})
+        sSWTrigger = get(findobj(GetWin(), 'tag', ...
+            sprintf('expcord_swtrigger%d', varargin{1})), ...
+            'string');
+    end
+end
+return
+
+% Check software trigger
+function CheckSWTrigger(sCmd)
+for t = 1:SetGetSWTriggerNum()
+    sTrig = SetGetSWTrigger(t);
+    if strcmp(sTrig, sCmd)
+        RunSWTrigger(t);
+    end
+end
+return
+
+% Execute events that should run when a software trigger occurs
+function RunSWTrigger(nTrig)
+global Spiky
+% Send custom command to Open Ephys
+sTag = TagifyString(sprintf('expcord_OE SW Trigger %d Cmd', nTrig));
+hInp = findobj('tag', sTag);
+sCmd = get(hInp, 'string');
+if ~isempty(sCmd)
+    set(hInp, 'backgroundcolor', 'g')
+    SendOE(sCmd);
+    pause(.05)
+    Spiky.main.ThemeObject(hInp)
+end
 return
 
 % Default input fields and values
 function tDefs = InputDefaults()
 tDefs = struct();
 tDefs(1).name = 'Recording Directory';
-tDefs(1).default = 'C:\Data\';
+tDefs(end).default = 'C:\Data\';
+tDefs(end).tooltip = 'Directory where data files will be saved';
 
 tDefs(end+1).name = 'Filename prefix';
 tDefs(end).default = 'oe_';
-tDefs(end).tooltip = 'Prepended to filename';
+tDefs(end).tooltip = 'String prepended to filenames';
 
 tDefs(end+1).name = 'Filename postfix';
 tDefs(end).default = '';
-tDefs(end).tooltip = 'Appended to filename';
+tDefs(end).tooltip = 'String appended to filenames';
 
 tDefs(end+1).name = 'Open Ephys IP:Port';
 tDefs(end).default = 'localhost:5556';
+tDefs(end).tooltip = 'Hostname or IP and port of machine running the Open Ephys GUI';
 
-tDefs(end+1).name = 'Open Ephys SW Trigger Cmd';
+tDefs(end+1).name = ''; % spacer
+
+for t = 1:SetGetSWTriggerNum()
+    tDefs(end+1).name = sprintf('SW Trigger %d', t);
+    tDefs(end).default = '';
+    tDefs(end).tooltip = sprintf('Default Arduino software trigger command %d', t);
+end
+
+for t = 1:SetGetSWTriggerNum()
+    tDefs(end+1).name = sprintf('OE SW Trigger %d Cmd', t);
+    tDefs(end).default = '';
+    tDefs(end).tooltip = 'Enter a valid Open Ephys network command';
+end
+
+tDefs(end+1).name = ''; % spacer
+
+tDefs(end+1).name = 'Start saving on SW Trigger';
 tDefs(end).default = '';
-tDefs(end).tooltip = 'StartAcquisition, StopAcquisition\nStartRecord, StopRecord, IsAcquiring, IsRecording, GetRecordingPath, GetRecordingNumber, GetExperimentNumber';
+tDefs(end).tooltip = sprintf('Choose a software trigger number between 1 and %d', SetGetSWTriggerNum());
+
+tDefs(end+1).name = 'Stop saving on SW Trigger';
+tDefs(end).default = '';
+tDefs(end).tooltip = sprintf('Choose a software trigger number between 1 and %d', SetGetSWTriggerNum());
+
+tDefs(end+1).name = ''; % spacer
+
+tDefs(end+1).name = 'Arduino start cmd'; % 4, SESSION_INIT
+tDefs(end).default = '4';
+tDefs(end+1).name = 'Arduino stop cmd';
+tDefs(end).default = '5'; % 5, SESSION_WAIT
+
+tDefs(end+1).name = ''; % spacer
+
+tDefs(end+1).name = 'Stop saving when Counter';
+tDefs(end).default = '';
+tDefs(end).tooltip = 'Choose a counter which will stop saving';
+
+tDefs(end+1).name = '... exceeds';
+tDefs(end).default = '';
+tDefs(end).tooltip = 'Enter a number how many counts will be recorded before Save is stopped';
+
+tDefs(end+1).name = ''; % spacer
+
 return
 
 % Get figure handle
@@ -428,3 +635,7 @@ function sStr = TagifyString(sStr)
 sStr = lower(regexprep(sStr, '[^\w'']', ''));
 return
 
+% Clear COM log
+function ClearCOMLog(varargin)
+set(findobj(GetWin(), 'tag', 'expcord_COMmonitor'), 'string', '')
+return
