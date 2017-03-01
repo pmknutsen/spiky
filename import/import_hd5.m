@@ -83,7 +83,7 @@ for c = 1:length(cDaqChannels)
         nFs = NI.Rate; % Hz
         nTimeBegin = vSecSinceMidnight;
         nTimeEnd = (size(mData, 1) / nFs) + vSecSinceMidnight;
-        [vUpTimes vDownTimes] = Spiky.main.DigitizeChannel(mData(:,c), nThresh, nFs, nTimeBegin, nTimeEnd);
+        [vUpTimes, vDownTimes] = Spiky.main.DigitizeChannel(mData(:,c), nThresh, nFs, nTimeBegin, nTimeEnd);
         
         tData(1).([sChName '_Up']) = vUpTimes; % sec
         tData.([sChName '_Down']) = vDownTimes; % sec
