@@ -1404,8 +1404,18 @@ hFig = GetGUIHandle();
 set(0, 'currentfigure', hFig)
 ThemeObject(hFig);
 
-if ~IsDataLoaded, return, end
-[FV, ~] = GetStruct();
+% Exit if no data has been loaded
+if ~IsDataLoaded()
+    vPos = get(hFig, 'position');
+    if vPos(4) ~= 0
+        vPos = [vPos(1) vPos(2)+vPos(4) 500 0];
+    end
+    set(hFig, 'position', vPos, 'name', 'Spiky')
+    % Delete axes and context menus
+    delete(findobj(hFig, 'type', 'axes'))
+    delete(findobj(hFig, 'type', 'uicontextmenu'))
+    return;
+end
 
 % If height of window is zero, then change to default width/height
 vPos = get(hFig, 'position');
@@ -1428,18 +1438,19 @@ if ~isempty(varargin)
     end
 end
 
-% Delete all current axes objects
-delete(findobj(hFig, 'type', 'axes'))
-
-% Delete all current uicontextmenu objects
-delete(findobj(hFig, 'type', 'uicontextmenu'))
-
 % Reset click callback (unless we're in pan mode)
 hPan = pan(hFig);
 if strcmp(get(hPan, 'Enable'), 'off')
     set(hFig, 'WindowButtonDownFcn', '');
 end
 zoom(hFig, 'off')
+
+% Get current data
+[FV, ~] = GetStruct();
+
+% Delete axes and context menus
+delete(findobj(hFig, 'type', 'axes'))
+delete(findobj(hFig, 'type', 'uicontextmenu'))
 
 % Select channels
 if isempty(FV.csDisplayChannels) && ~IsMergeMode(), SelectChannels; end
@@ -1935,24 +1946,8 @@ if bShowDigitalEvents
         vIndices = reshape(vIndices', numel(vIndices), 1);
         % Rearrange indices
         vYs = repmat([nY nY NaN NaN], 1, length(vIndices)/4);
-        
-        %if length(vIndices) > 100000000
-        %    vPlotIndx = 1:round(length(vIndices)/1000):length(vIndices);
-        %else
-            vPlotIndx = 1:length(vIndices);
-        %end
-        
-        % Set event width
-        %vXlim = FV.vXlim;
-        %if isempty(FV.vXlim)
-        %    vXlim = [min([vUpTimes vDownTimes]) max([vUpTimes vDownTimes])];
-        %end
-        %nEventWidth = GetEventWidth(vXlim)/3;
-        %iEnd = 2:2:length(vIndices);
-        %iRep = [vIndices(iEnd) - vIndices(1:2:end)] < nEventWidth;
-        %vIndices(iRep) = vIndices(iEnd(iRep)-1) + nEventWidth;
-        
-        plot(hSubplots(end), vIndices(vPlotIndx), vYs(vPlotIndx), 'linewidth', nEventHeight, 'color', FV.mColors(1,:))
+        vPlotIndx = 1:length(vIndices);
+        plot(hSubplots(end), vIndices(vPlotIndx), vYs(vPlotIndx), 'linewidth', nEventHeight, 'color', FV.mColors(2,:), 'marker', '.')
     end
 
     % Plot file start (green) and end (red) markers
@@ -2061,11 +2056,11 @@ else
     mXlim = cXlim;
 end
 
-% Remove [0 1] x-limits (likely an empty Events axes)
-nRmIndx = find(ismember(mXlim, [0 1], 'rows'));
-mXlim(nRmIndx, :) = [];
-
 if ~isempty(mXlim)
+    % Remove [0 1] x-limits (likely an empty Events axes)
+    nRmIndx = find(ismember(mXlim, [0 1], 'rows'));
+    mXlim(nRmIndx, :) = [];
+    
     nXlim_MinMax = [min(mXlim(:,1)) max(mXlim(:,2))];
     set(hSubplots(ishandle(hSubplots)), 'xlim', nXlim_MinMax);
 end
@@ -2106,9 +2101,11 @@ for h = 1:length(hHandles)
 end
 
 mPos = cell2mat(get(hHandles(iAxes), 'position')); % axes positions
-[~, iOrder] = sort(mPos(:, 2)); % order by Y position
-hHandles(iAxes) = hHandles(iAxes(iOrder));
-set(hFig, 'children', hHandles)
+if ~isempty(mPos)
+    [~, iOrder] = sort(mPos(:, 2)); % order by Y position
+    hHandles(iAxes) = hHandles(iAxes(iOrder));
+    set(hFig, 'children', hHandles)
+end
 
 SetStruct(FV, 'nosaveflag')
 PanMode()
@@ -2914,19 +2911,28 @@ switch sAns
         SetStruct(FV, 'nosaveflag');
         % Load trial data. Note that the LoadTrial function will replace
         % the default settings with saved settings/results if they exist
-        LoadTrial(sNextTrial);
+        bResult = LoadTrial(sNextTrial);
+        if ~bResult
+            ViewTrialData();
+            return
+        end
     otherwise
         return;
 end
 
-if length(FV.sLoadedTrial ) > 70
+if length(FV.sLoadedTrial) > 70
     sLoadedTrial = ['...' FV.sLoadedTrial(end-69:end)];
 else
     sLoadedTrial = FV.sLoadedTrial;
 end
 set(hWin, 'Name', sprintf('Spiky - %s', sLoadedTrial)) % update window name
 
-ViewTrialData
+% Check if any data was loaded (could be an empty file)
+if ~IsDataLoaded()
+    warndlg('No data was loaded. Empty file?');
+else
+    ViewTrialData();
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3066,7 +3072,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetGain(varargin)
 % Manually set gain of channels in dialog window.
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 if ~IsDataLoaded, return, end
 
 if isempty(FV.csChannels)
@@ -3085,7 +3091,7 @@ hFig = figure();
 nCL = length(FV.csChannels)*25+15;
 vHW = get(g_hSpike_Viewer, 'position');
 set(hFig, 'position', [vHW(1:2) 260 nCL+25], 'menu', 'none', 'Name', 'Set Gains', 'NumberTitle', 'off', 'visible', 'off')
-if exist('centerfig') centerfig(hFig, findobj('Tag', 'Spiky')); end
+if exist('centerfig'), centerfig(hFig, findobj('Tag', 'Spiky')); end
 set(hFig, 'visible', 'on')
 
 for nCh = 1:length(FV.csChannels)
@@ -3215,6 +3221,9 @@ end
 iDot = strfind(sFile, '.');
 eval(sprintf('FV = import_%s(sFile, FV);', lower(sFile(iDot(end)+1:end))))
 
+% Cancel load if import function returned and error
+if ~isstruct(FV), return; end
+
 % Check for errors that may have been reported during import
 if isfield(FV, 'sImportError')
     sp_disp(FV.sImportError)
@@ -3330,10 +3339,12 @@ function bLoaded = IsDataLoaded(varargin)
 %   bLoaded = IsDataLoaded()
 %
 [FV, ~] = GetStruct();
-if ~isfield(FV, 'tData') % check data has been loaded
-    bLoaded = 0;
-    return
-else bLoaded = 1; end
+bLoaded = 0;
+if isfield(FV, 'tData')
+    if ~isempty(FV.tData)
+        bLoaded = 1;
+    end
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -7406,9 +7417,13 @@ for nCh = 1:length(csChannels)
     if cData{nCh, 3} == cData{nCh, 4}
         FV.tData.([csChannels{nCh} '_Down']) = FV.tData.([csChannels{nCh} '_Up']);
     end
-    nIndx = strcmp(csChannels{nCh}, {FV.tChannelDescriptions.sChannel});
-    if ~isempty(FV.tChannelDescriptions(nIndx))
-        cData{nCh, 6} = FV.tChannelDescriptions(nIndx).sDescription;
+    if isempty(FV.tChannelDescriptions)
+        cData{nCh, 6} = '';
+    else
+        nIndx = strcmp(csChannels{nCh}, {FV.tChannelDescriptions.sChannel});
+        if ~isempty(FV.tChannelDescriptions(nIndx))
+            cData{nCh, 6} = FV.tChannelDescriptions(nIndx).sDescription;
+        end
     end
 end
 
