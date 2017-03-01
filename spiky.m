@@ -137,7 +137,7 @@ vPos = get(hGUI, 'position');
 ThemeObject(hGUI, 'Name', 'Spiky', 'MenuBar', 'none', 'UserData', FV, ...
     'Tag', 'Spiky', 'PaperOrientation', 'landscape', 'PaperUnits', 'normalized', ...
     'PaperPosition', [.05 .05 .9 .9], 'InvertHardcopy', 'off', ...
-    'position', [vPos(1)-200 vPos(2)-50 500 0], ...
+    'position', [vPos(1)-200 vPos(2)-50 500 1], ...
     'closeRequestFcn', @ExitSpiky, 'visible', 'off', ...
     'WindowButtonMotionFcn', @GUIMouseMotion );
 
@@ -1407,8 +1407,8 @@ ThemeObject(hFig);
 % Exit if no data has been loaded
 if ~IsDataLoaded()
     vPos = get(hFig, 'position');
-    if vPos(4) ~= 0
-        vPos = [vPos(1) vPos(2)+vPos(4) 500 0];
+    if vPos(4) ~= 1
+        vPos = [vPos(1) vPos(2)+vPos(4) 500 1];
     end
     set(hFig, 'position', vPos, 'name', 'Spiky')
     % Delete axes and context menus
@@ -1419,7 +1419,7 @@ end
 
 % If height of window is zero, then change to default width/height
 vPos = get(hFig, 'position');
-if vPos(4) == 0
+if vPos(4) == 1
     vPos = [vPos(1)-200 vPos(2)-50 vPos(3)+350 500];
     set(hFig, 'position', vPos)
     MoveFigToScreen(hFig);
