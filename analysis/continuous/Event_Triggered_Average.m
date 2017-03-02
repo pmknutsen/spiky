@@ -192,15 +192,14 @@ for o = p_nFirstPulse:nLastPulse
     if nStart < 1 || nEnd > nLen, continue; end
     if bIs2D
         vThis = vCont(:, nStartR:nEndR);
-        [M N] = size(vThis); % Assuming square matrix.
-        [xx yy] = meshgrid(1:N,1:M); % xx,yy are both outputs of meshgrid (so called plaid matrices).
+        [M, N] = size(vThis); % Assuming square matrix.
+        [xx, yy] = meshgrid(1:N,1:M); % xx,yy are both outputs of meshgrid (so called plaid matrices).
         sy = 0;
         sx = nStartR - nStart;
         try
             vThis = interp2(xx, yy, vThis, xx+sx, yy+sy, 'spline', nan);
         catch
         end
-        %vThis = conv2(vThis, [sy; 1-sy]*[sx, 1-sx], 'valid'); % works only for 0<sx<1
         
         vThisBaseline = vCont(:, (vOnsets(o) - round(.1 * nContFs)):vOnsets(o)); % 100 ms before pulse
     else
@@ -320,18 +319,19 @@ if ~bIs2D
     else
         nLatency = vIndx(1); % index
         [nY, nI] = min(abs(vTime - abs(min([0 p_nPre]))));
-        %find( vTime == abs(min([0 p_nPre])) )
         nLatS = vTime(nI + nLatency); %s
     end
-    hH(1) = plot([nLatS nLatS], [nBaseL max(vMean)], 'r--', 'linewidth', 2);
-    hH(2) = plot([nLatS nLatS], [min(vMean) nBaseL], 'g--', 'linewidth', 2);
-    legend(flipud(hH), {num2str(max(vMean)-nBaseL) num2str(min(vMean)-nBaseL)}, 'textcolor', 'w')
-    legend boxoff
+    %hH(1) = plot([nLatS nLatS], [nBaseL max(vMean)], 'r--', 'linewidth', 2);
+    %hH(2) = plot([nLatS nLatS], [min(vMean) nBaseL], 'g--', 'linewidth', 2);
+    %legend(flipud(hH), {num2str(max(vMean)-nBaseL) num2str(min(vMean)-nBaseL)}, 'textcolor', 'w')
+    %legend boxoff
 end
 
 % Axes properties
 Spiky.main.ThemeObject(hAx);
-set(hAx, 'xlim', [-p_nPre p_nPost], 'ylim', [min(vMean)-abs(min(vMean)*.05) max(vMean)+abs(max(vMean)*.05)])
+vYLim(1) = min(vMean) - max(vErrMean);
+vYLim(2) = max(vMean) + max(vErrMean);
+set(hAx, 'xlim', [-p_nPre p_nPost], 'ylim', vYLim * 1.1)
 xlabel('Time (s)')
 if bIs2D sYStr = FV.tData.([p_sContCh '_Unit']);
 else sYStr = 'Intensity'; end
@@ -367,8 +367,9 @@ end
 Spiky.main.ThemeObject(hTit);
 
 if ~bIs2D
-    plot([vTime(1) vTime(end)], [max(vMean) max(vMean)], 'r:') % max value indicator
-    plot([vTime(1) vTime(end)], [min(vMean) min(vMean)], 'g:') % min value indicator
+    %plot([vTime(1) vTime(end)], [max(vMean) max(vMean)], 'r:') % max value indicator
+    %plot([vTime(1) vTime(end)], [min(vMean) min(vMean)], 'g:') % min value indicator
+    grid on
 else
     plot([0 0], [0 max(vY)], 'w--')
 end
@@ -377,6 +378,14 @@ if nargout > 0, varargout(1) = {vMean}; end
 if nargout > 1, varargout(2) = {vErrMean}; end
 if nargout > 2, varargout(3) = {vTime}; end
 set(hFig, 'toolbar', 'figure')
-if ~g_bBatchMode Spiky.main.BatchRedo([], 'ShowEventTriggeredAverage'); end
+if ~g_bBatchMode
+    Spiky.main.BatchRedo([], 'ShowEventTriggeredAverage');
+end
+
+% Add an export button to the menu
+ToolbarExportVectorsBtn(findall(hFig, 'type', 'uitoolbar'), hTrials)
+
+%%
+
 
 return
