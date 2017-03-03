@@ -1,17 +1,18 @@
-function ToolbarExportVectorsBtn(hTools, hLines)
+function ToolbarExportVectorsBtn(hTools, hLines, sStr)
 % Add a button for exporting vector to a toolbar
 %
 % Usage:
-%   ToolbarExportVectorsBtn(T), where T is the handle for the toolbar where
-%   the button should be added and H is a vector of line handles that will
-%   be exported to the Matlab global workspace.
+%   ToolbarExportVectorsBtn(T,H,S), where T is the handle for the toolbar
+%   where the button should be added, H is a vector of line handles that
+%   will be exported to the Matlab global workspace and S is the tooltip
+%   string.
 %
 %
 
-[mCData, mMap] = imread(fullfile(matlabroot,'/toolbox/matlab/icons/HDF_object01.gif'));
-mMap(sum(mMap, 2) == 3, :) = NaN;
+[mCData, mMap] = imread(fullfile(matlabroot,'/toolbox/matlab/icons/HDF_grid.gif'));
+mMap(ismember(mMap, [1 0 1], 'rows'), :) = nan;
 uipushtool(hTools, 'cdata', ind2rgb(mCData, mMap), ...
-    'TooltipString', 'Export vectors', ...
+    'TooltipString', sStr, ...
     'userdata', hLines, ...
     'ClickedCallback', @ExportLines);
 

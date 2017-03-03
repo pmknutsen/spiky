@@ -383,7 +383,8 @@ if ~g_bBatchMode
 end
 
 % Add an export button to the menu
-ToolbarExportVectorsBtn(findall(hFig, 'type', 'uitoolbar'), hTrials)
+ToolbarExportVectorsBtn(findall(hFig, 'type', 'uitoolbar'), hTrials, 'Export trial vectors')
+ToolbarExportVectorsBtn(findall(hFig, 'type', 'uitoolbar'), hMeanLine, 'Export mean vectors')
 
 %%
 
