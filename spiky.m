@@ -133,13 +133,12 @@ SetStruct(FV);
 ThemeObject([]); % set default line colors
 
 % Set GUI window properties
-vPos = get(hGUI, 'position');
 ThemeObject(hGUI, 'Name', 'Spiky', 'MenuBar', 'none', 'UserData', FV, ...
     'Tag', 'Spiky', 'PaperOrientation', 'landscape', 'PaperUnits', 'normalized', ...
     'PaperPosition', [.05 .05 .9 .9], 'InvertHardcopy', 'off', ...
-    'position', [vPos(1)-200 vPos(2)-50 500 1], ...
     'closeRequestFcn', @ExitSpiky, 'visible', 'off', ...
     'WindowButtonMotionFcn', @GUIMouseMotion );
+MinimizeGUI();
 
 if isfield(get(hGUI),'SizeChangedFcn')
     set(hGUI, 'SizeChangedFcn', @GUIResize )
@@ -159,6 +158,24 @@ g_bBatchMode = false;
 
 return
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function MinimizeGUI()
+% Set the height of the GUI window to the minimum
+%
+hGUI = GetGUIHandle();
+vPos = get(hGUI, 'position');
+if datenum(version('-date')) < 736000
+    nHeight = 20;
+else
+    nHeight = 0;
+end
+set(hGUI, 'position', [vPos(1)-200 vPos(2)-50 500 nHeight], 'name', 'Spiky')
+
+% Delete axes and context menus
+delete(findobj(hGUI, 'type', 'axes'))
+delete(findobj(hGUI, 'type', 'uicontextmenu'))
+return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function GUIResize(varargin)
@@ -1407,19 +1424,13 @@ ThemeObject(hFig);
 % Exit if no data has been loaded
 if ~IsDataLoaded()
     vPos = get(hFig, 'position');
-    if vPos(4) ~= 1
-        vPos = [vPos(1) vPos(2)+vPos(4) 500 1];
-    end
-    set(hFig, 'position', vPos, 'name', 'Spiky')
-    % Delete axes and context menus
-    delete(findobj(hFig, 'type', 'axes'))
-    delete(findobj(hFig, 'type', 'uicontextmenu'))
+    MinimizeGUI();
     return;
 end
 
 % If height of window is zero, then change to default width/height
 vPos = get(hFig, 'position');
-if vPos(4) == 1
+if vPos(4) < 2
     vPos = [vPos(1)-200 vPos(2)-50 vPos(3)+350 500];
     set(hFig, 'position', vPos)
     MoveFigToScreen(hFig);
