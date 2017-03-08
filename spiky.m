@@ -7400,7 +7400,7 @@ return
 function ShowEventStatistics(varargin)
 % Show the number of UP/DOWN events on each channel.
 %
-[FV, hWin] = GetStruct();
+[FV, ~] = GetStruct();
 
 % Iterate over digital channels
 csChannels = FV.csDigitalChannels;
@@ -7428,12 +7428,13 @@ for nCh = 1:length(csChannels)
     if cData{nCh, 3} == cData{nCh, 4}
         FV.tData.([csChannels{nCh} '_Down']) = FV.tData.([csChannels{nCh} '_Up']);
     end
-    if isempty(FV.tChannelDescriptions)
-        cData{nCh, 6} = '';
-    else
-        nIndx = strcmp(csChannels{nCh}, {FV.tChannelDescriptions.sChannel});
-        if ~isempty(FV.tChannelDescriptions(nIndx))
-            cData{nCh, 6} = FV.tChannelDescriptions(nIndx).sDescription;
+    cData{nCh, 6} = '';
+    if isfield(FV, 'tChannelDescriptions')
+        if ~isempty(FV.tChannelDescriptions)
+            nIndx = strcmp(csChannels{nCh}, {FV.tChannelDescriptions.sChannel});
+            if ~isempty(FV.tChannelDescriptions(nIndx))
+                cData{nCh, 6} = FV.tChannelDescriptions(nIndx).sDescription;
+            end
         end
     end
 end
