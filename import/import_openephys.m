@@ -27,6 +27,10 @@ for k = 0:oChannels.getLength-1
    csFiles(end+1) = oCh.getAttribute('filename');
 end
 
+% Remove duplicates
+[csCh, vI, ~] = unique(csCh);
+csFiles = csFiles(vI);
+
 if isempty(csCh), return; end
 
 %% Ask which channels to load
