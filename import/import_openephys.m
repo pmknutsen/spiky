@@ -8,7 +8,6 @@ function FV = import_openephys(sFile, FV)
 % 
 
 % TODO
-% remember which channels were imported last time
 % read spike data
 % add support for messages, i.e. save these in FV and display them in the
 % data viewer
@@ -26,6 +25,10 @@ for k = 0:oChannels.getLength-1
    csCh(end+1) = oCh.getAttribute('name');
    csFiles(end+1) = oCh.getAttribute('filename');
 end
+
+%% Get experiment number (when multiple files are saved in same directory)
+oExp = oOE.getElementsByTagName('EXPERIMENT');
+nExpNumber = str2num(oExp.item(0).getAttribute('number'));
 
 % Remove duplicates
 [csCh, vI, ~] = unique(csCh);
@@ -114,9 +117,17 @@ for c = 1:length(csCh)
 end
 close(hWait)
 
+%% Get name of events file
+if nExpNumber > 1
+    sEventsFile = sprintf('all_channels_%d.events', nExpNumber);
+else
+    sEventsFile = 'all_channels.events';
+end
+
 %% Read events
-if exist('all_channels.events', 'file')
-    [vCh, vTime, tInfo] = load_open_ephys_data_faster('all_channels.events');
+tInfo.recNum
+if exist(sEventsFile, 'file')
+    [vCh, vTime, tInfo] = load_open_ephys_data_faster(sEventsFile);
     for ch = unique(vCh)'
         % Detect what type of event this is (TTL or message)
         vEventType = unique(tInfo.eventType(vCh == ch));
