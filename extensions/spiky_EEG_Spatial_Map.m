@@ -8,23 +8,23 @@ function FV = spiky_EEG_Spatial_Map(FV)
 global Spiky;
 
 % Hard-coded variables
-nDecimateFactor = 2; % higher means more or original signal preserved
-nResMult = 4; % resolution multiplier
+nDecimateFactor = 1.5; % higher means more or original signal preserved
 bInterp = 1; % interpolate
 bMask = 1;
 
-persistent p_nLowPass p_nHighPass p_bComputeERP p_nERPPreT p_nERPPostT p_csStimChannel p_bShowNames p_cNormMethod p_sRefCh p_sFidPath p_nSVDModes
+persistent p_nLowPass p_nHighPass p_bComputeERP p_nERPPreT p_nERPPostT p_csStimChannel p_bShowNames p_cNormMethod p_sRefCh p_sFidPath p_nSVDModes p_nResMult
 
 % Default parameters
 if isempty(p_nLowPass), p_nLowPass = 50; end
 if isempty(p_nHighPass), p_nHighPass = 0.1; end
 if isempty(p_cNormMethod), p_cNormMethod = 'z'; end % normalization method (z, percent or mean)
 if isempty(p_bComputeERP), p_bComputeERP = 1; end % compute ERP, 0/1 = no/yes
-if isempty(p_nERPPreT), p_nERPPreT = 0.5; end % s
-if isempty(p_nERPPostT), p_nERPPostT = 2; end % s
+if isempty(p_nERPPreT), p_nERPPreT = 0.2; end % s
+if isempty(p_nERPPostT), p_nERPPostT = 1; end % s
 if isempty(p_bShowNames), p_bShowNames = 1; end % show electrode names, 0/1 = no/yes
 if isempty(p_sRefCh), p_sRefCh = 'all'; end % reference channel
 if isempty(p_nSVDModes), p_nSVDModes = 0; end % SVD modes to denoise with (< 1 = no denoising)
+if isempty(p_nResMult), p_nResMult = 1; end % resolution multiplier
 
 cPrompt = {'Low pass (Hz)', ...
     'High pass (Hz)', ...
@@ -34,12 +34,13 @@ cPrompt = {'Low pass (Hz)', ...
     'ERP post-stimulus period (s)', ...
     'Show electrode names (1=yes)', ...
     'Reference channel (string; ''all'')', ... };
-    'SVD denoising modes' };
+    'SVD denoising modes', ...
+    'Resolution multiplier' };
 cAns = inputdlg(cPrompt, 'EEG Spatial Map', 1, { ...
     num2str(p_nLowPass), num2str(p_nHighPass), ...
     p_cNormMethod, num2str(p_bComputeERP), ...
     num2str(p_nERPPreT), num2str(p_nERPPostT), ...
-    num2str(p_bShowNames), p_sRefCh, num2str(p_nSVDModes) } );
+    num2str(p_bShowNames), p_sRefCh, num2str(p_nSVDModes), num2str(p_nResMult) } );
 if isempty(cAns), return, end
 
 p_nLowPass = max([0 str2num(cAns{1})]);
@@ -51,6 +52,7 @@ p_nERPPostT = max([0 str2num(cAns{6})]);
 p_bShowNames = max([0 str2num(cAns{7})]);
 p_sRefCh = cAns{8};
 p_nSVDModes = str2num(cAns{9});
+p_nResMult = str2num(cAns{10});
 
 %% Load spatial coordinates of electrodes
 % Get fiducials image
@@ -89,21 +91,21 @@ mSkull = tData.cont_skull;
 mSkullRel = mSkull - repmat(tData.refs_bregma, size(mSkull, 1), 1);
 mSkullRelMM = mSkullRel .* tData.calibration_mmpix;
 
-% Get matrix size to nearest 100 um (pixel resolution is 100 um)
+% Get matrix size to nearest 100 um
 nWidthMM = max(abs(mSkullRelMM(:, 1))) * 2;
 nHeightMM = max(abs(mSkullRelMM(:, 2)))  * 2;
-nWidthMM = round(nWidthMM * nResMult) / nResMult;
-nHeightMM = round(nHeightMM * nResMult) / nResMult;
+nWidthMM = round(nWidthMM * p_nResMult) / p_nResMult;
+nHeightMM = round(nHeightMM * p_nResMult) / p_nResMult;
 
-nWidth = nWidthMM * nResMult + 1;
-nHeight = nHeightMM * nResMult + 1;
+nWidth = nWidthMM * p_nResMult + 1;
+nHeight = nHeightMM * p_nResMult + 1;
 
 % Bregma coordinates (pixels; in the middle)
 vBregmaPos = round([nWidth / 2 nHeight / 2]);
-mSkullRelPix = ceil(mSkullRelMM * nResMult) + repmat(vBregmaPos, size(mSkullRelMM, 1), 1);
+mSkullRelPix = ceil(mSkullRelMM * p_nResMult) + repmat(vBregmaPos, size(mSkullRelMM, 1), 1);
 
 % Electrode positions in pixel coordinates
-mElecCoordsPix = ceil(mElecCoordsRelMM * nResMult) + repmat(vBregmaPos, size(mElecCoordsRelMM, 1), 1);
+mElecCoordsPix = ceil(mElecCoordsRelMM * p_nResMult) + repmat(vBregmaPos, size(mElecCoordsRelMM, 1), 1);
 
 %% Get list of electrodes
 csCh = fieldnames(FV.tData);
@@ -190,22 +192,19 @@ switch lower(p_sRefCh)
         vRef = mean(mSigs, 2);
     case 'none'
         vRef = [];
-    case ''
-        vRef = [];
     otherwise
         % Subtract a reference channel from all other channels
         vRef = [];
-        
-        % Subtract a reference channel from all other channels
-        vPos = mElecCoordsPix(strcmp(['elec_' csCh{ch}], csElecCoords), :);
 
         iMatch = find(strcmpi(['elec_' p_sRefCh], csElecCoords));
         if isempty(iMatch)
             Spiky.main.sp_disp(['Unknown name for reference channel elec_' p_sRefCh]);
-            return
+        else
+            % Subtract a reference channel from all other channels
+            vPos = mElecCoordsPix(strcmp(['elec_' csCh{ch}], csElecCoords), :);
+            
+            vRef = squeeze(mMap(mElecCoordsPix(iMatch, 1), mElecCoordsPix(iMatch, 2), :));
         end
-        
-        vRef = squeeze(mMap(mElecCoordsPix(iMatch, 1), mElecCoordsPix(iMatch, 2), :));
 end
 
 %% Subtract reference signal from all channels
@@ -359,6 +358,8 @@ mMin = min(mMap, [], 3);
 cCLim = [min(mMin(:)) max(mMax(:))];
 nMax = max(abs(cCLim));
 hAx.CLim = [-nMax nMax];
+
+% Compute clim from the average min/max
 
 hCol = colorbar;
 hCol.Label.String = 'uV';
