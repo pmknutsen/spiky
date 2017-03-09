@@ -352,10 +352,10 @@ end
 
 hSkull = plot(mSkullRelPix(:, 2), mSkullRelPix(:, 1), 'w--');
 
-% Compute appropriate clim's from data
+%% Compute appropriate clim's from data
 mMax = max(mMap, [], 3);
 mMin = min(mMap, [], 3);
-cCLim = [min(mMin(:)) max(mMax(:))];
+cCLim = [mean(mMin(:)) mean(mMax(:))] .* 2;
 nMax = max(abs(cCLim));
 hAx.CLim = [-nMax nMax];
 
