@@ -8,7 +8,7 @@ function FV = spiky_EEG_Spatial_Map(FV)
 global Spiky;
 
 % Hard-coded variables
-nDecimateFactor = 4; % higher means more or original signal preserved
+nDecimateFactor = 2; % higher means more or original signal preserved
 nResMult = 4; % resolution multiplier
 bInterp = 1; % interpolate
 bMask = 1;
@@ -64,7 +64,8 @@ centerfig(hWaitbar, Spiky.main.GetGUIHandle())
 %% Initialize coordinates matrix
 waitbar(0.1, hWaitbar, 'Initialize coordinate system');
 csElecCoords = fieldnames(tData);
-iCh = regexpi(csElecCoords, '^elec_EGF_\d*$');
+%iCh = regexpi(csElecCoords, '^elec_EGF_\d*$'); % Axona
+iCh = regexpi(csElecCoords, '^elec_CH\d*$'); % Open Ephys
 vRem = [];
 for cs = 1:length(iCh)
     if isempty(iCh{cs})
@@ -106,7 +107,8 @@ mElecCoordsPix = ceil(mElecCoordsRelMM * nResMult) + repmat(vBregmaPos, size(mEl
 
 %% Get list of electrodes
 csCh = fieldnames(FV.tData);
-iCh = regexpi(csCh, '^EGF_\d*$');
+%iCh = regexpi(csCh, '^EGF_\d*$'); % Axona
+iCh = regexpi(csCh, '^CH\d*$'); % Open Ephys
 for i = fliplr(1:length(iCh))
     if isempty(iCh{i}), csCh(i) = []; end
 end
@@ -173,7 +175,7 @@ for ch = 1:length(csCh)
     mMap(vPos(1), vPos(2), :) = vSig;
 end
 waitbar(0.5, hWaitbar, 'Substituting zeros with NaNs...');
-mMap(mMap(:) == 0) = NaN;
+mMap(mMap(:) == 0) = NaN; % huge mem drain: mMap(:) == 0 duplicates matrix
 
 %% Compute reference signal
 waitbar(0, hWaitbar, 'Computing reference signal...');
