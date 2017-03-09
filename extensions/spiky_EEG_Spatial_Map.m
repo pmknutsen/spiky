@@ -170,12 +170,12 @@ for ch = 1:length(csCh)
     end
     
     if isempty(mMap)
-        mMap = zeros(nWidth, nHeight, length(vSig));
+        mMap = nan(nWidth, nHeight, length(vSig));
     end
     mMap(vPos(1), vPos(2), :) = vSig;
 end
 waitbar(0.5, hWaitbar, 'Substituting zeros with NaNs...');
-mMap(mMap(:) == 0) = NaN; % huge mem drain: mMap(:) == 0 duplicates matrix
+%mMap(mMap(:) == 0) = NaN; % huge mem drain: mMap(:) == 0 duplicates matrix
 
 %% Compute reference signal
 waitbar(0, hWaitbar, 'Computing reference signal...');
@@ -343,7 +343,10 @@ end
 
 % Text labels
 if p_bShowNames
-    csElec = cell2mat(csElecCoords(:));
+    csElec = char();
+    for c = 1:length(csElecCoords)
+        csElec(c, 1:length(csElecCoords{c})) = char(csElecCoords{c});
+    end
     hTxt = text(mElecCoordsPix(:, 2) - 1.2, mElecCoordsPix(:, 1), csElec(:, 6:end));
     set(hTxt, 'FontSize', 8, 'interpreter', 'none', 'HorizontalAlignment', 'center', 'color', 'w');
 end
