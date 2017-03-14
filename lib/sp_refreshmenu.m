@@ -50,13 +50,14 @@ uimenu(hGUI, 'Parent', hEdit, 'Label', '&DAQ Info', 'Callback', Spiky.main.ShowD
 % View menu
 hView  = uimenu(hGUI, 'Label', '&View');
 uimenu(hGUI, 'Parent', hView, 'Label', '&Show Channels...', 'Callback', Spiky.main.SelectChannels);
-uimenu(hGUI, 'Parent', hView, 'Label', 'Show &Events', 'Callback', Spiky.main.ToggleStatus, 'Checked', 'on', 'Accelerator', 'E');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Show &Events', 'Callback', Spiky.main.ToggleStatus, 'Checked', 'off', 'Accelerator', 'E');
 uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &In', 'Callback', Spiky.main.ZoomIn, 'separator', 'on');
 uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &Out', 'Callback', Spiky.main.ZoomOut);
 uimenu(hGUI, 'Parent', hView, 'Label', '&Zoom Range', 'Callback', Spiky.main.ZoomRange, 'Accelerator', 'Z');
 uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &Reset', 'Callback', Spiky.main.ZoomReset, 'Accelerator', 'X');
 uimenu(hGUI, 'Parent', hView, 'Label', 'Pan', 'Callback', Spiky.main.PanWindow, 'Accelerator', 'L');
 uimenu(hGUI, 'Parent', hView, 'Label', '&Zoom Amplitude', 'Callback', Spiky.main.ZoomAmplitude, 'Accelerator', 'Y', 'separator', 'on');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &Tight', 'Callback', Spiky.main.ZoomTight, 'Accelerator', 'T');
 hAmpUnit = uimenu(hGUI, 'Parent', hView, 'Label', 'Amplitude Unit');
 uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Volts (V)',  'callback', {Spiky.main.SetAmplitudeUnit, 'V'});
 uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Millivolts (mV)', 'callback', {Spiky.main.SetAmplitudeUnit, 'mV'});
@@ -96,7 +97,7 @@ uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Remove Thresholds', 'Callback', Sp
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Run Spike Detection (B)', 'Callback', Spiky.main.DetectSpikes, 'separator', 'on');
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Dejitter Spikes (B)', 'Callback', Spiky.main.DejitterSpikes);
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Remove &Outliers (B)', 'Callback', Spiky.main.RemoveOutlierSpikes);
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Add &Multitrode...', 'Callback', Spiky.main.AddTetrode, 'separator', 'on', 'Accelerator', 'T');
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Add &Multitrode...', 'Callback', Spiky.main.AddTetrode, 'separator', 'on');
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Remove Multitrode...', 'Callback', Spiky.main.RemoveTetrode );
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set Max &Jitter...', 'Callback', Spiky.main.SetMaxSpikeJitter );
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Show Waveforms', 'Callback', Spiky.main.ViewWaveforms, 'separator', 'on');
@@ -127,11 +128,11 @@ uimenu(hGUI, 'Parent', hAnalysis, 'Label', 'Experiment &Variables...', 'Callback
 
 % Tools menu
 hTools  = uimenu(hGUI, 'Label', '&Tools');
-hScripts = uimenu(hGUI, 'Parent', hTools, 'Label', 'Scripts');
-uimenu(hGUI, 'Parent', hScripts, 'Label', '&Run Script... (B)', 'Callback', Spiky.main.RunScript);
-uimenu(hGUI, 'Parent', hScripts, 'Label', 'Run &Batch Script...', 'Callback', Spiky.main.RunBatchScript);
-uimenu(hGUI, 'Parent', hScripts, 'Label', 'Redo &Script', 'Callback', Spiky.main.RedoScript, 'Accelerator', 'Y');
-uimenu(hGUI, 'Parent', hScripts, 'Label', 'Get Script Help...', 'Callback', Spiky.main.GetScriptHelp);
+hExtensions = uimenu(hGUI, 'Parent', hTools, 'Label', 'Extensions');
+uimenu(hGUI, 'Parent', hExtensions, 'Label', '&Run Script... (B)', 'Callback', Spiky.main.RunScript);
+uimenu(hGUI, 'Parent', hExtensions, 'Label', 'Run &Batch Script...', 'Callback', Spiky.main.RunBatchScript);
+uimenu(hGUI, 'Parent', hExtensions, 'Label', 'Redo &Script', 'Callback', Spiky.main.RedoScript, 'Accelerator', 'Y');
+uimenu(hGUI, 'Parent', hExtensions, 'Label', 'Get Script Help...', 'Callback', Spiky.main.GetScriptHelp);
 
 % Find scripts anywhere in Matlab path
 % Scripts are prefixed with spiky_ in the filename and can be placed
@@ -157,7 +158,7 @@ for s = 1:length(csScripts)
     sName = strrep(csScripts{s}(7:end-2), '_', ' ');
     iSpace = strfind(sName, ' ');
     sName([1 iSpace+1]) = upper(sName([1 iSpace+1])); % capitalize all words
-    hMenu = uimenu(hGUI, 'Label', sName, 'Parent', hScripts, 'Callback', [sprintf('Spiky.main.RunScript(''%s'')', csScripts{s})]);
+    hMenu = uimenu(hGUI, 'Label', sName, 'Parent', hExtensions, 'Callback', [sprintf('Spiky.main.RunScript(''%s'')', csScripts{s})]);
     if s == 1
         set(hMenu, 'Separator', 'on')
     end
