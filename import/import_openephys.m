@@ -34,54 +34,21 @@ nExpNumber = str2num(oExp.item(0).getAttribute('number'));
 [csCh, vI, ~] = unique(csCh);
 csFiles = csFiles(vI);
 
+% Rename channels from CHX to CHXX
+for c = 1:length(csCh)
+    if strcmp(csCh{c}(1:2), 'CH')
+        csCh{c} = sprintf('CH%.2d', str2num(csCh{c}(3:end)));
+    end
+end
+
+% Sort
+[csCh, iOrder] = sort(csCh);
+csFiles = csFiles(iOrder);
 if isempty(csCh), return; end
 
-%% Ask which channels to load
-hFig = figure;
-vPos = get(hFig, 'position');
-nH = length(csCh) * 20;
-set(hFig, 'position', [vPos(1) vPos(2) 200 nH+60], 'menu', 'none', ...
-    'Name', 'Select channels', 'NumberTitle', 'off', ...
-    'closeRequestFcn', 'global STAT; STAT=[]; delete(gcf)')
-csChf = fliplr(csCh);
-for nCh = 1:length(csCh)
-    nVal = 1;
-    sStr = csChf(nCh);
-    if strcmp(csChf{nCh}(1:3), 'AUX')
-        sStr = sprintf('%s (Accelerometer)', csChf{nCh});
-        nVal = 0;
-    elseif strcmp(csChf{nCh}(1:3), 'ADC')
-        sStr = sprintf('%s (Digital)', csChf{nCh});
-        nVal = 0;
-    end
-    uicontrol(hFig, 'Style', 'checkbox', 'Position', [15 (nCh+2)*20 nH 20], ...
-        'String', sStr, 'HorizontalAlignment', 'left', 'value', nVal);
-end
-persistent p_STAT
-if ~isempty(p_STAT)
-    hChecks = findobj(gcf, 'style', 'checkbox');
-    for c = 1:length(hChecks)
-        set(hChecks(c), 'value', p_STAT{c})
-    end
-end
-uicontrol(hFig, 'Style', 'checkbox', 'Position', [15 40 nH 20], ...
-    'String', 'Select all', 'HorizontalAlignment', 'left', 'value', 1, ...
-    'callback', 'set(findobj(gcf,''style'',''checkbox''),''value'',get(gcbo,''value''))');
-uicontrol(hFig, 'Style', 'pushbutton', 'Position', [110 10 80 20], ...
-    'Callback', 'global STAT;STAT=get(findobj(gcf,''style'',''checkbox''),''value'');delete(gcf)', ...
-    'String', 'OK' );
-set(findobj(hFig, 'style', 'checkbox'), 'backgroundcolor', get(hFig, 'color'))
-centerfig(hFig)
-uiwait(hFig)
-
-% Filter out deselected channels
-global STAT
-if isempty(STAT)
-    FV = false;
-    return;
-end
-p_STAT = STAT;
-iRem = setdiff(1:length(csCh), find(cell2mat(STAT(2:end))));
+% Select channels to import
+iSelected = Spiky.main.SelectChannelsUI(csCh, csCh);
+iRem = setdiff(1:length(csCh), find(iSelected));
 csCh(iRem) = [];
 csFiles(iRem) = [];
 
@@ -95,9 +62,13 @@ FV.sLoadedTrial = fullfile(FV.sDirectory, sFile);
 hWait = waitbar(0, 'Loading continuous Open ePhys files...');
 centerfig(hWait, Spiky.main.GetGUIHandle());
 for c = 1:length(csCh)
+    if ~ishandle(hWait)
+        break;
+    end
     waitbar(c/length(csCh), hWait)
     if exist(csFiles{c}, 'file')
         [vData, vTime, tInfo] = load_open_ephys_data_faster(csFiles{c});
+        vData = single(vData);
         sCh = csCh{c};
         sTime = tInfo.header.date_created(end-5:end);
         FV.tData(1).(sCh) = vData'; % microvolts
