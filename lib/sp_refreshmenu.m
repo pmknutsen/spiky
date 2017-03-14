@@ -63,7 +63,7 @@ uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Volts (V)',  'callback', {Spiky.main.
 uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Millivolts (mV)', 'callback', {Spiky.main.SetAmplitudeUnit, 'mV'});
 uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Microvolts (µV)', 'callback', {Spiky.main.SetAmplitudeUnit, 'uV'});
 uimenu(hGUI, 'Parent', hView, 'Label', '&Normal Time', 'Callback', Spiky.main.ToggleStatus, 'separator', 'on', 'Tag', 'ShowNormalTime', 'checked', 'on');
-uimenu(hGUI, 'Parent', hView, 'Label', '&Grid', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', Spiky.main.ToggleStatus, 'Checked', 'on');
+uimenu(hGUI, 'Parent', hView, 'Label', '&Draw time ticks', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', Spiky.main.ToggleStatus, 'Checked', 'off');
 
 % List of themes
 hThemes = uimenu(hGUI, 'Parent', hView, 'Label', '&Themes', 'separator', 'on');
