@@ -237,6 +237,7 @@ ViewTrialData();
 GUIRefreshToolbar();
 GUIRefreshMenu();
 g_bBatchMode = 0;
+ThemeObject(GetGUIHandle());
 
 return
 
@@ -1302,17 +1303,22 @@ function vTime = GetTime(nBeginTime, nEndTime, vCont, nFs)
 %
 if all(size(vCont) > 1) % 2D trace (e.g. spectrogram)
     nEndTime = nBeginTime + (size(vCont, 2))*(1/nFs);
-    vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
+    % Inline linspace for ~35% speed improvement
+    %vTime = linspace(nBeginTime, nEndTime, size(vCont, 2));
+    nD = (nEndTime - nBeginTime) ./ (size(vCont, 2) - 1);
+    vTime = [nBeginTime:nD:nEndTime];
 else % 1D trace (voltage etc)
     % TODO: Why don't I always calculate vTime from nFs
     % Compute end time if it is not provided
-    if isempty(nEndTime)
-        %length(vCont) nFs
-    end
-    vTime = linspace(nBeginTime, nEndTime, length(vCont));
+    
+    % Inline linspace for ~35% speed improvement
+    %vTime = linspace(nBeginTime, nEndTime, length(vCont));
+    nD = (nEndTime - nBeginTime) ./ (length(vCont) - 1);
+    vTime = [nBeginTime:nD:nEndTime];
+    
     % Check that time intervals == nFs; if not, then recalculate
     % vTime from nFs
-    nFs_i = 1 / diff(vTime(1:2));
+    nFs_i = round(1 / diff(vTime(1:2)));
     if nFs_i ~= nFs
         vTime = nBeginTime:(1/nFs):(nBeginTime+(1/nFs)*length(vCont)+1);
         vTime = vTime(1:length(vCont));
@@ -1340,6 +1346,18 @@ if isempty(g_bMergeMode)
     g_bMergeMode = 0;
 end
 bResult = g_bMergeMode;
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function bResult = IsBatchMode(varargin)
+% Determine batch mode. Return 1 if Spiky is currently running in batch
+% mode. Otherwise, returns 0.
+%
+global g_bBatchMode
+if isempty(g_bBatchMode)
+    g_bBatchMode = 0;
+end
+bResult = g_bBatchMode;
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1415,11 +1433,10 @@ function ViewTrialData(varargin)
 % Update main window in GUI (channels and events) with current data and
 % options.
 %
-
+sp_disp('Refresh UI')
 % Make Spiky window current without raising it to the top
 hFig = GetGUIHandle();
 set(0, 'currentfigure', hFig)
-ThemeObject(hFig);
 
 % Exit if no data has been loaded
 if ~IsDataLoaded()
@@ -1437,8 +1454,7 @@ if vPos(4) < 2
 end
 
 % Destroy waitbar unless we are in Merge or Batch mode
-global g_bBatchMode
-if ~IsMergeMode() && ~g_bBatchMode
+if ~IsMergeMode() && ~IsBatchMode()
     SpikyWaitbar(1,1);
 end
 
@@ -1457,15 +1473,17 @@ end
 zoom(hFig, 'off')
 
 % Get current data
-[FV, ~] = GetStruct();
+FV = GetStruct();
 
 % Delete axes and context menus
 delete(findobj(hFig, 'type', 'axes'))
 delete(findobj(hFig, 'type', 'uicontextmenu'))
 
 % Select channels
-if isempty(FV.csDisplayChannels) && ~IsMergeMode(), SelectChannels; end
-[FV, hWin] = GetStruct();
+if isempty(FV.csDisplayChannels) && ~IsMergeMode()
+    SelectChannels();
+    FV = GetStruct();
+end
 
 % Check that all channel names exist in FV.csChannels
 cFields = fieldnames(FV.tData);
@@ -1491,18 +1509,20 @@ for i = 1:length(FV.csChannels)
     end
 end
 
-% Check that all DisplayChannels exist (and remove those that dont)
+% Check that all DisplayChannels exist (and remove those that don't)
 vRemIndx = [];
 for i = 1:length(FV.csDisplayChannels)
     if ~isfield(FV.tData, FV.csDisplayChannels{i})
         vRemIndx = [vRemIndx i];
     end
 end
-FV.csDisplayChannels(vRemIndx) = [];
-SetStruct(FV, 'nosaveflag')
+if ~isempty(vRemIndx)
+    FV.csDisplayChannels(vRemIndx) = [];
+    SetStruct(FV, 'nosaveflag')
+end
 
 hSubplots = [];
-bShowDigitalEvents = strcmp(get(findobj(hWin, 'Label', 'Show &Events'),'checked'), 'on');
+bShowDigitalEvents = strcmp(get(findobj(hFig, 'Label', 'Show &Events'), 'checked'), 'on');
 if isempty(FV.csDigitalChannels), bShowDigitalEvents = 0; end
 
 if bShowDigitalEvents
@@ -1570,13 +1590,11 @@ for i = 1:length(FV.csDisplayChannels)
             FV.tYlim.(sCh) = [min(vCont) max(vCont)];
         end
         % Decimate
-        nLen = 20000;
-        vShowIndx = unique(round(linspace(1,length(vTime),nLen)));
+        nLen = 2000;
+        vShowIndx = unique(round( linspace(1, length(vTime), nLen) ));
         
         if any(size(vCont) == 1)
-            vTimeAllTrace = vTime;
             vTime = vTime(vShowIndx);
-            vContAllTrace = vCont;
             vCont = vCont(vShowIndx);
         end
     end
@@ -1738,9 +1756,6 @@ for i = 1:length(FV.csDisplayChannels)
         end
         % attach context menu to line to enable additional options
         hMenu = uicontextmenu;
-        if exist('vTimeAllTrace')
-            set(hMenu, 'userdata', [vTimeAllTrace(:) vContAllTrace(:)], 'Tag', sCh);
-        end
         set(hMenu, 'Tag', sCh);
         CreateAnalysisMenu(hMenu, 'continuous', 'Analysis')
         uimenu(hMenu, 'Label', '&Copy to Figure', 'Callback', @CopyChannelToFig, 'Tag', sCh, 'Separator', 'on');
@@ -1777,6 +1792,7 @@ for i = 1:length(FV.csDisplayChannels)
             hLabel = ylabel(sprintf('%s', strrep(sYLabel, '_', ' ')));
         end
         set(hLabel, 'userdata', sUnit, ...
+            'ButtonDownFcn', @ChangeChannel, ...
             'units', 'normalized', ...
             'position', [-.03 0.5 0]);
     end
@@ -1877,14 +1893,15 @@ for i = 1:length(FV.csDisplayChannels)
                 vYLim = FV.tYlim.(sCh) + nYd;
                 if vYLim(1) == vYLim(2)
                     nD = vYLim(1) * .05 - (10^-6);
-                    set(hSubplots(end), 'ylim',  vYLim - [-nD nD]); % use ylim +/- 5%
-                else
-                    set(hSubplots(end), 'ylim',  vYLim); % use saved ylim * 5%
+                    vYLim = vYLim - [-nD nD]; % use ylim +/- 5%
                 end
-                % Reduce number of y-ticks
-                vYTicks = get(hSubplots(end), 'ytick');
-                set(hSubplots(end), 'ytick', vYTicks(1:2:end));
+            else
+                vYLim = [min(vCont) max(vCont)];
             end
+            set(hSubplots(end), 'ylim',  vYLim);
+            % Reduce number of y-ticks
+            vYTicks = get(hSubplots(end), 'ytick');
+            set(hSubplots(end), 'ytick', vYTicks(1:2:end));
         else
             % 2D plot
             if exist('vY', 'var')
@@ -2069,7 +2086,7 @@ end
 
 if ~isempty(mXlim)
     % Remove [0 1] x-limits (likely an empty Events axes)
-    nRmIndx = find(ismember(mXlim, [0 1], 'rows'));
+    nRmIndx = ismember(mXlim, [0 1], 'rows');
     mXlim(nRmIndx, :) = [];
     
     nXlim_MinMax = [min(mXlim(:,1)) max(mXlim(:,2))];
@@ -2118,9 +2135,10 @@ if ~isempty(mPos)
     set(hFig, 'children', hHandles)
 end
 
-SetStruct(FV, 'nosaveflag')
+%SetStruct(FV, 'nosaveflag')
 PanMode()
-set(GetGUIHandle(), 'WindowButtonMotionFcn', @GUIMouseMotion);
+set(hFig, 'WindowButtonMotionFcn', @GUIMouseMotion);
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2560,6 +2578,16 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ChangeChannel(varargin)
+% Change the displayed channel when clicking on an axis y-handle
+%
+% Usage: ChangeChannel(OBJ)
+%
+disp('method not implemented')
+
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function csSelected = SelectChannels(varargin)
 % Select the channels that should be displayed in the GUI
 % 
@@ -2613,62 +2641,103 @@ end
 [csDisplayChannels, iOrder] = sort(csDisplayChannels);
 csChannelDescriptions = csChannelDescriptions(iOrder);
 
-global g_vSelCh;
-if length(csDisplayChannels) == 1
-    g_vSelCh = 1;
-else
-    if isempty(csDisplayChannels), return, end
-    hFig = figure;
-    nFigWidth = 300;
-    nCL = length(csDisplayChannels)*25+35;
-    vHW = get(g_hSpike_Viewer, 'position');
-    set(hFig, 'position', [vHW(1)+40 (vHW(2)+vHW(4)-nCL-50) nFigWidth nCL+25], 'menu', 'none', 'Name', 'Select channels', 'NumberTitle', 'off')
-    for i = 1:length(csDisplayChannels)
-        sBoxStr = sprintf('%s (%s)', csChannelDescriptions{i}, csDisplayChannels{i});
-        if any(strcmp(FV.csDisplayChannels, csDisplayChannels{i}))
-            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL nFigWidth-20 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 1);
-        else
-            uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL nFigWidth-20 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 0);
-        end
-        nCL = nCL - 25;
-    end
-    % 'Select all' checkbox
-    uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 170 20], 'String', 'Select all', ...
-        'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 0, 'callback', ...
-        'set(get(gcf,''children''),''value'', 1)');
-    nCL = nCL - 25;
-    uicontrol(hFig, 'Style', 'pushbutton', 'Position', [50 nCL 100 20], ...
-        'Callback', 'global g_vSelCh; g_vSelCh=flipud(get(get(gcf,''children''),''value'')); g_vSelCh=[g_vSelCh{:}];close(gcf)', ...
-        'String', '      OK      ' ); % OK button
-    uiwait % wait for user to close window or click OK button
-    g_vSelCh = logical(g_vSelCh(1:end-2));
-end
-% Assign channels to FV or just return them
-bReturn = 0;
-csSelected = csDisplayChannels(g_vSelCh);
-csSelectedDescr = csChannelDescriptions(g_vSelCh);
-
-if ~isempty(varargin)
-    if strcmp(varargin{1}, 'return') || isempty(g_vSelCh)
-        bReturn = 1;
-    end
-end
-% Return selected channels back to calling function
-if bReturn
+iSelected = SelectChannelsUI(csDisplayChannels, csChannelDescriptions);
+if iSelected == 0
+    csSelectedDescr = {};
+    csSelected = {};
     return
-else % Assign channels to FV and update display
-    
-    % Sort channels in alphabetical order based on their Description
-    % strings
-    iEmpty = strcmp(csSelectedDescr, '');
-    csSelectedDescr(iEmpty) = csSelected(iEmpty);
-    [~, iSorted] = sort(csSelectedDescr);
-    
-    FV.csDisplayChannels = csSelected(iSorted); % selected channels
-    clear global g_vSelCh
-    SetStruct(FV)
-    ViewTrialData
 end
+csSelectedDescr = csChannelDescriptions(iSelected);
+csSelected = csDisplayChannels(iSelected);
+
+% Sort channels in alphabetical order based on description strings
+iEmpty = strcmp(csSelectedDescr, '');
+csSelectedDescr(iEmpty) = csSelected(iEmpty);
+[~, iSorted] = sort(csSelectedDescr);
+
+FV.csDisplayChannels = csSelected(iSorted); % selected channels
+%clear global g_vSelCh
+SetStruct(FV)
+ViewTrialData()
+
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function iSelected = SelectChannelsUI(csCh, csChDescr, varargin)
+% UI to select any number of channels. This is a lower-level function
+% called by SelectChannels(). It can also be called by extensions etc that
+% need a UI to select from a series of channels/strings/options.
+% 
+% Usage:
+%   S = SelectChannelsUI(S, CS), where S is a cell of channel names, CS
+%   are optional descriptions of the channels, and I is a vector of checked
+%   indices in S.
+%
+%   If the UI is closed without making a selection, a zero is returned
+%   instead of a vector of indices in I.
+%
+global STAT
+persistent p_STAT
+
+if isempty(csCh)
+    iSelected = 0;
+    return
+elseif length(csCh) == 1
+    iSelected = 1;
+    return
+end
+
+% Ask which channels to load
+hFig = figure;
+vPos = get(hFig, 'position');
+nRows = min([20 length(csCh)]);
+nCols = ceil(length(csCh) / nRows);
+nColW = 150;
+nRowH = 20;
+nH = nRows * nRowH;
+nW = nCols * nColW;
+set(hFig, 'position', [vPos(1) vPos(2) nW nH+60], 'menu', 'none', ...
+    'Name', 'Select channels', 'NumberTitle', 'off', ...
+    'closeRequestFcn', 'global STAT; STAT=[]; delete(gcf)')
+
+for nCh = 1:length(csCh)
+    nVal = 1;
+    sStr = csCh(nCh);
+    if strcmp(csCh{nCh}(1:3), 'AUX')
+        sStr = sprintf('%s (Accelerometer)', csCh{nCh});
+        nVal = 0;
+    elseif strcmp(csCh{nCh}(1:3), 'ADC')
+        sStr = sprintf('%s (Digital)', csCh{nCh});
+        nVal = 0;
+    end
+    nCol = ceil(nCh / nRows) - 1;
+    nRow = (nRows + 1) - rem(nCh, nRows);
+    if nRow == (nRows + 1), nRow = 1; end
+    uicontrol(hFig, 'Style', 'checkbox', 'String', sStr, ...
+        'Position', [(nCol * nColW)+15 (nRow+1.5)*nRowH+5 nH 20], ...
+        'HorizontalAlignment', 'left', 'value', nVal);
+end
+if ~isempty(p_STAT)
+    hChecks = findobj(gcf, 'style', 'checkbox');
+    for c = 1:length(hChecks)
+        if c <= length(p_STAT)
+            set(hChecks(c), 'value', p_STAT{c})
+        end
+    end
+end
+uicontrol(hFig, 'Style', 'checkbox', 'Position',  [(nCol * nColW)+15 (nRow)*nRowH+15 nColW nRowH], ...
+    'String', 'Select all', 'HorizontalAlignment', 'left', 'value', 1, ...
+    'callback', 'set(findobj(gcf,''style'',''checkbox''),''value'',get(gcbo,''value''))');
+uicontrol(hFig, 'Style', 'pushbutton', 'Position', [(nW/2 - 80/2) 10 80 20], ...
+    'Callback', 'global STAT;STAT=get(findobj(gcf,''style'',''checkbox''),''value'');delete(gcf)', ...
+    'String', 'OK' );
+set(findobj(hFig, 'style', 'checkbox'), 'backgroundcolor', get(hFig, 'color'))
+centerfig(hFig)
+uiwait(hFig)
+
+p_STAT = STAT(2:end);
+iSelected = flipud(logical(cell2mat(p_STAT)));
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2888,7 +2957,7 @@ if isempty(FV.sLoadedTrial)
     sAns = 'No';
 else
     if isempty(p_bNeverApply), p_bNeverApply = 0; end
-    if ~p_bNeverApply && ~g_bBatchMode
+    if ~p_bNeverApply && ~IsBatchMode()
         sAns = questdlg('Should current settings be applied to the new file?', 'Spiky', 'Yes', 'No', 'Never apply', 'No');
     else
         sAns = 'No';
@@ -3002,11 +3071,12 @@ if ~g_bBatchMode, BatchRedo([], 'ImportFile([],[])'); end % set up batch job
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [FV, hWin] = GetStruct(varargin)
+function [FV, varargout] = GetStruct(varargin)
 % Fetch the FV structure from the Spiky GUI, or a sub-field of FV and the
 % handle of the Spiky GUI window.
 % 
 % Usage:
+%   FV = GetStruct()
 %   [FV, hWin] = GetStruct()
 %   [tData, hWin] = GetStruct('tData'), returns FV.tData
 %
@@ -3025,6 +3095,9 @@ if nargin == 1
         error(['The requested field ' varargin{1} ' is not a field in FV.']);
     end
 end
+if nargout == 2
+    varargout{1} = hWin;
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3034,10 +3107,14 @@ function hWin = GetGUIHandle(varargin)
 % Usage:
 %   H = GetGUIHandle()
 %
-hWin = findobj('Tag', 'Spiky');
-if length(hWin) > 1
-    hWin = hWin(1);
+persistent p_hWin
+if isempty(p_hWin)
+    p_hWin = findobj('Tag', 'Spiky');
 end
+if length(p_hWin) > 1
+    p_hWin = p_hWin(1);
+end
+hWin = p_hWin;
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5950,6 +6027,20 @@ hBox = msgbox(cAboutText, 'Channel Statistics');
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ZoomTight(varargin)
+% Reset Y zoom only
+%
+[FV, ~] = GetStruct();
+if ~isfield(FV, 'tData') return, end
+cFieldnames = fieldnames(FV.tYlim);
+for f = 1:length(cFieldnames)
+    FV.tYlim.(cFieldnames{f}) = [];
+end
+SetStruct(FV);
+ViewTrialData();
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomAmplitude(varargin)
 % Click on an axes and zoom vertically
 %
@@ -6586,8 +6677,10 @@ FV.csDisplayChannels = unique({FV.csDisplayChannels{~strcmp(FV.csDisplayChannels
 FV.csDigitalChannels = unique({FV.csDigitalChannels{~strcmp(FV.csDigitalChannels, sCh)}});
 FV.csChannels = unique({FV.csChannels{~strcmp(FV.csChannels, sCh)}});
 
-FV.tChannelDescriptions = FV.tChannelDescriptions(~strcmp({FV.tChannelDescriptions(:).sChannel}, sCh));
-FV.tChannelDescriptions(strcmp({FV.tChannelDescriptions(:).sChannel}, sCh)) = [];
+if isfield(FV, 'tChannelDescriptions')
+    FV.tChannelDescriptions = FV.tChannelDescriptions(~strcmp({FV.tChannelDescriptions(:).sChannel}, sCh));
+    FV.tChannelDescriptions(strcmp({FV.tChannelDescriptions(:).sChannel}, sCh)) = [];
+end
 
 SetStruct(FV);
 ViewTrialData
@@ -7544,7 +7637,7 @@ delete([hLine1 hLine2])
 hold off
 
 SetStruct(FV)
-ViewTrialData
+ViewTrialData()
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
