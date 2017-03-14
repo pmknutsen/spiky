@@ -1433,6 +1433,7 @@ function ViewTrialData(varargin)
 % Update main window in GUI (channels and events) with current data and
 % options.
 %
+tic
 sp_disp('Refresh UI')
 % Make Spiky window current without raising it to the top
 hFig = GetGUIHandle();
@@ -1476,8 +1477,9 @@ zoom(hFig, 'off')
 FV = GetStruct();
 
 % Delete axes and context menus
-delete(findobj(hFig, 'type', 'axes'))
-delete(findobj(hFig, 'type', 'uicontextmenu'))
+hAx = findobj(hFig, 'type', 'axes');
+hMenu = findobj(hFig, 'type', 'uicontextmenu');
+delete([hAx; hMenu])
 
 % Select channels
 if isempty(FV.csDisplayChannels) && ~IsMergeMode()
@@ -1798,7 +1800,7 @@ for i = 1:length(FV.csDisplayChannels)
     end
     set(hLabel, 'Interpreter', 'tex')
     ThemeObject(hSubplots(end))
-    
+        
     if IsMergeMode()
         if isempty(FV.vXlim), axis(hSubplots(end), 'tight')
         else set(hSubplots(end), 'xlim', FV.vXlim); end
@@ -2068,10 +2070,14 @@ if bShowDigitalEvents
     set(hSubplots(end), 'uicontextmenu', hMenu)
 end
 
-% Show x-axis grid
+% Show time ticks
 if ~isempty(hSubplots)
     if strcmpi(get(findobj(hFig, 'Tag', 'Spiky_Menu_ShowGrid'), 'Checked'), 'on')
-        set(hSubplots(ishandle(hSubplots)), 'xgrid', 'on');
+        set(hSubplots, 'xgrid', 'on');
+    else
+        vCol = get(hSubplots(1), 'color');
+        set(hSubplots(2:end), 'xcolor', vCol, 'xtick', [])
+        set(hSubplots, 'xgrid', 'off');
     end
 end
 
@@ -2138,7 +2144,7 @@ end
 %SetStruct(FV, 'nosaveflag')
 PanMode()
 set(hFig, 'WindowButtonMotionFcn', @GUIMouseMotion);
-
+toc
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
