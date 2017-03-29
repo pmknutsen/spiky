@@ -15,6 +15,9 @@ p.axes.tickdir = 'out';
 p.axes.fontsize = 8;
 p.axes.ticklength = [.0025 .0025];
 
+% Copy axis properties to colorbars
+p.colorbar = p.axes;
+
 mGradient = uint8([ 20 20 50 50; ... % [B B T T] red
     20 20 50 50; ... % green
     20 20 50 50; ... % blue
