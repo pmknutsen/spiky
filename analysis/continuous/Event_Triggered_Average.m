@@ -61,13 +61,11 @@ if ~isfield(FV.tData, [p_sContCh '_KHz'])
     return
 end
 
-% Get continuous signal
-nContFs = FV.tData.([p_sContCh '_KHz']) * 1000; % Hz
-vCont = Spiky.main.ChannelCalculator(FV.tData.(p_sContCh), p_sContCh);
-vContBegin = FV.tData.([p_sContCh '_TimeBegin']);
+% Get continuous, filtered signal
+vCont = Spiky.main.GetFilteredChannel(p_sContCh, FV.tData.(p_sContCh));
 
-% Filter continuous signal
-vCont = Spiky.main.GetFilteredChannel(p_sContCh, vCont);
+nContFs = FV.tData.([p_sContCh '_KHz']) * 1000; % Hz
+vContBegin = FV.tData.([p_sContCh '_TimeBegin']);
 
 % Check if signal is 1D or 2D
 if all(size(vCont) > 1); bIs2D = true;
@@ -77,7 +75,7 @@ else bIs2D = false; end
 % We don't collect parameters when function is called with outputs or if we
 % are in batch-mode (assuming parameters are known, which they should be).
 persistent p_nStimDel p_nPre p_nPost p_nDetrend p_nFirstPulse p_nLastPulse p_nDerivative
-persistent p_bAbsolute p_bLowPassHz p_bHiPassHz p_bHilbert p_nFilterTime
+persistent p_bAbsolute p_bHilbert p_nFilterTime
 if isempty(p_nStimDel) || (~g_bBatchMode && nargout == 0)
     if isempty(p_nStimDel), p_nStimDel = 0; end
     if isempty(p_nPre), p_nPre = 1; end
@@ -87,19 +85,17 @@ if isempty(p_nStimDel) || (~g_bBatchMode && nargout == 0)
     if isempty(p_nLastPulse), p_nLastPulse = length(vEventTimes); end
     if isempty(p_nDerivative), p_nDerivative = 0; end
     if isempty(p_bAbsolute), p_bAbsolute = 0; end
-    if isempty(p_bHiPassHz), p_bHiPassHz = 0; end
-    if isempty(p_bLowPassHz), p_bLowPassHz = 1000; end
     if isempty(p_bHilbert), p_bHilbert = 0; end
     if isempty(p_nFilterTime), p_nFilterTime = 0; end
     cPrompt = {'Pre-event duration (s)','Post-event duration (s)', 'Detrend (1=yes, 0=no)', ...
         'Stimulus delay (ms)', 'First pulse', sprintf('Last pulse (max %d)', length(vEventTimes)), ...
-        'Derivative', 'Use absolute values (1=yes, 0=no)', 'High pass (Hz; 1D only)', 'Low pass (Hz; 1D only)', ...
+        'Derivative', 'Use absolute values (1=yes, 0=no)', ...
         'Average Hilbert amplitude (1=yes, 0=no; 1D only)', ...
         'Exclude if filter is ON at time relative to trigger (s)'};
     cAnswer = inputdlg(cPrompt,'Averaging options', 1, ...
         {num2str(p_nPre), num2str(p_nPost), num2str(p_nDetrend), num2str(p_nStimDel), ...
         num2str(p_nFirstPulse), num2str(min([p_nLastPulse length(vEventTimes)])), num2str(p_nDerivative), ...
-        num2str(p_bAbsolute), num2str(p_bHiPassHz), num2str(p_bLowPassHz), num2str(p_bHilbert), ...
+        num2str(p_bAbsolute), num2str(p_bHilbert), ...
         num2str(p_nFilterTime)});
     if isempty(cAnswer), return, end
     p_nPre  = str2num(cAnswer{1}); % sec
@@ -107,13 +103,11 @@ if isempty(p_nStimDel) || (~g_bBatchMode && nargout == 0)
     p_nDetrend  = str2num(cAnswer{3});
     p_nStimDel = str2num(cAnswer{4}); % ms
     p_nFirstPulse = str2num(cAnswer{5});
-    p_nLastPulse = str2num(cAnswer{6}); %#ok<*ST2NM>
+    p_nLastPulse = str2num(cAnswer{6});
     p_nDerivative = str2num(cAnswer{7});
     p_bAbsolute = str2num(cAnswer{8});
-    p_bHiPassHz = str2num(cAnswer{9});
-    p_bLowPassHz = str2num(cAnswer{10});
-    p_bHilbert = str2num(cAnswer{11});
-    p_nFilterTime = str2num(cAnswer{12});
+    p_bHilbert = str2num(cAnswer{9});
+    p_nFilterTime = str2num(cAnswer{10});
 end
 
 % Remove event times where the filter event was UP at the selected relative
@@ -168,7 +162,6 @@ if bIs2D
     vTime = linspace(0, (1/nContFs)*length(vCont), size(vCont, 2));
 else
     vTime = linspace(0, (1/nContFs)*length(vCont), length(vCont));
-    [vCont, ~, nContFs] = Spiky.main.FilterChannel(vCont, vTime, nContFs, p_bLowPassHz, p_bHiPassHz, p_bAbsolute, 'decimate', 10);
 end
 
 % Convert unit to Intensity/s^-d
