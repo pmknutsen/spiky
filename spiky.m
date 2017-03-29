@@ -95,23 +95,16 @@ for f = 1:length(tFiles)
     end
 end
 
-% Create handles to all /import
-sThisPath = [sPath filesep 'import' filesep];
-tFiles = dir(sThisPath);
-for f = 1:length(tFiles)
-    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
-        sName = tFiles(f).name(1:end-2);
-        Spiky.import(1).(sName) = eval(['@' sName]);
-    end
-end
-
-% Create handles to all /export
-sThisPath = [sPath filesep 'export' filesep];
-tFiles = dir(sThisPath);
-for f = 1:length(tFiles)
-    if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
-        sName = tFiles(f).name(1:end-2);
-        Spiky.export(1).(sName) = eval(['@' sName]);
+% Create handles to all import and export filters and data filters
+csSetHandles = {'import' 'export' 'filters'};
+for sHandle = csSetHandles
+    sThisPath = [sPath filesep sHandle{1} filesep];
+    tFiles = dir(sThisPath);
+    for f = 1:length(tFiles)
+        if ~isempty(strfind(tFiles(f).name, '.m')) && isempty(strfind(tFiles(f).name, '.m~'))
+            sName = tFiles(f).name(1:end-2);
+            Spiky.(sHandle{1})(1).(sName) = eval(['@' sName]);
+        end
     end
 end
 
@@ -219,7 +212,15 @@ else
         sYFormat = '%.1f';
     end
     sUnit = get(get(hAx, 'ylabel'), 'userdata');
-    set(hTxt(1), 'string', sprintf([' x = %.1f  y = ' sYFormat ' ' sUnit], vXY(1), vXY(2)), ...
+    
+    hAxLab = findobj(hAx, 'type', 'text');
+    sCh = '';
+    if ~isempty(hAxLab)
+        sCh = get(hAxLab(1), 'string');
+    end
+
+    set(hTxt(1), 'string', sprintf(['%s: x = %.1f  y = ' sYFormat ' ' sUnit], ...
+        sCh, vXY(1), vXY(2)), ...
         'backgroundcolor', get(hFig, 'color'))
 end
 
@@ -393,14 +394,16 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetAmplitudeUnit(varargin)
 % Set the voltage amplitude unit on a per-channel basis.
-% SetAmplitudeUnit(S)
-%   sets a common unit S for all channels with an undefined unit
-%   (i.e. channels where the unit is assumed to be volts)
+%
+% Usage:
+%   SetAmplitudeUnit(S)
+%       sets a common unit S for all channels with an undefined unit
+%       (i.e. channels where the unit is assumed to be volts)
 % 
-% SetAmplitudeUnit(S, C)
-%   sets the voltage unit S for channel C
+%   SetAmplitudeUnit(S, C)
+%       sets the voltage unit S for channel C
 % 
-% where     S can be:
+%       where S can be:
 %               'V'  (volts)
 %               'mV' (millivolts)
 %               'uV' (microvolts)
@@ -553,7 +556,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ZoomRangeUpdateLine(varargin)
 % Callback to update display of zoom indicator during horizontal zoom
-%
+% 
 
 global pnt1
 pnt2 = get(gca, 'CurrentPoint'); % button down detected
@@ -873,159 +876,131 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function SetFilterChannels(varargin)
-% Interactively select which channels should be filtered
-%
-if ~IsDataLoaded, return, end
-[FV, ~] = GetStruct();
-global g_hSpike_Viewer g_vSelCh
-% create list of selectable channels
-hFig = figure;
-cFields = fieldnames(FV.tData);
-csDisplayChannels = {};
-
-csChannelDescriptions = {};
-for i = 1:length(cFields)
-    if ~isempty(strfind(cFields{i}, '_TimeBegin'))
-        if isfield(FV.tData, cFields{i}(1:end-10))
-            csDisplayChannels{end+1} = cFields{i}(1:end-10);
-            nIndx = find(strcmpi({FV.tChannelDescriptions.sChannel}, csDisplayChannels{end}));
-            if isempty(nIndx)
-                csChannelDescriptions{end+1} = '';
-            else
-                csChannelDescriptions{end+1} = FV.tChannelDescriptions(nIndx).sDescription;
-            end
-        end
-    end
-end
-nCL = length(csDisplayChannels)*25+5;
-
-vHW = get(g_hSpike_Viewer, 'position');
-set(hFig, 'position', [vHW(1:2) 200 nCL+25], 'menu', 'none', 'Name', 'Select channels', 'NumberTitle', 'off')
-
-% Get currently selected filter channels
-if isfield(FV, 'tFilteredChannels')
-    csFiltCh = {FV.tFilteredChannels.sChannel};
-else
-    csFiltCh = {};
-end
-
-for i = 1:length(csDisplayChannels)
-    sBoxStr = sprintf('%s (%s)', csChannelDescriptions{i}, csDisplayChannels{i});
-    if any(strcmp(csDisplayChannels{i}, csFiltCh))
-        uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 150 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 1);
-    else
-        uicontrol(hFig, 'Style', 'checkbox', 'Position', [10 nCL 150 20], 'String', sBoxStr, 'HorizontalAlignment', 'left', 'backgroundcolor', get(hFig, 'color'), 'value', 0);
-    end
-    nCL = nCL - 25;
-end
-uicontrol(hFig, 'Style', 'pushbutton', 'Position', [50 nCL 50 20], ...
-    'Callback', 'global g_vSelCh; g_vSelCh=flipud(get(get(gcf,''children''),''value'')); g_vSelCh=[g_vSelCh{:}];close(gcf)', ...
-    'String', 'OK' ); % OK button
-uiwait % wait for user to close window or click OK button
-g_vSelCh = logical(g_vSelCh(1:end-1));
-
-% Create the tFilteredChannels structure (will replace old)
-tFilteredChannels = struct('sChannel', [], 'vBandpass', [], 'bRectify', []);
-csCh = csDisplayChannels(g_vSelCh);
-for i = 1:length(csCh)
-    tFilteredChannels(i).sChannel = csCh{i};
-    tFilteredChannels(i).vBandpass = [NaN NaN]; % there is no default
-    tFilteredChannels(i).bRectify = 0;
-    if isfield(FV, 'tFilteredChannels')
-        if isfield(FV.tFilteredChannels, 'sChannel')
-            iCh = strcmp(csCh{i}, {FV.tFilteredChannels.sChannel});
-            if any(iCh)
-                if isfield(FV.tFilteredChannels(iCh), 'vBandpass')
-                    if ~isempty(FV.tFilteredChannels(iCh).vBandpass)
-                        tFilteredChannels(i).vBandpass = FV.tFilteredChannels(iCh).vBandpass;
-                    end
-                end
-                if isfield(FV.tFilteredChannels(iCh), 'bRectify')
-                    if ~isempty(FV.tFilteredChannels(iCh).bRectify)
-                        tFilteredChannels(i).bRectify = FV.tFilteredChannels(iCh).bRectify;
-                    end
-                end
-            end
-        end
-    end
-end
-FV.tFilteredChannels = tFilteredChannels;
-
-% Force all filtered channels to be displayed
-FV.csDisplayChannels = unique([FV.csDisplayChannels csCh]);
-clear global g_vSelCh
-SetStruct(FV)
-
-% Display filters options dialog of any of the settings are NaNs
-if any( isnan([FV.tFilteredChannels.vBandpass FV.tFilteredChannels.bRectify]) )
-    FilterOptions(varargin)
-else
-    ViewTrialData();
-end
-
-return
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function FilterOptions(varargin)
-% Set the low and high pass frequencies of filtered channels
+% Set filtering options per channel in a UI.
 % 
-% FilterOptions() opens a table to enter parameters manually
-%
+% Usage: FilterOptions()
+% 
+
+%%
 [FV, ~] = GetStruct();
-if ~isfield(FV, 'tFilteredChannels'); return; end
-if isempty(FV.tFilteredChannels(1).sChannel)
-    waitfor(warndlg('You first need to select the channels that should be filtered.', 'Spiky'))
-    return
-end
+
+csFilters = GetFilters();
+csFilters = {' ' csFilters{:}};
 
 % Initialize figure
 hFig = figure('closeRequestFcn', 'set(gcbf,''userdata'',1)', ...
-    'Name', 'Spiky Filtered Channels', 'ToolBar', 'none', ...
-    'menuBar','none', 'visible', 'off');
-ThemeObject(hFig)
+    'Name', 'Spiky Filtering Options', 'ToolBar', 'none', ...
+    'menuBar','none');
+vPos = get(hFig, 'position');
+vPos = [vPos(1:2) 730 500];
+ThemeObject(hFig, 'position', vPos)
 centerfig(hFig, GetGUIHandle());
-set(hFig, 'visible', 'on')
-cColumnNames = {'Channel', 'Highpass (Hz)' 'Lowpass (Hz)' 'Rectify (1/0)'};
-cColumnFormat = {{'numeric' 'Adjustable'}, {'numeric' 'Adjustable'}, {'numeric' 'Adjustable'}, {'numeric' 'Adjustable'}};
-cColumnEditable =  [false true true true];
+cColumnNames = {'Channel', 'Filter 1', 'Filter 2', 'Highpass (Hz)', 'Lowpass (Hz)', 'Filter 3', 'Filter 4'};
+cColumnFormat = {[], csFilters, csFilters, 'numeric', 'numeric', csFilters, csFilters};
+cColumnEditable =  [false true true true true true true];
+
+if ~isfield(FV, 'tFilteredChannels')
+    FV.tFilteredChannels = struct();
+end
 
 % Create data cell for table
 cData = {};
-for i = 1:length(FV.tFilteredChannels)
-    cData{i, 1} = GetChannelDescription(FV.tFilteredChannels(i).sChannel);
+for i = 1:length(FV.csChannels)
+    cData{i, 1} = GetChannelDescription(FV.csChannels{i});
     if isempty(cData{i, 1})
-        cData{i, 1} = FV.tFilteredChannels(i).sChannel;
+        cData{i, 1} = FV.csChannels{i};
     end
-    cData{i, 2} = FV.tFilteredChannels(i).vBandpass(1);
-    cData{i, 3} = FV.tFilteredChannels(i).vBandpass(2);
-    cData{i, 4} = FV.tFilteredChannels(i).bRectify;
+    if isfield(FV.tFilteredChannels, FV.csChannels{i})
+        % Pre-bandpass filters
+        if isfield(FV.tFilteredChannels.(FV.csChannels{i}), 'csFiltersPre')
+            cData{i, 2} = FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPre{1};
+            if length(FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPre) > 1
+                cData{i, 3} = FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPre{2};
+            else cData{i, 3} = []; end
+        end
+        
+        % Bandpass
+        if isfield(FV.tFilteredChannels.(FV.csChannels{i}), 'nHighPass')
+            cData{i, 4} = FV.tFilteredChannels.(FV.csChannels{i}).nHighPass;
+        end
+        if isfield(FV.tFilteredChannels.(FV.csChannels{i}), 'nLowPass')
+            cData{i, 5} = FV.tFilteredChannels.(FV.csChannels{i}).nLowPass;
+        end
+        
+        % Post-bandpass filters
+        if isfield(FV.tFilteredChannels.(FV.csChannels{i}), 'csFiltersPost')
+            cData{i, 6} = FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPost{1};
+            if length(FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPost) > 1
+                cData{i, 7} = FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPost{2};
+            else cData{i, 7} = []; end
+        end
+    else
+        cData{i, 2} = [];
+        cData{i, 3} = [];
+        cData{i, 4} = [];
+        cData{i, 5} = [];
+        cData{i, 6} = [];
+        cData{i, 7} = [];
+    end
 end
 
-% Create table
+%% Create table
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, ...
     'ColumnName', cColumnNames, 'ColumnEditable', cColumnEditable, ...
-    'ColumnWidth', {150, 100, 100 100});
+    'ColumnFormat', cColumnFormat, 'ColumnWidth', {150 80 80 100 100 100});
 
 % Wait for figure to be closed
 waitfor(hFig, 'userdata')
 cData = get(hTable, 'data');
 delete(hFig)
 
-% Assign new values to structure
-for i = 1:length(FV.tFilteredChannels)
-    FV.tFilteredChannels(i).vBandpass(1) = cData{i, 2};
-    FV.tFilteredChannels(i).vBandpass(2) = cData{i, 3};
-    FV.tFilteredChannels(i).bRectify = cData{i, 4};
+%% Replace NaNs with nothing
+for i = 1:numel(cData)
+    if isnan((cData{i}))
+        cData{i} = [];
+    end
+end
+
+%% Get new filter parameters
+FV.tFilteredChannels = struct([]);
+for i = 1:length(FV.csChannels)
+    if ~isempty(cData{i, 2})
+        FV.tFilteredChannels(1).(FV.csChannels{i}).csFiltersPre{1} = cData{i, 2};
+    end
+    if ~isempty(cData{i, 3})
+        FV.tFilteredChannels(1).(FV.csChannels{i}).csFiltersPre{2} = cData{i, 3};
+    end
+    
+    if ~isempty(cData{i, 4})
+        if ~isnumeric(cData{i, 4}), cData{i, 4} = str2num(cData{i, 4}); end
+        FV.tFilteredChannels(1).(FV.csChannels{i}).nHighPass = cData{i, 4};
+    end
+    if ~isempty(cData{i, 5})
+        if ~isnumeric(cData{i, 5}), cData{i, 5} = str2num(cData{i, 5}); end
+        FV.tFilteredChannels(1).(FV.csChannels{i}).nLowPass = cData{i, 5};
+    end
+    
+    if ~isempty(cData{i, 6})
+        FV.tFilteredChannels(1).(FV.csChannels{i}).csFiltersPost{1} = cData{i, 6};
+    end
+    if ~isempty(cData{i, 7})
+        FV.tFilteredChannels(1).(FV.csChannels{i}).csFiltersPost{2} = cData{i, 7};
+    end
 end
 
 SetStruct(FV)
-ViewTrialData()
+ViewTrialData();
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetChannelCalculator(varargin)
+% Open UI to specify a calculation to be performed on a channel. This
+% user-define function is applied to the data after the selected built-in
+% filters have been applied.
 % 
+% Usage:
+%   SetChannelCalculator()
 % 
 
 if ~IsDataLoaded, return, end
@@ -1042,13 +1017,14 @@ else
         sEval = '';
     end
 end
-cAnswer = inputdlg(['Enter a string that will be evaluated every time this channel is used. ' ...
-                    'Note that not all operations currently support channel calculations. ' ...
+cAnswer = inputdlg(['Enter a Matlab interpretible string that will be evaluated when the channel is filtered for any purpose. ' ...
+                    'This user-defined function is applied after any selected built-in filters.' ...
                     'Substitute signal vector with ''a'' in your string:'], ...
-                    'Channel Calculator', 3, {sEval});
+                    'Custom Filter', 3, {sEval});
 if isempty(cAnswer), return; end % cancel button pressed
 FV.tChannelCalculator(1).(sCh) = cAnswer{1};
-SetStruct(FV); ViewTrialData();
+SetStruct(FV);
+ViewTrialData();
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1250,6 +1226,20 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function csFilters = GetFilters()
+% Get list of filters.
+%
+sDir = which(mfilename);
+tDir = dir([sDir(1:end-7) 'filters']);
+csFilters = {};
+for i = 3:length(tDir)
+    if ~isempty(findstr('spikyfilter_', tDir(i).name))
+        csFilters{end+1,1} = tDir(i).name(13:end-2);
+    end
+end
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function csExt = GetExportFilters()
 % Get list of import filters.
 %
@@ -1433,8 +1423,6 @@ function ViewTrialData(varargin)
 % Update main window in GUI (channels and events) with current data and
 % options.
 %
-tic
-sp_disp('Refresh UI')
 % Make Spiky window current without raising it to the top
 hFig = GetGUIHandle();
 set(0, 'currentfigure', hFig)
@@ -1500,7 +1488,6 @@ FV.csChannels = unique(FV.csChannels);
 for i = 1:length(FV.csChannels)
     if isfield(FV.tData, FV.csChannels{i})
         vMinMax = [min(FV.tData.(FV.csChannels{i})) max(FV.tData.(FV.csChannels{i}))];
-        [vMinMax, FV] = AdjustChannelGain(FV, vMinMax, FV.csChannels{i});
         if ~isfield(FV.tYlim, FV.csChannels{i})
             FV.tYlim(1).(FV.csChannels{i}) = vMinMax;
         end
@@ -1524,7 +1511,7 @@ if ~isempty(vRemIndx)
 end
 
 hSubplots = [];
-bShowDigitalEvents = strcmp(get(findobj(hFig, 'Label', 'Show &Events'), 'checked'), 'on');
+bShowDigitalEvents = strcmp(get(findobj(hFig, 'Label', 'Show Events'), 'checked'), 'on');
 if isempty(FV.csDigitalChannels), bShowDigitalEvents = 0; end
 
 if bShowDigitalEvents
@@ -1534,7 +1521,7 @@ else nSubEventHeight = 0; end
 % Iterate over channels alphabetically
 for i = 1:length(FV.csDisplayChannels)
     sCh = FV.csDisplayChannels{end - i + 1};
-    vCont = ChannelCalculator(FV.tData.(sCh), sCh); % continuous trace (V)
+    vCont = FV.tData.(sCh); % continuous trace (V)
     if length(vCont) <= 1 && ~FV.bPlotRasters
         uiwait(warndlg(sprintf('Cannot display channel %s as it is not a vector.', sCh)))
         continue
@@ -1545,7 +1532,6 @@ for i = 1:length(FV.csDisplayChannels)
     if isempty(sYLabel), sYLabel = sCh; end
 
     if ( ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh) ) || ~IsMergeMode()
-        [vCont, ~] = AdjustChannelGain(FV, vCont, sCh);
         nContAllMinMax = [min(vCont(:)) max(vCont(:))];
         [FV, ~] = GetStruct(); % reload FV since channel gains may have changed in previous line
         
@@ -1576,24 +1562,16 @@ for i = 1:length(FV.csDisplayChannels)
     
     % Custom filter and decimate continuous channels
     if ~FV.bPlotRasters || ~isfield(FV.tSpikes, sCh)
-        % Custom filter
-        if isfield(FV, 'tFilteredChannels')
-            iParams = strcmp(sCh, {FV.tFilteredChannels.sChannel});
-            if any(iParams)
-                nHiPass = FV.tFilteredChannels(iParams).vBandpass(1);
-                nLoPass = FV.tFilteredChannels(iParams).vBandpass(2);
-                bRectify = FV.tFilteredChannels(iParams).bRectify;                
-                if nFs < 2000 || nLoPass < 2000
-                    [vCont, vTime, ~] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, 'none');
-                else
-                    [vCont, vTime, ~] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, 'decimate');
-                end
-            end
-            FV.tYlim.(sCh) = [min(vCont) max(vCont)];
+        [vCont, vTimeNew, ~] = GetFilteredChannel(sCh, vCont, vTime, 'decimate');
+        if length(vTimeNew) == length(vCont)
+            vTime = vTimeNew;
         end
-        % Decimate
-        nLen = 2000;
+        
+        % Decimate to limit number of displayed points
+        nLen = 5000;
         vShowIndx = unique(round( linspace(1, length(vTime), nLen) ));
+
+        FV.tYlim.(sCh) = [min(vCont) max(vCont)];
         
         if any(size(vCont) == 1)
             vTime = vTime(vShowIndx);
@@ -1605,8 +1583,8 @@ for i = 1:length(FV.csDisplayChannels)
     nSubs = length(FV.csDisplayChannels);
 
     % Create axis
-    nYBase = .06; % lower boundary of bottom axis
-    nXBase = .07; % left-most boundary axes
+    nYBase = .05; % lower boundary of bottom axis
+    nXBase = .05; % left-most boundary axes
     nYSep = 0.008; % separation between events and top axis
     nSubHeight = (((1-nYBase-nYSep)-(nSubs*.02+nSubEventHeight)) / nSubs);
     nSubY = nYBase + (.02*(i-1)) + (nSubHeight*(i-1));
@@ -1788,12 +1766,16 @@ for i = 1:length(FV.csDisplayChannels)
     if FV.bPlotRasters && isfield(FV.tSpikes, sCh)
         hLabel = ylabel(hSubplots(end), hSubplots(end), sYLabel);
     else
-        if isempty(sUnit)
-            hLabel = ylabel(sprintf('%s', strrep(sYLabel, '_', ' ')));
-        else
-            hLabel = ylabel(sprintf('%s', strrep(sYLabel, '_', ' ')));
-        end
-        set(hLabel, 'userdata', sUnit, ...
+        sTit = sprintf('%s', strrep(sYLabel, '_', ' '));
+        nRot = 90;
+        if length(sTit) < 4, nRot = 0; end
+        hLabel = text(-.03, 0.5, sTit, ...
+            'rotation', nRot, ...
+            'horizontalalign', 'center', ...
+            'parent', hSubplots(end), ...
+            'units', 'normalized', 'fontsize', 12, ...
+            'color', FV.mColors(nContTrace, :), ...
+            'userdata', sUnit, ...
             'ButtonDownFcn', @ChangeChannel, ...
             'units', 'normalized', ...
             'position', [-.03 0.5 0]);
@@ -1916,7 +1898,7 @@ end
 % Plot digital events
 if bShowDigitalEvents
     % Create subplot
-    hSubplots(end+1) = axes('position', [.07 .985-nSubEventHeight .91 nSubEventHeight]);
+    hSubplots(end+1) = axes('position', [.05 .995-nSubEventHeight .91 nSubEventHeight]);
     hold on
     
     % Get number of events
@@ -2072,13 +2054,9 @@ end
 
 % Show time ticks
 if ~isempty(hSubplots)
-    if strcmpi(get(findobj(hFig, 'Tag', 'Spiky_Menu_ShowGrid'), 'Checked'), 'on')
-        set(hSubplots, 'xgrid', 'on');
-    else
-        vCol = get(hSubplots(1), 'color');
-        set(hSubplots(2:end), 'xcolor', vCol, 'xtick', [])
-        set(hSubplots, 'xgrid', 'off');
-    end
+    vCol = get(hSubplots(1), 'color');
+    set(hSubplots(2:end), 'xticklabel', [], 'box', 'off')
+    set(hSubplots, 'xgrid', 'on');
 end
 
 % Get x-limits of all subplots and adjust so all are same
@@ -2134,7 +2112,8 @@ for h = 1:length(hHandles)
     end
 end
 
-mPos = cell2mat(get(hHandles(iAxes), 'position')); % axes positions
+mPos = get(hHandles(iAxes), 'position'); % axes positions
+if iscell(mPos), mPos = cell2mat(mPos); end
 if ~isempty(mPos)
     [~, iOrder] = sort(mPos(:, 2)); % order by Y position
     hHandles(iAxes) = hHandles(iAxes(iOrder));
@@ -2144,7 +2123,6 @@ end
 %SetStruct(FV, 'nosaveflag')
 PanMode()
 set(hFig, 'WindowButtonMotionFcn', @GUIMouseMotion);
-toc
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2386,11 +2364,11 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function CopyChannelToFig(varargin)
 % Copy right-clicked channel in main window to a separate, default Figure.
+% 
 [FV, hWin] = GetStruct();
 sCh = get(gcbo, 'Tag');
 if ~isfield(FV.tData, sCh); return; end
-vCont = ChannelCalculator(FV.tData.(sCh), sCh);
-[vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
+
 nBegin = FV.tData.([sCh '_TimeBegin']); % sampling start, sec
 nEnd = FV.tData.([sCh '_TimeEnd']); % sampling end, sec
 nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency Hz
@@ -2491,7 +2469,10 @@ else
         end
     end
 end
-linkaxes(findobj(get(GetGUIHandle(), 'children'), 'type', 'axes'), 'x')
+hAx = findobj(get(GetGUIHandle(), 'children'), 'type', 'axes');
+if ~isempty(hAx)
+    linkaxes(hAx, 'x')
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2505,10 +2486,29 @@ FV.vXlim = vCurrLim; % pan left by 25%
 SetStruct(FV); ViewTrialData
 return
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ConfigureFilter(varargin)
+% Configure a filter for a selected channel
+% 
+% Usage: ConfigureFilter()
+% 
+if nargin == 0, return; end
+sFunc = varargin{1};
+sFunc = sFunc(1:end-2);
+if exist(sFunc, 'file')
+    try
+        eval(sprintf('[~, ~, ~] = %s([], [], []);', sFunc));
+    catch
+        warndlg('This filter either returned an execution error or (more likely) does not accept any configuration parameters.', 'Spiky')
+    end
+end
+ViewTrialData();
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, sOption, varargin)
-% Bandpass vector.
-%
+% Apply a frequency bandpass to continuous vector.
+% 
 % Usage:
 %   FilterChannel(C, T, Fs, LO, HI, R, OPT, [DF])
 %       where   C    signal to filter
@@ -2519,10 +2519,7 @@ function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiP
 %               R    1 = rectify, 0 = no rectify
 %               OPT  'decimate' or 'none'
 %               DF   Decimation factor (default 2.5; optional)
-%
-% See:
-%   GetFilteredChannel()
-%
+% 
 
 % Check for sane inputs
 nLoPass = min([nLoPass nFs]);
@@ -2597,6 +2594,10 @@ return
 function csSelected = SelectChannels(varargin)
 % Select the channels that should be displayed in the GUI
 % 
+% Usage:
+%   SelectChannels()
+%   SelectChannels(CS) toggle channel by string CS
+% 
 if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
 
@@ -2620,8 +2621,7 @@ if ~isempty(varargin)
     end
 end
 
-global g_hSpike_Viewer
-% create list of selectable channels
+% Create list of selectable channels
 cFields = fieldnames(FV.tData);
 csDisplayChannels = {};
 csChannelDescriptions = {};
@@ -2669,7 +2669,7 @@ ViewTrialData()
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function iSelected = SelectChannelsUI(csCh, csChDescr, varargin)
+function iSelected = SelectChannelsUI(csCh, varargin)
 % UI to select any number of channels. This is a lower-level function
 % called by SelectChannels(). It can also be called by extensions etc that
 % need a UI to select from a series of channels/strings/options.
@@ -2693,6 +2693,12 @@ elseif length(csCh) == 1
     return
 end
 
+if nargin == 2
+    csChDescr = varargin{1};
+else
+    csChDescr = {};
+end
+
 % Ask which channels to load
 hFig = figure;
 vPos = get(hFig, 'position');
@@ -2708,19 +2714,22 @@ set(hFig, 'position', [vPos(1) vPos(2) nW nH+60], 'menu', 'none', ...
 
 for nCh = 1:length(csCh)
     nVal = 1;
-    sStr = csCh(nCh);
-    if strcmp(csCh{nCh}(1:3), 'AUX')
+    if ~isempty(csChDescr)
+        sStr = sprintf('%s (%s)', csCh{nCh}, csChDescr{nCh});
+    elseif strcmp(csCh{nCh}(1:3), 'AUX')
         sStr = sprintf('%s (Accelerometer)', csCh{nCh});
         nVal = 0;
     elseif strcmp(csCh{nCh}(1:3), 'ADC')
         sStr = sprintf('%s (Digital)', csCh{nCh});
         nVal = 0;
+    else
+        sStr = csCh(nCh);
     end
     nCol = ceil(nCh / nRows) - 1;
     nRow = (nRows + 1) - rem(nCh, nRows);
     if nRow == (nRows + 1), nRow = 1; end
     uicontrol(hFig, 'Style', 'checkbox', 'String', sStr, ...
-        'Position', [(nCol * nColW)+15 (nRow+1.5)*nRowH+5 nH 20], ...
+        'Position', [(nCol * nColW)+15 (nRow+1.5)*nRowH+5 nColW 20], ...
         'HorizontalAlignment', 'left', 'value', nVal);
 end
 if ~isempty(p_STAT)
@@ -3116,6 +3125,8 @@ function hWin = GetGUIHandle(varargin)
 persistent p_hWin
 if isempty(p_hWin)
     p_hWin = findobj('Tag', 'Spiky');
+elseif ~ishandle(p_hWin)
+    p_hWin = findobj('Tag', 'Spiky');
 end
 if length(p_hWin) > 1
     p_hWin = p_hWin(1);
@@ -3455,7 +3466,6 @@ end
 zoom xon
 sTag = get(gca, 'Tag');
 vContData = FV.tData.(sTag);
-[vContData, FV] = AdjustChannelGain(FV, vContData, sTag);
 vContData = GetFilteredChannel(sTag, vContData);
 
 nMed = median(vContData);
@@ -3474,63 +3484,117 @@ ViewTrialData
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [vContOut, varargout] = GetFilteredChannel(sCh, vCont, varargin)
+function [vCont, varargout] = GetFilteredChannel(sCh, vCont, varargin)
 % Checks for filtering parameters and filters a channel if necessary
 % 
 % Usage:
-%   vCont = GetFilteredChannel(sCh, vCont)
-%   [vCont, vTime] = GetFilteredChannel(sCh, vCont, 'decimate')
-%   [vCont, vTime, nNewFs] = GetFilteredChannel(sCh, vCont, 'decimate')
-%    
+%   C = GetFilteredChannel(S, C)
+%   C = GetFilteredChannel(S, C, T)
+%   [C, T] = GetFilteredChannel(S, C, T, 'decimate')
+%   [C, T, FS] = GetFilteredChannel(S, C, 'decimate')
+%   
+%   where, S is the channel name
+%          C is the continuous data to be filtered
+%          T is the time vector (required when filtering a segment of a
+%            channel)
+%   
 % This function is a higher-level call to FilterChannel() and can
-% optionally decimate. See usage.
+% optionally decimate.
 % 
-% See:
-%   FilterChannel()
-%
 
 % Initialize outputs in case we abort early
-vContOut = vCont;
 if nargout > 1
     varargout(1:(nargout-1)) = {[]};
 end
-
 [FV, ~] = GetStruct();
 
-if ~isfield(FV, 'tFilteredChannels'); return; end
-iCh = strcmp(sCh, {FV.tFilteredChannels.sChannel});
-if ~any(iCh); return; end
-
-nHiPass = FV.tFilteredChannels(iCh).vBandpass(1);
-nLoPass = FV.tFilteredChannels(iCh).vBandpass(2);
-bRectify = FV.tFilteredChannels(iCh).bRectify;
+%% Compute absolute time
 nFs = FV.tData.([sCh '_KHz']) * 1000;
-
-% Decimate
-bDecimate = 0;
-if ~isempty(varargin)
-    if strcmpi(varargin{1}, 'decimate')
-        bDecimate = 1;
-    end
-end
-
-if bDecimate
+if nargin > 2
+    vTime = varargin{1};
+else
     nBegin = FV.tData.([sCh '_TimeBegin']); % sampling start, sec
     nEnd = FV.tData.([sCh '_TimeEnd']); % sampling end, sec
-    nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency Hz
-    vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
-    [vContOut, vTimeOut, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiPass, bRectify, 'decimate');
-    if nargout > 1, varargout{1} = vTimeOut; end
-    if nargout > 2, varargout{2} = nNewFs; end
-else
-    [vContOut, ~, ~] = FilterChannel(vCont, [], nFs, nLoPass, nHiPass, bRectify, 'nodecimate');
+    vTime = (nBegin + 1/nFs):(1/nFs):(nBegin + length(vCont)/nFs); % absolute time, sec
 end
 
+%% Adjust gain
+vCont = AdjustChannelGain(vCont, sCh);
+
+%% Apply selected built-in filters
+nHighPass = nan; nLowPass = nan;
+csFiltersPre = {}; csFiltersPost = {};
+if isfield(FV, 'tFilteredChannels')
+    if isfield(FV.tFilteredChannels, sCh)
+        if isfield(FV.tFilteredChannels.(sCh), 'nHighPass')
+            nHighPass = FV.tFilteredChannels.(sCh).nHighPass;
+        end
+        if isfield(FV.tFilteredChannels.(sCh), 'nLowPass')
+            nLowPass = FV.tFilteredChannels.(sCh).nLowPass;
+        end
+        if isfield(FV.tFilteredChannels.(sCh), 'csFiltersPre')
+            csFiltersPre = FV.tFilteredChannels.(sCh).csFiltersPre;
+        end
+        if isfield(FV.tFilteredChannels.(sCh), 'csFiltersPost')
+            csFiltersPost = FV.tFilteredChannels.(sCh).csFiltersPost;
+        end
+    end
+    
+    %% Apply pre-bandpass filters
+    for sFilter = csFiltersPre
+        if length(sFilter{1}) < 2, continue; end
+        sFunc = sprintf('spikyfilter_%s', sFilter{1});
+        if exist(sFunc, 'file')
+            try
+                eval(sprintf('[vCont, vTime, nFs] = %s(vCont, vTime, nFs);', sFunc));
+            catch
+                sp_disp(['Failed to filter with ' sFunc]) % ignore but report errors
+            end
+        end
+    end
+    
+    %% Check whether to decimate or not
+    bDecimate = 0;
+    if ~isempty(varargin)
+        if strcmpi(varargin{end}, 'decimate')
+            bDecimate = 1;
+        end
+    end
+    
+    %% Filter and decimate
+    if any(~isnan([nHighPass nLowPass]))
+        if bDecimate
+            [vCont, vTimeOut, nNewFs] = FilterChannel(vCont, vTime, nFs, nLowPass, nHighPass, 0, 'nodecimate');
+            if nargout > 1, varargout{1} = vTimeOut; end
+            if nargout > 2, varargout{2} = nNewFs; end
+        else
+            [vCont, ~, ~] = FilterChannel(vCont, [], nFs, nLowPass, nHighPass, 0, 'nodecimate');
+        end
+    end
+    
+    % Apply post-bandpass filters
+    for sFilter = csFiltersPost
+        if length(sFilter{1}) < 2, continue; end
+        sFunc = sprintf('spikyfilter_%s', sFilter{1});
+        if exist(sFunc, 'file')
+            try
+                eval(sprintf('[vCont, vTime, nFs] = %s(vCont, vTime, nFs);', sFunc));
+            catch
+                sp_disp(['Failed to filter with ' sFunc]) % ignore but report errors
+            end
+        end
+    end
+    
+end
+
+%% Apply user-defined filter/function
+vCont = ChannelCalculator(vCont, sCh);
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RemoveSpikeThreshold(sCh, sDir)
-%
+% 
+% 
 [FV, ~] = GetStruct();
 sTag = get(gco, 'Tag');
 sCh = sTag(1:end-4);
@@ -3550,13 +3614,14 @@ switch lower(sTag(end-2:end))
     otherwise
         return;
 end
-SetStruct(FV)
-ViewTrialData
+SetStruct(FV);
+ViewTrialData();
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function SetThresholdManually(sCh, sDir)
-%
+% 
+% 
 [FV, hWin] = GetStruct();
 sTag = get(gco, 'Tag');
 sCh = sTag(1:end-4);
@@ -3628,11 +3693,9 @@ hWait = waitbar(0, 'Automatically determining spike thresholds...');
 for nCh = 1:length(csSelected)
     hWait = waitbar(nCh/length(csSelected), hWait);
     sCh = csSelected{nCh};
-    vCont = ChannelCalculator(FV.tData.(sCh), sCh);
-    [vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
 
     % Filter channel
-    vCont = GetFilteredChannel(sCh, vCont);
+    vCont = GetFilteredChannel(sCh, FV.tData.(sCh));
     
     % Negative threshold (values < 1th percentile)
     FV.tSpikeThresholdsNeg(1).(sCh) = nanmean(vCont) - (4*nanstd(vCont));
@@ -3696,13 +3759,9 @@ for nCh = 1:length(csChUnique)
     if isfield(FV.tSpikeThresholdsPos, sCh), vThresh(2) = FV.tSpikeThresholdsPos.(sCh);
     else vThresh(2) = NaN; end
 
-    % Filter continuous signal
-    vCont = ChannelCalculator(FV.tData.(sCh), sCh);
-    [vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
-    nFs = FV.tData.([sCh '_KHz']) * 1000; % channel sampling rate
-    
     % Filter channel
-    vCont = GetFilteredChannel(sCh, vCont);
+    vCont = GetFilteredChannel(sCh, FV.tData.(sCh));
+    nFs = FV.tData.([sCh '_KHz']) * 1000; % channel sampling rate
     
     % Run spike detection
     nBeginTime = FV.tData.([sCh '_TimeBegin']) * 1000; % begin time
@@ -5594,8 +5653,7 @@ for f = 1:nLen
         end
         csChannels = unique(csChannels);
         for nCh = 1:length(csChannels) % iterate over imported channels
-            vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
-            [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh});
+            vCont = FV.tData.(csChannels{nCh});
             
             % Time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
@@ -5638,8 +5696,7 @@ for f = 1:nLen
             
             % Raw signal
             sCh = csChannels{nCh};
-            vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
-            [vCont, FV] = AdjustChannelGain(FV, vCont, sCh);
+            vCont = FV.tData.(csChannels{nCh});
             
             % Time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
@@ -5686,11 +5743,7 @@ for f = 1:nLen
             if isfield(tFiltCh, csChannels(nCh)), continue; end
             if isfield(tImported, csChannels(nCh)), continue; end
             
-            % Apply custom math
-            vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
-            
-            % Adjust gain
-            [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh});
+            vCont = FV.tData.(csChannels{nCh});
             
             % Time vector
             nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
@@ -6196,6 +6249,8 @@ close(findobj('Tag', 'UIHoldFigure'));
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 
+% 
 function IdentifySpike(varargin)
 [FV, ~] = GetStruct();
 sAxTag = get(gca, 'Tag');
@@ -6474,9 +6529,6 @@ if bInteractive
     nFs = FV.tData.([sTag '_KHz']) * 1000; % sampling frequency (Hz)
     nBeginTime = FV.tData.([sTag '_TimeBegin']); % start of sampling (sec)
     nEndTime = FV.tData.([sTag '_TimeEnd']); % start of sampling (sec)
-
-    % Arbitrary channel operation
-    vContData = ChannelCalculator(vContData, sTag);
 else
     % Get data and threshold from function input
     vContData = varargin{1};
@@ -6648,15 +6700,44 @@ ViewTrialData
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function DeleteHiddenChannels(varargin)
+% Delete all hidden channels (except digital channels)
+% 
+% Usage:
+%   DeleteHiddenChannels()
+% 
+[FV, ~] = GetStruct();
+if ~IsDataLoaded, return, end
+csDelCh = setdiff(FV.csChannels, [FV.csDisplayChannels FV.csDigitalChannels]);
+for sCh = csDelCh
+    DeleteChannel(sCh{1}, 'silent');
+end
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function DeleteChannel(varargin)
 % Delete a channel. If input arguments are provided, the first string
 % encountered will be the channel to delete.
+% 
+% Usage:
+%   DeleteChannel()             display UI to select channel to delete
+%   DeleteChannel(CS)           delete channel CS
+%   DeleteChannel(CS, 'silent') dont ask or refresh UI
+% 
+% 
 [FV, ~] = GetStruct();
 if ~IsDataLoaded, return, end
 
+bSilent = 0;
+nArgin = nargin;
+if strcmpi('silent', varargin{end})
+    bSilent = 1;
+    nArgin = nArgin - 1;
+end
+
 sCh = '';
-if nargin > 0
-    for i = 1:nargin
+if nArgin > 0
+    for i = 1:nArgin
         if ischar(varargin{i}) sCh = varargin{i}; end
     end
 end
@@ -6666,18 +6747,19 @@ if ~any(strcmp(sCh, [FV.csDisplayChannels FV.csChannels]))
     if isempty(sCh), return, end % no channel selected
 end
 
-sAns = questdlg(['Are you sure you want to delete channel ' sCh '?'], 'Spiky', 'Yes', 'No', 'No');
-if strcmp(sAns, 'No'), return; end
+if ~bSilent
+    sAns = questdlg(['Are you sure you want to delete channel ' sCh '?'], 'Spiky', 'Yes', 'No', 'No');
+    if strcmp(sAns, 'No'), return; end
+end
 
 % Delete fields
 if isfield(FV.tData, sCh), FV.tData = rmfield(FV.tData, sCh); end
-if isfield(FV.tData, [sCh '_KHz']), FV.tData = rmfield(FV.tData, [sCh '_KHz']); end
-if isfield(FV.tData, [sCh '_KHz_Orig']), FV.tData = rmfield(FV.tData, [sCh '_KHz_Orig']); end
-if isfield(FV.tData, [sCh '_TimeBegin']), FV.tData = rmfield(FV.tData, [sCh '_TimeBegin']); end
-if isfield(FV.tData, [sCh '_TimeEnd']), FV.tData = rmfield(FV.tData, [sCh '_TimeEnd']); end
-if isfield(FV.tData, [sCh '_Imported']), FV.tData = rmfield(FV.tData, [sCh '_Imported']); end
-if isfield(FV.tData, [sCh '_Up']), FV.tData = rmfield(FV.tData, [sCh '_Up']); end
-if isfield(FV.tData, [sCh '_Down']), FV.tData = rmfield(FV.tData, [sCh '_Down']); end
+csRemFields = {'TimeBegin', 'TimeEnd', 'KHz', 'KHz_Orig', 'Imported', '_Up', '_Down'};
+for csRem = csRemFields
+    if isfield(FV.tData, sprintf('%s_%s', sCh, csRem{1}))
+        FV.tData = rmfield(FV.tData, sprintf('%s_%s', sCh, csRem{1}));
+    end
+end
 
 FV.csDisplayChannels = unique({FV.csDisplayChannels{~strcmp(FV.csDisplayChannels, sCh)}});
 FV.csDigitalChannels = unique({FV.csDigitalChannels{~strcmp(FV.csDigitalChannels, sCh)}});
@@ -6689,7 +6771,7 @@ if isfield(FV, 'tChannelDescriptions')
 end
 
 SetStruct(FV);
-ViewTrialData
+if ~bSilent, ViewTrialData(); end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -6856,15 +6938,6 @@ SpikyWaitbar(4, 10)
 
 mCh(mCh < 0) = 0;
 
-% Create a sparse matrix where events are represented by ones
-%for u = 1:size(mEvents1, 1)
-%    mCh(mEvents1(u,1):mEvents1(u,2), 1) = 1;
-%end
-%for u = 1:size(mEvents2, 1)
-%    mCh(mEvents2(u,1):mEvents2(u,2), 2) = 1;
-%end
-%%
-
 eval(sprintf('vNew = %s(mCh(:,1), %smCh(:,2));', lower(sOp), sNot))
 SpikyWaitbar(5, 10)
 
@@ -6900,6 +6973,9 @@ return
 function ModifyEventInterval(varargin)
 % Set a minimum interval between events on selected channel. Events that
 % occur after a preceding event at less than the minimum interval are deleted.
+% 
+% Usage: ModifyEventInterval()
+% 
 [FV, ~] = GetStruct();
 if ~IsDataLoaded, return, end
 persistent p_nMinInt p_sCh
@@ -7018,8 +7094,7 @@ return
 function ChannelDescriptions(varargin)
 % Set descriptive strings and units for all channels interactively.
 % 
-% Usage:
-%   ChannelDescriptions()
+% Usage: ChannelDescriptions()
 %
 if ~IsDataLoaded, return, end
 [FV, hWin] = GetStruct();
@@ -7067,9 +7142,9 @@ end
 ThemeObject(hFig)
 set(hFig, 'Name', 'Spiky Channel Descriptions', 'ToolBar', 'none', 'menuBar','none')
 hTable = uitable('Units', 'normalized','Position', [0 0 1 1], 'Data', cData, 'ColumnName', ...
-    cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth',{150, 277, 100});
-waitfor(hFig, 'userdata') % wait for figure to be closed
-cData = get(hTable, 'data'); % modified data
+    cColumnNames, 'ColumnEditable', cColumnEditable, 'ColumnWidth', {150, 277, 100});
+waitfor(hFig, 'userdata')
+cData = get(hTable, 'data');
 
 % Assign new descriptions
 if ~isfield(FV, 'tChannelDescriptions')
@@ -7092,9 +7167,60 @@ ViewTrialData()
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ExportChannelSettings(varargin)
+% Export channel configurations to .mat file for later import. This feature
+% is useful for datasets with a large number of channels. Data saved to
+% file include: descriptions, gain, display status
+% 
+% Usage: ExportChannelSettings()
+% 
+[FV, ~] = GetStruct();
+if ~IsDataLoaded, return, end
+
+tExport = struct();
+csFields = {'csDisplayChannels', 'tGain', 'tChannelDescriptions', 'tYlim'};
+for f = 1:length(csFields)
+    if isfield(FV, csFields{f})
+        tExport.(csFields{f}) = FV.(csFields{f});
+    end
+end
+
+[~, sFile, ~] = fileparts(FV.sLoadedTrial);
+sFile = sprintf('%s%s%s_ChannelSettings.mat', FV.sDirectory, filesep, sFile);
+save(sFile, 'tExport');
+sp_disp('Exported channel settings');
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ImportChannelSettings(varargin)
+% Import channel settings from previously exported settings.
+%
+% Usage: ImportChannelSettings()
+% 
+[FV, ~] = GetStruct();
+if ~IsDataLoaded, return, end
+
+[sFile, sPath] = uigetfile('*.mat', 'Pick an M-file');
+load(fullfile(sPath, sFile), 'tExport')
+if ~exist('tExport', 'var')
+    warndlg('Invalid file: File does not contain channel settings.', 'Spiky');
+    return
+end
+
+csFields = fieldnames(tExport);
+for f = 1:length(csFields)
+    FV.(csFields{f}) = tExport.(csFields{f});
+end
+SetStruct(FV)
+ViewTrialData();
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ExperimentDescriptions(varargin)
 % Add, remove and edit custom file description variables
 %
+% Usage: ExperimentDescriptions()
+% 
 [FV, ~] = GetStruct();
 if ~IsDataLoaded, return, end
 
@@ -7138,7 +7264,9 @@ function DeleteSortingData(varargin)
 % Remove all spike sorting results. All assignments of spikes into clusters
 % or outliers will be removed. Raw waveforms, or dejittered waveforms, are
 % not affected.
-%
+% 
+% Usage: DeleteSortingData()
+% 
 [FV, ~] = GetStruct();
 if ~IsDataLoaded, return, end
 
@@ -7165,11 +7293,15 @@ ViewTrialData()
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [vCont, FV] = AdjustChannelGain(FV, vCont, sCh)
+function vCont = AdjustChannelGain(vCont, sCh)
 % Adjust channel amplitude by specified gain. The returned signal is by
 % default in microvolts, unless a different range (V or mV) has been
 % selected in View -> Amplitude Unit or via SetAmplitudeUnit()
-%
+% 
+% Usage: AdjustChannelGain(FV, C, CH)
+% 
+
+[FV, ~] = GetStruct();
 
 % Adjust gain of signal
 bIsGain = 0;
@@ -7194,20 +7326,21 @@ if ~bIsGain
     nGain = FV.tGain.(sCh);
 end
 
-vCont = vCont ./ nGain; % divide by gain
+vCont = vCont ./ nGain; % divide by gain; result is now VOLTS at the source/electrode
 
 % Scale to microvolts (or optionally to V or mV)
-if nGain ~= 1
-    vCont = vCont .* FV.tAmplitudeUnit.nFactor;
-end
+vCont = vCont .* FV.tAmplitudeUnit.nFactor;
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function sHash = GetGitHash
+function sHash = GetGitHash(varargin)
 % Get current GIT SHA1 hash (unique identifier of currently used commit).
 % The local SHA1 hash can be compared to other versions of Spiky to
 % determine if versions are the same or not.
-%
+% 
+% Usage: GetGitHash()
+% 
 
 % Set paths
 sWT_dir = which('spiky');
@@ -7236,7 +7369,9 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function MergeChannels(varargin)
 % Merge selected channels
-%
+% 
+% Usage: MergeChannels()
+% 
 [FV, ~] = GetStruct();
 if ~IsDataLoaded, return, end
 persistent p_sName
@@ -7260,8 +7395,7 @@ vFs = nan(1, length(csChannels));
 vBegin = nan(1, length(csChannels));
 vEnd = nan(1, length(csChannels));
 for nCh = 1:length(csChannels) % iterate over imported channels
-    vCont = ChannelCalculator(FV.tData.(csChannels{nCh}), csChannels{nCh});
-    [vCont, FV] = AdjustChannelGain(FV, vCont, csChannels{nCh});
+    vCont = FV.tData.(csChannels{nCh});
     
     % Time vector
     nBegin = FV.tData.([csChannels{nCh} '_TimeBegin']); % sampling start, sec
@@ -7314,39 +7448,21 @@ SetStruct(FV)
 ViewTrialData
 return
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function InvertChannel(varargin)
-% Select a continuous channel manually and invert it.
-%
-
-[FV, ~] = GetStruct();
-if ~IsDataLoaded, return, end
-
-% Select channel
-[sCh, ~] = SelectChannelNumber(FV.csChannels);
-
-% Invert channel data
-FV.tData.(sCh) = FV.tData.(sCh) .* -1;
-
-% Force inverted channel to be displayed
-FV.csDisplayChannels = unique([FV.csDisplayChannels sCh]);
-
-SetStruct(FV)
-ViewTrialData
-return
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function RedoScript(varargin)
 % Redo last run script
-%
+% 
+% Usage: RedoScript()
+% 
 BatchRedo([], 'redoscript');
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ToggleStatus(varargin)
 % Toggle status of the current object (eg. Grid, Normal Time etc)
-%
+% 
+% Usage: ToggleStatus()
+% 
 [FV, ~] = GetStruct();
 switch lower(get(gcbo,'Checked'))
     case 'on'
@@ -7363,7 +7479,9 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ShiftBeginTime(varargin)
 % Shift the BeginTime time of selected channel
-%
+% 
+% Usage: ShiftBeginTime()
+% 
 [FV, ~] = GetStruct();
 
 % Check that tag of handle references a known channel
@@ -7406,7 +7524,7 @@ if ~(isempty(sCh) || ~any(strcmp(fieldnames(FV.tData), sCh)))
     nFrom = str2double(p_cAns{1});
     nTo = str2double(p_cAns{2});
     vDataOrig = FV.tData.(sCh);
-    vData = ChannelCalculator(vDataOrig, sCh);
+    vData = vDataOrig;
     if isnan(nFrom)
         iChange = isnan(vData);
     else
@@ -7453,7 +7571,7 @@ hAx = findobj('Type', 'axes', 'Tag', sCh);
 if isempty(hAx), return
 else axes(hAx(1)), end
 
-vCont = ChannelCalculator(FV.tData.(sCh), sCh); % continuous trace (V)
+vCont = FV.tData.(sCh); % continuous trace (V)
 nBeginTime = FV.tData.([sCh '_TimeBegin']); % start of sampling (sec)
 nEndTime = FV.tData.([sCh '_TimeEnd']); % start of sampling (sec)
 nFs = FV.tData.([sCh '_KHz']) * 1000; % Hz
