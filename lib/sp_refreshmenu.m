@@ -49,21 +49,20 @@ uimenu(hGUI, 'Parent', hEdit, 'Label', '&DAQ Info', 'Callback', Spiky.main.ShowD
 
 % View menu
 hView  = uimenu(hGUI, 'Label', '&View');
-uimenu(hGUI, 'Parent', hView, 'Label', '&Show Channels...', 'Callback', Spiky.main.SelectChannels);
-uimenu(hGUI, 'Parent', hView, 'Label', 'Show &Events', 'Callback', Spiky.main.ToggleStatus, 'Checked', 'off', 'Accelerator', 'E');
-uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &In', 'Callback', Spiky.main.ZoomIn, 'separator', 'on');
-uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &Out', 'Callback', Spiky.main.ZoomOut);
-uimenu(hGUI, 'Parent', hView, 'Label', '&Zoom Range', 'Callback', Spiky.main.ZoomRange, 'Accelerator', 'Z');
-uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &Reset', 'Callback', Spiky.main.ZoomReset, 'Accelerator', 'X');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Show Channels...', 'Callback', Spiky.main.SelectChannels);
+uimenu(hGUI, 'Parent', hView, 'Label', 'Show Events', 'Callback', Spiky.main.ToggleStatus, 'Checked', 'off', 'Accelerator', 'E');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom In', 'Callback', Spiky.main.ZoomIn, 'separator', 'on');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom Out', 'Callback', Spiky.main.ZoomOut);
+uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom Range', 'Callback', Spiky.main.ZoomRange, 'Accelerator', 'Z');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom Reset', 'Callback', Spiky.main.ZoomReset, 'Accelerator', 'X');
 uimenu(hGUI, 'Parent', hView, 'Label', 'Pan', 'Callback', Spiky.main.PanWindow, 'Accelerator', 'L');
-uimenu(hGUI, 'Parent', hView, 'Label', '&Zoom Amplitude', 'Callback', Spiky.main.ZoomAmplitude, 'Accelerator', 'Y', 'separator', 'on');
-uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom &Tight', 'Callback', Spiky.main.ZoomTight, 'Accelerator', 'T');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom Amplitude', 'Callback', Spiky.main.ZoomAmplitude, 'Accelerator', 'Y', 'separator', 'on');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Zoom Tight', 'Callback', Spiky.main.ZoomTight, 'Accelerator', 'T');
 hAmpUnit = uimenu(hGUI, 'Parent', hView, 'Label', 'Amplitude Unit');
 uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Volts (V)',  'callback', {Spiky.main.SetAmplitudeUnit, 'V'});
 uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Millivolts (mV)', 'callback', {Spiky.main.SetAmplitudeUnit, 'mV'});
 uimenu(hGUI, 'Parent', hAmpUnit, 'Label', 'Microvolts (µV)', 'callback', {Spiky.main.SetAmplitudeUnit, 'uV'});
-uimenu(hGUI, 'Parent', hView, 'Label', '&Normal Time', 'Callback', Spiky.main.ToggleStatus, 'separator', 'on', 'Tag', 'ShowNormalTime', 'checked', 'on');
-uimenu(hGUI, 'Parent', hView, 'Label', '&Draw time ticks', 'Tag', 'Spiky_Menu_ShowGrid', 'Callback', Spiky.main.ToggleStatus, 'Checked', 'off');
+uimenu(hGUI, 'Parent', hView, 'Label', 'Normal Time', 'Callback', Spiky.main.ToggleStatus, 'separator', 'on', 'Tag', 'ShowNormalTime', 'checked', 'on');
 
 % List of themes
 hThemes = uimenu(hGUI, 'Parent', hView, 'Label', '&Themes', 'separator', 'on');
@@ -77,46 +76,52 @@ uimenu(hGUI, 'Parent', hView, 'Label', '&Refresh', 'Accelerator', 'R', ...
 
 % Channels menu
 hChannels = uimenu(hGUI, 'Label', '&Channels');
-uimenu(hGUI, 'Parent', hChannels, 'Label', '&Gains...', 'Callback', Spiky.main.SetGain, 'Accelerator', 'G');
-uimenu(hGUI, 'Parent', hChannels, 'Label', '&Descriptions...', 'Callback', Spiky.main.ChannelDescriptions);
-uimenu(hGUI, 'Parent', hChannels, 'Label', 'Digiti&ze', 'Callback', Spiky.main.DigitizeChannel, 'separator', 'on');
-uimenu(hGUI, 'Parent', hChannels, 'Label', 'D&uplicate', 'Callback', Spiky.main.DuplicateChannel);
-uimenu(hGUI, 'Parent', hChannels, 'Label', 'D&elete', 'Callback', Spiky.main.DeleteChannel);
-uimenu(hGUI, 'Parent', hChannels, 'Label', '&Noise Reduction... (B)', 'Callback', Spiky.main.PCACleaning);
-uimenu(hGUI, 'Parent', hChannels, 'Label', '&Merge...', 'Callback', Spiky.main.MergeChannels);
-uimenu(hGUI, 'Parent', hChannels, 'Label', '&Invert...', 'Callback', Spiky.main.InvertChannel);
-uimenu(hGUI, 'Parent', hChannels, 'Label', '&Filtered Channels...', 'Callback', Spiky.main.SetFilterChannels, 'separator', 'on', 'Accelerator', 'F');
-uimenu(hGUI, 'Parent', hChannels, 'Label', '&Filter Options...', 'Callback', Spiky.main.FilterOptions);
-uimenu(hGUI, 'Parent', hChannels, 'Label', '&Channel Calculator...', 'Callback', Spiky.main.SetChannelCalculator, 'Accelerator', 'C');
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Gains...', 'Callback', Spiky.main.SetGain, 'Accelerator', 'G');
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Descriptions...', 'Callback', Spiky.main.ChannelDescriptions);
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Digitize', 'Callback', Spiky.main.DigitizeChannel, 'separator', 'on');
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Duplicate', 'Callback', Spiky.main.DuplicateChannel);
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Delete', 'Callback', Spiky.main.DeleteChannel);
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Delete All Hidden', 'Callback', Spiky.main.DeleteHiddenChannels);
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Noise Reduction... (B)', 'Callback', Spiky.main.PCACleaning);
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Merge...', 'Callback', Spiky.main.MergeChannels);
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Select Filters...', 'Callback', Spiky.main.FilterOptions, 'separator', 'on', 'Accelerator', 'F');
+hFilters = uimenu(hGUI, 'Parent', hChannels, 'Label', 'Configure Filters');
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Custom Filter...', 'Callback', Spiky.main.SetChannelCalculator, 'Accelerator', 'C');
+
+% Get list of filters
+GetScriptList('spikyfilter_', hGUI, hFilters, 'Spiky.main.ConfigureFilter', 0)
+
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Export settings...', 'Callback', Spiky.main.ExportChannelSettings, 'separator', 'on');
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Import settings...', 'Callback', Spiky.main.ImportChannelSettings);
 
 % Spikes menu
 hWaveforms  = uimenu(hGUI, 'Label', '&Spikes');
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set &Threshold...', 'Callback', Spiky.main.SetSpikeThreshold );
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Auto-Detect Thresholds', 'Callback', Spiky.main.AutoDetectThresholds );
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Remove Thresholds', 'Callback', Spiky.main.RemoveThresholds );
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Run Spike Detection (B)', 'Callback', Spiky.main.DetectSpikes, 'separator', 'on');
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Dejitter Spikes (B)', 'Callback', Spiky.main.DejitterSpikes);
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Remove &Outliers (B)', 'Callback', Spiky.main.RemoveOutlierSpikes);
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Add &Multitrode...', 'Callback', Spiky.main.AddTetrode, 'separator', 'on');
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set Threshold...', 'Callback', Spiky.main.SetSpikeThreshold );
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Auto-Detect Thresholds', 'Callback', Spiky.main.AutoDetectThresholds );
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Remove Thresholds', 'Callback', Spiky.main.RemoveThresholds );
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Run Spike Detection (B)', 'Callback', Spiky.main.DetectSpikes, 'separator', 'on');
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Dejitter Spikes (B)', 'Callback', Spiky.main.DejitterSpikes);
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Remove Outliers (B)', 'Callback', Spiky.main.RemoveOutlierSpikes);
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Add Multitrode...', 'Callback', Spiky.main.AddTetrode, 'separator', 'on');
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Remove Multitrode...', 'Callback', Spiky.main.RemoveTetrode );
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set Max &Jitter...', 'Callback', Spiky.main.SetMaxSpikeJitter );
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set Max Jitter...', 'Callback', Spiky.main.SetMaxSpikeJitter );
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Show Waveforms', 'Callback', Spiky.main.ViewWaveforms, 'separator', 'on');
-uimenu(hGUI, 'Parent', hWaveforms, 'Label', '&Channel Statistics', 'Callback', Spiky.main.ChannelStatistics);
+uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Channel Statistics', 'Callback', Spiky.main.ChannelStatistics);
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set Pre-Trigger...', 'Callback', Spiky.main.EditPreTriggerTime, 'separator', 'on');
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set Post-Trigger...', 'Callback', Spiky.main.EditPostTriggerTime);
 uimenu(hGUI, 'Parent', hWaveforms, 'Label', 'Set Spike Deadtime...', 'Callback', Spiky.main.SetDeadtime);
 
 % Sorting menu
 hSorting  = uimenu(hGUI, 'Label', '&Sort');
-uimenu(hGUI, 'Parent', hSorting, 'Label', '&Sort Channel...', 'Callback', Spiky.main.SortSpikes);
-uimenu(hGUI, 'Parent', hSorting, 'Label', 'Sort &All Channels', 'Callback', Spiky.main.SortAllChannels);
-uimenu(hGUI, 'Parent', hSorting, 'Label', '&QuickSort!', 'Callback', Spiky.main.QuickSort);
-uimenu(hGUI, 'Parent', hSorting, 'Label', 'Show S&orted Spikes', 'Callback', Spiky.main.ShowSpikeClusters, 'separator', 'on');
-uimenu(hGUI, 'Parent', hSorting, 'Label', '&Cluster Control', 'Callback', Spiky.main.ShowOverlappingSpikeClusters, 'Accelerator', 'W');
-uimenu(hGUI, 'Parent', hSorting, 'Label', 'Show Aggregration &Tree', 'Callback', Spiky.main.ShowAggregationTree, 'Accelerator', 'A');
-uimenu(hGUI, 'Parent', hSorting, 'Label', 'View &Principal Components', 'Callback', Spiky.main.ViewWaveformPCs);
-uimenu(hGUI, 'Parent', hSorting, 'Label', 'Plot &Rasters', 'Callback', Spiky.main.PlotRasters);
-uimenu(hGUI, 'Parent', hSorting, 'Label', 'Plot &Instantaneous Rate', 'Callback', Spiky.main.PlotInstSpikeRate);
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'Sort Channel...', 'Callback', Spiky.main.SortSpikes);
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'Sort All Channels', 'Callback', Spiky.main.SortAllChannels);
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'QuickSort!', 'Callback', Spiky.main.QuickSort);
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'Show Sorted Spikes', 'Callback', Spiky.main.ShowSpikeClusters, 'separator', 'on');
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'Cluster Control', 'Callback', Spiky.main.ShowOverlappingSpikeClusters, 'Accelerator', 'W');
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'Show Aggregration Tree', 'Callback', Spiky.main.ShowAggregationTree, 'Accelerator', 'A');
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'View Principal Components', 'Callback', Spiky.main.ViewWaveformPCs);
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'Plot Rasters', 'Callback', Spiky.main.PlotRasters);
+uimenu(hGUI, 'Parent', hSorting, 'Label', 'Plot Instantaneous Rate', 'Callback', Spiky.main.PlotInstSpikeRate);
 uimenu(hGUI, 'Parent', hSorting, 'Label', 'Delete sorting data...', 'Callback', Spiky.main.DeleteSortingData, 'separator', 'on');
 
 % Analysis menu
@@ -134,35 +139,8 @@ uimenu(hGUI, 'Parent', hExtensions, 'Label', 'Run &Batch Script...', 'Callback',
 uimenu(hGUI, 'Parent', hExtensions, 'Label', 'Redo &Script', 'Callback', Spiky.main.RedoScript, 'Accelerator', 'Y');
 uimenu(hGUI, 'Parent', hExtensions, 'Label', 'Get Script Help...', 'Callback', Spiky.main.GetScriptHelp);
 
-% Find scripts anywhere in Matlab path
-% Scripts are prefixed with spiky_ in the filename and can be placed
-% anywhere in the MatLab path
-sPath = path();
-if ispc
-    csPath = regexp(sPath, ';', 'split');
-else
-    csPath = regexp(sPath, ':', 'split');
-end
-csScripts = {};
-for p = 1:length(csPath) % iterate over all directories in path
-    if exist(csPath{p}, 'dir')
-        tDir = dir([csPath{p} filesep 'spiky_*.m']);
-        if ~isempty(tDir)
-            csScripts = [csScripts {tDir.name}];
-        end
-    end
-end
-
-% Create links to scripts in the Tools->Scripts menu
-for s = 1:length(csScripts)
-    sName = strrep(csScripts{s}(7:end-2), '_', ' ');
-    iSpace = strfind(sName, ' ');
-    sName([1 iSpace+1]) = upper(sName([1 iSpace+1])); % capitalize all words
-    hMenu = uimenu(hGUI, 'Label', sName, 'Parent', hExtensions, 'Callback', [sprintf('Spiky.main.RunScript(''%s'')', csScripts{s})]);
-    if s == 1
-        set(hMenu, 'Separator', 'on')
-    end
-end
+% Get list of extensions/scripts
+GetScriptList('spiky_', hGUI, hExtensions, 'Spiky.main.RunScript', 1)
 
 uimenu(hGUI, 'Parent', hTools, 'Label', '&Batch Redo', 'Callback', 'Spiky.main.BatchRedo([],''redo'');', 'Accelerator', 'B');
 uimenu(hGUI, 'Parent', hTools, 'Label', '&Autoload New Files...', 'Callback', Spiky.main.AutoloadNewFiles, 'Separator', 'on');
@@ -189,4 +167,39 @@ uimenu(hGUI, 'Parent', hWebResSub , 'Label', '&GitHub Repository', 'Callback', '
 uimenu(hGUI, 'Parent', hWebResSub , 'Label', '&Wiki', 'Callback', 'web(''https://github.com/pmknutsen/spiky/wiki'', ''-browser'')');
 uimenu(hGUI, 'Parent', hWebResSub , 'Label', '&Bug Tracker', 'Callback', 'web(''https://github.com/pmknutsen/spiky/issues'', ''-browser'')');
 
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function GetScriptList(sPrefix, hMenu, hParentItem, sCallbackFcn, bSep)
+% Get a list of matching filenames and insert them, with callbacks, into a
+% UI menu. Function will search for mathing filenames anywhere below the 
+% home directory of spiky
+sPath = which('spiky');
+[sPath, ~] = fileparts(sPath);
+
+% Get a list of all files and folders in this folder.
+csFiles = dir(sPath);
+csDirs = {csFiles([csFiles.isdir]).name};
+
+csScripts = {};
+for p = 3:length(csDirs) % iterate over all directories in path
+    sFullPath = sprintf('%s%s%s', sPath, filesep, csDirs{p});
+    if exist(sFullPath, 'dir')
+        tDir = dir([sFullPath filesep sPrefix '*.m']);
+        if ~isempty(tDir)
+            csScripts = [csScripts {tDir.name}];
+        end
+    end
+end
+
+% Create links to scripts in the Tools->Scripts menu
+for s = 1:length(csScripts)
+    sName = strrep(csScripts{s}((length(sPrefix)+1):end-2), '_', ' ');
+    iSpace = strfind(sName, ' ');
+    sName([1 iSpace+1]) = upper(sName([1 iSpace+1])); % capitalize all words
+    hMenu = uimenu(hMenu, 'Label', sName, 'Parent', hParentItem, 'Callback', [sprintf('%s(''%s'')', sCallbackFcn, csScripts{s})]);
+    if s == 1 && bSep
+        set(hMenu, 'Separator', 'on')
+    end
+end
 return
