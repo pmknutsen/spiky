@@ -12,6 +12,10 @@ nDecimateFactor = 1.5; % higher means more or original signal preserved
 bInterp = 1; % interpolate
 bMask = 1;
 
+% Choose which data acquisition system was used
+%sDAQType = 'axona';
+sDAQType = 'openephys';
+
 persistent p_nLowPass p_nHighPass p_bComputeERP p_nERPPreT p_nERPPostT p_csStimChannel p_bShowNames p_cNormMethod p_sRefCh p_sFidPath p_nSVDModes p_nResMult
 
 % Default parameters
@@ -66,8 +70,19 @@ centerfig(hWaitbar, Spiky.main.GetGUIHandle())
 %% Initialize coordinates matrix
 waitbar(0.1, hWaitbar, 'Initialize coordinate system');
 csElecCoords = fieldnames(tData);
-%iCh = regexpi(csElecCoords, '^elec_EGF_\d*$'); % Axona
-iCh = regexpi(csElecCoords, '^elec_CH\d*$'); % Open Ephys
+if strcmpi(sDAQType, 'axona')
+    iCh = regexpi(csElecCoords, '^elec_EGF_\d*$'); % Axona
+else
+    iCh = regexpi(csElecCoords, '^elec_CH\d*$'); % Open Ephys
+    if isempty(cell2mat(iCh))
+        iCh = regexpi(csElecCoords, '^elec_\d*$'); % Open Ephys, alternative syntax
+    end
+end
+if isempty(cell2mat(iCh))
+    warndlg('No matching electrodes: Check labels created in "Get_Fiducials".')
+    return;
+end
+
 vRem = [];
 for cs = 1:length(iCh)
     if isempty(iCh{cs})
@@ -109,12 +124,24 @@ mElecCoordsPix = ceil(mElecCoordsRelMM * p_nResMult) + repmat(vBregmaPos, size(m
 
 %% Get list of electrodes
 csCh = fieldnames(FV.tData);
-%iCh = regexpi(csCh, '^EGF_\d*$'); % Axona
-iCh = regexpi(csCh, '^CH\d*$'); % Open Ephys
+if strcmpi(sDAQType, 'axona')
+    iCh = regexpi(csCh, '^EGF_\d*$'); % Axona
+else
+    iCh = regexpi(csCh, '^CH\d*$'); % Open Ephys
+end
 for i = fliplr(1:length(iCh))
     if isempty(iCh{i}), csCh(i) = []; end
 end
 csCh = sort(csCh);
+
+% Get channel descriptions
+csChDescr = cell(size(csCh));
+for c = 1:length(csCh)
+    nIndx = strcmp(csCh{c}, {FV.tChannelDescriptions.sChannel});
+    if ~isempty(FV.tChannelDescriptions(nIndx))
+        csChDescr{c} = FV.tChannelDescriptions(nIndx).sDescription;
+    end
+end
 
 %% Get the start and end points of the timeseries that will be analyzes
 % This defaults to the current displayed range in the Spiky UI. If the
@@ -137,11 +164,18 @@ vRange = nStart:nEnd;
 mMap = [];
 for ch = 1:length(csCh)
     waitbar(ch/length(csCh), hWaitbar, 'Computing signal matrix...');
-    vPos = mElecCoordsPix(strcmp(['elec_' csCh{ch}], csElecCoords), :);
-    if isempty(vPos)
+
+    % Get electrode index (based on channel name first, description second)
+    iCh = strcmp(['elec_' csCh{ch}], csElecCoords);
+    if ~any(iCh)
+        iCh = strcmp(['elec_' csChDescr{ch}], csElecCoords);
+    end
+    if ~any(iCh)
         disp(['elec_' csCh{ch} ' is missing!'])
         continue
     end
+    vPos = mElecCoordsPix(iCh, :);
+    
     vSig = FV.tData.(csCh{ch});
     vSig = vSig(vRange);
 
@@ -176,8 +210,13 @@ for ch = 1:length(csCh)
     end
     mMap(vPos(1), vPos(2), :) = vSig;
 end
-waitbar(0.5, hWaitbar, 'Substituting zeros with NaNs...');
+%waitbar(0.5, hWaitbar, 'Substituting zeros with NaNs...');
 %mMap(mMap(:) == 0) = NaN; % huge mem drain: mMap(:) == 0 duplicates matrix
+
+if isempty(mMap)
+    warndlg('Data matrix is empty: Check labels and electrode data.')
+    return;
+end
 
 %% Compute reference signal
 waitbar(0, hWaitbar, 'Computing reference signal...');
@@ -189,7 +228,7 @@ switch lower(p_sRefCh)
             waitbar(e / size(mElecCoordsPix, 1), hWaitbar, 'Subtracting reference signal...');
             mSigs(:, end+1) = squeeze(mMap(mElecCoordsPix(e, 1), mElecCoordsPix(e, 2), :));
         end
-        vRef = mean(mSigs, 2);
+        vRef = nanmean(mSigs, 2);
     case 'none'
         vRef = [];
     otherwise
@@ -259,6 +298,10 @@ if p_bComputeERP
         end
         nN = nN + 1;
     end
+    if nN == 0
+        warndlg('No trigger pulses detected: Try expanding the time-range in the Spiky UI.')
+        return;
+    end
     nStart = 1;
     nEnd = size(mMapAvg, 3);
     mMapAvg = mMapAvg ./ nN;
@@ -266,7 +309,12 @@ if p_bComputeERP
     % Plot all ERPs on all channels
     mERPSigs = zeros(size(mMapAvg, 3), length(csCh));
     for ch = 1:length(csCh)
-        vPos = mElecCoordsPix(strcmp(['elec_' csCh{ch}], csElecCoords), :);
+        % Get electrode index (based on channel name first, description second)
+        iCh = strcmp(['elec_' csCh{ch}], csElecCoords);
+        if ~any(iCh)
+            iCh = strcmp(['elec_' csChDescr{ch}], csElecCoords);
+        end
+        vPos = mElecCoordsPix(iCh, :);
         mERPSigs(:, ch) = squeeze(mMapAvg(vPos(1), vPos(2), :));
     end
     hFig = figure;
@@ -362,12 +410,13 @@ hAx.CLim = [-nMax nMax];
 % Compute clim from the average min/max
 
 hCol = colorbar;
+Spiky.main.ThemeObject(hCol);
 hCol.Label.String = 'uV';
-axis(hAx, 'image')
+axis image
 hAx.View = [90 90];
 hAx.XLim = [min(mSkullRelPix(:, 2))-.5 max(mSkullRelPix(:, 2))+.5];
 hAx.YLim = [min(mSkullRelPix(:, 1))-.5 max(mSkullRelPix(:, 1))+.5];
-hTit = title(hAx, 'Anterior');
+hTit = title('Anterior');
 if bMask
     mMask = poly2mask(mSkullRelPix(:, 2), mSkullRelPix(:, 1), nWidth, nHeight);
 else
@@ -448,6 +497,7 @@ if isnumeric(varargin{1})
 elseif isobject(varargin{1})
     % Change framenumber depending on button pressed
     hBut = varargin{1};
+    if ~ishandle(hBut), return; end
     switch hBut.String
         case '>'
             % Play continuously forward, until last frame
@@ -474,7 +524,7 @@ end
 
 % Validate frame number
 iFrame = max([1 iFrame]);
-iFrame = min([iFrame length(tD.vRange)]);
+iFrame = min([iFrame size(tD.mMap, 3)]);
 
 % Update time marker
 if tD.bComputeERP
@@ -503,7 +553,9 @@ drawnow
 
 % Update figure userdata
 tD.nCurrentFrame = iFrame;
-set(hFig, 'userdata', tD);
+if ishandle(hFig)
+    set(hFig, 'userdata', tD);
+end
 
 return;
 
