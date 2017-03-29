@@ -226,9 +226,40 @@ if isempty(hLine)
     % Attach menu to object
     hMenu = uicontextmenu;
     uimenu(hMenu, 'Label', sStr);
+    uimenu(hMenu, 'Label', 'Rename', 'Callback', @RenameObject, 'userdata', hLine);
     uimenu(hMenu, 'Label', 'Delete', 'Callback', @RemoveObject, 'userdata', hLine);
     set(hLine, 'uicontextmenu', hMenu)
 end
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function RenameObject(hObj, varargin)
+% Rename an object
+
+% Remove entry in data structure
+sTag = get(get(hObj, 'userdata'), 'tag');
+
+tData = get(GetAxis, 'userdata');
+if ~isfield(tData, sTag), return; end
+
+% Get new label
+csLabel = inputdlg('New label:', 'Rename', 1, {sTag});
+if isempty(csLabel), return; end
+
+% Abort if label was not changed
+if strcmp(sTag, csLabel{1}), return; end
+
+tData.(csLabel{1}) = tData.(sTag);
+tData = rmfield(tData, sTag);
+vXY = tData.(csLabel{1});
+
+set(GetAxis, 'userdata', tData);
+
+% Remove old and draw new graphical object
+delete(get(hObj, 'userdata'))
+iSep = strfind(csLabel, '_');
+DrawLabel(GetLineHandle(csLabel{1}), vXY(1), vXY(2), csLabel{1}(1:(iSep{1} - 1)))
+
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
