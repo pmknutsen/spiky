@@ -71,7 +71,9 @@ for c = 1:length(csCh)
         vData = single(vData);
         sCh = csCh{c};
         sTime = tInfo.header.date_created(end-5:end);
-        FV.tData(1).(sCh) = vData'; % microvolts
+        % Import functions should return VOLTS AS RECORDED, i.e. not volts
+        % at the source.
+        FV.tData(1).(sCh) = vData' ./ 1e6; % VData is in microvolts; convert to volts
         FV.tData(1).([sCh '_KHz']) = tInfo.header.sampleRate / 1000;
         FV.tData(1).([sCh '_KHz_Orig']) = tInfo.header.sampleRate / 1000;
         FV.tData(1).([sCh '_TimeBegin']) = vTime(1) / tInfo.header.sampleRate;
