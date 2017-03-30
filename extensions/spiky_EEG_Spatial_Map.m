@@ -189,15 +189,17 @@ while ch < length(csCh)
     nTimeBegin = FV.tData.([csCh{ch} '_TimeBegin']);
 
     % Check memory requirements
-    tSize = whos('vSig');
-    nMemReq = tSize.bytes * nWidth * nHeight; % minimum memory required
-    tMem = memory;
-    if nMemReq > tMem.MaxPossibleArrayBytes
-        waitfor(warndlg('Total memory requirements exceeds available memory. Reduce length of data by low-pass filtering all equally channels in Channels -> Select Filters...'))
-        Spiky.main.SetFilterOptions();
-        [FV, ~] = Spiky.main.GetStruct();
-        ch = 1;
-        continue
+    if ispc
+        tSize = whos('vSig');
+        nMemReq = tSize.bytes * nWidth * nHeight; % minimum memory required
+        tMem = memory;
+        if nMemReq > tMem.MaxPossibleArrayBytes
+            waitfor(warndlg('Total memory requirements exceeds available memory. Reduce length of data by low-pass filtering all equally channels in Channels -> Select Filters...'))
+            Spiky.main.SetFilterOptions();
+            [FV, ~] = Spiky.main.GetStruct();
+            ch = 1;
+            continue
+        end
     end
     
     % Time course normalization
