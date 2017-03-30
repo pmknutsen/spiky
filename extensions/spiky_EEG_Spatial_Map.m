@@ -1,9 +1,11 @@
 function FV = spiky_EEG_Spatial_Map(FV)
-% Generate spatial map of EEG measurements from point sources
-%
+% Generate a spatial map of EEG/ECoG measurements from an array of point
+% sources.
+% 
 % TODO Show anatomical coordinates on axes in millimeters 
 %      Display when STIM is on in ERP mode
-%
+%      Move normalization methods to ./filters?
+% 
 
 global Spiky;
 
@@ -341,7 +343,7 @@ if p_bComputeERP
         set(hLines(h), 'color', FV.mColors(h, :))
     end
     xlabel(hAx, 'Time (s)')
-    ylabel(hAx, 'ERP (uV)')
+    ylabel(hAx, ['Event Related Potential (' FV.tAmplitudeUnit.sUnit ')'])
     axis(hAx, 'tight')
     set(hAx, 'XGrid', 'on', 'YGrid', 'on')
     Spiky.main.ThemeObject(hAx)
@@ -414,9 +416,13 @@ end
 hSkull = plot(mSkullRelPix(:, 2), mSkullRelPix(:, 1), 'w--');
 
 %% Compute appropriate clim's from data
+% TODO Does give appropriate values
 mMax = max(mMap, [], 3);
 mMin = min(mMap, [], 3);
-cCLim = [mean(mMin(:)) mean(mMax(:))] .* 2;
+nStd = std(mMap(:));
+mMin(abs(mMin) < nStd*2) = [];
+mMax(abs(mMax) < nStd*2) = [];
+cCLim = [mean(mMin(:)) mean(mMax(:))] .* 2.5;
 nMax = max(abs(cCLim));
 hAx.CLim = [-nMax nMax];
 
@@ -424,9 +430,9 @@ hAx.CLim = [-nMax nMax];
 
 hCol = colorbar;
 Spiky.main.ThemeObject(hCol);
-hCol.Label.String = 'uV';
+hCol.Label.String = FV.tAmplitudeUnit.sUnit;
 axis image
-hAx.View = [90 90];
+hAx.View = [-90 -90];
 hAx.XLim = [min(mSkullRelPix(:, 2))-.5 max(mSkullRelPix(:, 2))+.5];
 hAx.YLim = [min(mSkullRelPix(:, 1))-.5 max(mSkullRelPix(:, 1))+.5];
 hTit = title('Anterior');
