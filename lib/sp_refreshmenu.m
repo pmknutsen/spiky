@@ -84,7 +84,7 @@ uimenu(hGUI, 'Parent', hChannels, 'Label', 'Delete', 'Callback', Spiky.main.Dele
 uimenu(hGUI, 'Parent', hChannels, 'Label', 'Delete All Hidden', 'Callback', Spiky.main.DeleteHiddenChannels);
 uimenu(hGUI, 'Parent', hChannels, 'Label', 'Noise Reduction... (B)', 'Callback', Spiky.main.PCACleaning);
 uimenu(hGUI, 'Parent', hChannels, 'Label', 'Merge...', 'Callback', Spiky.main.MergeChannels);
-uimenu(hGUI, 'Parent', hChannels, 'Label', 'Select Filters...', 'Callback', Spiky.main.FilterOptions, 'separator', 'on', 'Accelerator', 'F');
+uimenu(hGUI, 'Parent', hChannels, 'Label', 'Select Filters...', 'Callback', Spiky.main.SetFilterOptions, 'separator', 'on', 'Accelerator', 'F');
 hFilters = uimenu(hGUI, 'Parent', hChannels, 'Label', 'Configure Filters');
 uimenu(hGUI, 'Parent', hChannels, 'Label', 'Custom Filter...', 'Callback', Spiky.main.SetChannelCalculator, 'Accelerator', 'C');
 
