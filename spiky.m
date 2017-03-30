@@ -183,14 +183,16 @@ return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function GUIMouseMotion(varargin)
-% Execute code when mouse cursor moves over GUI
-%
+% Execute code when mouse cursor moves over GUI, such as updating status
+% text in bottom left corner of UI.
+% 
+[FV, ~] = GetStruct();
 
 % Create tooltip if it does not exist
 hFig = GetGUIHandle();
 hTxt = findobj(hFig, 'Tag', 'AxesCursorLocationTip');
 if isempty(hTxt)
-    hTxt = uicontrol(hFig, 'Style', 'text', 'Position', [0 0 200 15], ...
+    hTxt = uicontrol(hFig, 'Style', 'text', 'Position', [0 0 400 15], ...
         'HorizontalAlignment', 'left', 'Tag', 'AxesCursorLocationTip', ...
         'fontsize', 8, 'backgroundcolor', get(hFig, 'color'));
 end
@@ -203,24 +205,40 @@ hAx = overobj('axes');
 if isempty(hAx)
     set(hTxt(1), 'string', '')
 else
-    mPnt = get(hAx, 'CurrentPoint');
-    vXY = mPnt(1, 1:2);
     % Update tooltip
-    if abs(vXY(2)) <= 1
-        sYFormat = '%.2f';
-    else
-        sYFormat = '%.1f';
-    end
-    sUnit = get(get(hAx, 'ylabel'), 'userdata');
+    mPnt = get(hAx, 'CurrentPoint');
     
     hAxLab = findobj(hAx, 'type', 'text');
-    sCh = '';
+    sChDescr = '';
     if ~isempty(hAxLab)
-        sCh = get(hAxLab(1), 'string');
+        sChDescr = get(hAxLab(1), 'string');
     end
 
-    set(hTxt(1), 'string', sprintf(['%s: x = %.1f  y = ' sYFormat ' ' sUnit], ...
-        sCh, vXY(1), vXY(2)), ...
+    % Get channel real name
+    sCh = sChDescr;
+    if ~isempty(sChDescr)
+        sChB = GetChannelRealName(sChDescr);
+        if ~isempty(sChB)
+            sCh = sChB;
+        end
+    end
+    
+    % Get voltage scaling
+    sUnit = get(get(hAx, 'ylabel'), 'userdata');
+    if isempty(sUnit)
+        sUnit = FV.tAmplitudeUnit.sUnit;
+    end
+    
+    % Check if channel is filtered or not
+    sFilters = '';
+    if isfield(FV, 'tFilteredChannels')
+        if isfield(FV.tFilteredChannels, sCh)
+            sFilters = ', FILTERED';
+        end
+    end
+    
+    set(hTxt(1), 'string', sprintf(' %s (%s): %.1f sec , %.1f %s %s ', ...
+        sChDescr, sCh, mPnt(1, 1), mPnt(1, 2), sUnit, sFilters), ...
         'backgroundcolor', get(hFig, 'color'))
 end
 
@@ -876,13 +894,12 @@ end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function FilterOptions(varargin)
+function SetFilterOptions(varargin)
 % Set filtering options per channel in a UI.
 % 
-% Usage: FilterOptions()
+% Usage: SetFilterOptions()
 % 
 
-%%
 [FV, ~] = GetStruct();
 
 csFilters = GetFilters();
@@ -918,15 +935,17 @@ for i = 1:length(FV.csChannels)
             if length(FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPre) > 1
                 cData{i, 3} = FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPre{2};
             else cData{i, 3} = []; end
+        else
+            cData{i, 3} = [];
         end
         
         % Bandpass
         if isfield(FV.tFilteredChannels.(FV.csChannels{i}), 'nHighPass')
             cData{i, 4} = FV.tFilteredChannels.(FV.csChannels{i}).nHighPass;
-        end
+        else cData{i, 4} = []; end
         if isfield(FV.tFilteredChannels.(FV.csChannels{i}), 'nLowPass')
             cData{i, 5} = FV.tFilteredChannels.(FV.csChannels{i}).nLowPass;
-        end
+        else cData{i, 5} = []; end
         
         % Post-bandpass filters
         if isfield(FV.tFilteredChannels.(FV.csChannels{i}), 'csFiltersPost')
@@ -934,6 +953,8 @@ for i = 1:length(FV.csChannels)
             if length(FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPost) > 1
                 cData{i, 7} = FV.tFilteredChannels.(FV.csChannels{i}).csFiltersPost{2};
             else cData{i, 7} = []; end
+        else
+            cData{i, 7} = [];
         end
     else
         cData{i, 2} = [];
@@ -965,10 +986,10 @@ end
 %% Get new filter parameters
 FV.tFilteredChannels = struct([]);
 for i = 1:length(FV.csChannels)
-    if ~isempty(cData{i, 2})
+    if ~isempty(cData{i, 2}) && ~strcmp(cData{i, 2}, ' ')
         FV.tFilteredChannels(1).(FV.csChannels{i}).csFiltersPre{1} = cData{i, 2};
     end
-    if ~isempty(cData{i, 3})
+    if ~isempty(cData{i, 3}) && ~strcmp(cData{i, 3}, ' ')
         FV.tFilteredChannels(1).(FV.csChannels{i}).csFiltersPre{2} = cData{i, 3};
     end
     
@@ -981,10 +1002,10 @@ for i = 1:length(FV.csChannels)
         FV.tFilteredChannels(1).(FV.csChannels{i}).nLowPass = cData{i, 5};
     end
     
-    if ~isempty(cData{i, 6})
+    if ~isempty(cData{i, 6}) && ~strcmp(cData{i, 6}, ' ')
         FV.tFilteredChannels(1).(FV.csChannels{i}).csFiltersPost{1} = cData{i, 6};
     end
-    if ~isempty(cData{i, 7})
+    if ~isempty(cData{i, 7}) && ~strcmp(cData{i, 7}, ' ')
         FV.tFilteredChannels(1).(FV.csChannels{i}).csFiltersPost{2} = cData{i, 7};
     end
 end
@@ -2518,7 +2539,7 @@ function [vCont, vTime, nNewFs] = FilterChannel(vCont, vTime, nFs, nLoPass, nHiP
 %               HI   high-pass frequency (Hz)
 %               R    1 = rectify, 0 = no rectify
 %               OPT  'decimate' or 'none'
-%               DF   Decimation factor (default 2.5; optional)
+%               DF   Decimation factor (default 4; optional)
 % 
 
 % Check for sane inputs
@@ -2554,7 +2575,7 @@ switch lower(sOption)
     case 'decimate'
         % Decimation factor
         if isempty(varargin)
-            nNewFs = nLoPass * 2.5;
+            nNewFs = nLoPass * 4;
         else
             nNewFs = nLoPass * varargin{1};
         end        
@@ -3502,20 +3523,24 @@ function [vCont, varargout] = GetFilteredChannel(sCh, vCont, varargin)
 % optionally decimate.
 % 
 
-% Initialize outputs in case we abort early
-if nargout > 1
-    varargout(1:(nargout-1)) = {[]};
-end
 [FV, ~] = GetStruct();
 
-%% Compute absolute time
+%% Channel sample rate
 nFs = FV.tData.([sCh '_KHz']) * 1000;
+
+%% Compute absolute time
 if nargin > 2
     vTime = varargin{1};
 else
     nBegin = FV.tData.([sCh '_TimeBegin']); % sampling start, sec
     nEnd = FV.tData.([sCh '_TimeEnd']); % sampling end, sec
     vTime = (nBegin + 1/nFs):(1/nFs):(nBegin + length(vCont)/nFs); % absolute time, sec
+end
+
+% Initialize outputs in case we abort early
+if nargout > 1
+    varargout{1} = vTime;
+    varargout{2} = nFs;
 end
 
 %% Adjust gain
@@ -3554,22 +3579,14 @@ if isfield(FV, 'tFilteredChannels')
     end
     
     %% Check whether to decimate or not
-    bDecimate = 0;
-    if ~isempty(varargin)
-        if strcmpi(varargin{end}, 'decimate')
-            bDecimate = 1;
-        end
+    sDecimate = 'nodecimate';
+    if strcmpi(varargin{end}, 'decimate')
+        sDecimate = 'decimate';
     end
     
     %% Filter and decimate
     if any(~isnan([nHighPass nLowPass]))
-        if bDecimate
-            [vCont, vTimeOut, nNewFs] = FilterChannel(vCont, vTime, nFs, nLowPass, nHighPass, 0, 'nodecimate');
-            if nargout > 1, varargout{1} = vTimeOut; end
-            if nargout > 2, varargout{2} = nNewFs; end
-        else
-            [vCont, ~, ~] = FilterChannel(vCont, [], nFs, nLowPass, nHighPass, 0, 'nodecimate');
-        end
+        [vCont, varargout{1}, varargout{2}] = FilterChannel(vCont, vTime, nFs, nLowPass, nHighPass, 0, sDecimate);
     end
     
     % Apply post-bandpass filters
@@ -5022,6 +5039,47 @@ set(hLeg, 'color', 'none', 'textcolor', 'w', 'location', 'northeast')
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function csNames = GetChannelRealName(varargin)
+% Get the real name of a channel from its descriptive string.
+% 
+% Usage:
+%   GetChannelRealName(S) where S is a string
+%   GetChannelRealName(C) where C is a cell of strings
+% 
+% The function returns a cell or string as a function of C or S,
+% respectively.
+% 
+
+[FV, ~] = GetStruct();
+if ischar(varargin{1})
+    cCh = {varargin{1}};
+else
+    cCh = varargin{1};
+end
+
+csNames = cell(1, length(cCh));
+for iCs = 1:length(cCh)
+    sCh = cCh{iCs};
+    if isfield(FV, 'tChannelDescriptions')
+        if isfield(FV.tChannelDescriptions, 'sChannel') && isfield(FV.tChannelDescriptions, 'sDescription')
+            nIndx = find(strcmp({FV.tChannelDescriptions.sDescription}, sCh));
+            if ~isempty(nIndx)
+                csNames{iCs} = FV.tChannelDescriptions(nIndx).sChannel;
+            else
+                csNames{iCs} = '';
+            end
+        end
+    end
+end
+
+% If a single string was passed, return a string
+if ischar(varargin{1})
+    csNames = csNames{1};
+end
+
+return
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function csDescr = GetChannelDescription(varargin)
 % Get the descriptive string of a channel name.
 % 
@@ -5031,7 +5089,7 @@ function csDescr = GetChannelDescription(varargin)
 % 
 % The function returns a cell or string as a function of C or S,
 % respectively.
-%
+% 
 
 [FV, ~] = GetStruct();
 if ischar(varargin{1})
