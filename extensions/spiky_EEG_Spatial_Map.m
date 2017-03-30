@@ -130,11 +130,13 @@ end
 csCh = sort(csCh);
 
 % Get channel descriptions
-csChDescr = cell(size(csCh));
+csChDescr = csCh;
 for c = 1:length(csCh)
-    nIndx = strcmp(csCh{c}, {FV.tChannelDescriptions.sChannel});
-    if ~isempty(FV.tChannelDescriptions(nIndx))
-        csChDescr{c} = FV.tChannelDescriptions(nIndx).sDescription;
+    if isfield(FV, 'tChannelDescriptions')
+        nIndx = strcmp(csCh{c}, {FV.tChannelDescriptions.sChannel});
+        if ~isempty(FV.tChannelDescriptions(nIndx))
+            csChDescr{c} = FV.tChannelDescriptions(nIndx).sDescription;
+        end
     end
 end
 
