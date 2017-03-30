@@ -16,11 +16,9 @@ bMask = 1;
 %sDAQType = 'axona';
 sDAQType = 'openephys';
 
-persistent p_nLowPass p_nHighPass p_bComputeERP p_nERPPreT p_nERPPostT p_csStimChannel p_bShowNames p_cNormMethod p_sRefCh p_sFidPath p_nSVDModes p_nResMult
+persistent p_bComputeERP p_nERPPreT p_nERPPostT p_csStimChannel p_bShowNames p_cNormMethod p_sRefCh p_sFidPath p_nSVDModes p_nResMult
 
 % Default parameters
-if isempty(p_nLowPass), p_nLowPass = 50; end
-if isempty(p_nHighPass), p_nHighPass = 0.1; end
 if isempty(p_cNormMethod), p_cNormMethod = 'z'; end % normalization method (z, percent or mean)
 if isempty(p_bComputeERP), p_bComputeERP = 1; end % compute ERP, 0/1 = no/yes
 if isempty(p_nERPPreT), p_nERPPreT = 0.2; end % s
@@ -30,9 +28,7 @@ if isempty(p_sRefCh), p_sRefCh = 'all'; end % reference channel
 if isempty(p_nSVDModes), p_nSVDModes = 0; end % SVD modes to denoise with (< 1 = no denoising)
 if isempty(p_nResMult), p_nResMult = 1; end % resolution multiplier
 
-cPrompt = {'Low pass (Hz)', ...
-    'High pass (Hz)', ...
-    'Normalization method (z, percent, mean)', ...
+cPrompt = {'Normalization method (z, percent, mean)', ...
     'Compute ERP (1=yes)', ...
     'ERP baseline period (s)', ...
     'ERP post-stimulus period (s)', ...
@@ -41,22 +37,19 @@ cPrompt = {'Low pass (Hz)', ...
     'SVD denoising modes', ...
     'Resolution multiplier' };
 cAns = inputdlg(cPrompt, 'EEG Spatial Map', 1, { ...
-    num2str(p_nLowPass), num2str(p_nHighPass), ...
     p_cNormMethod, num2str(p_bComputeERP), ...
     num2str(p_nERPPreT), num2str(p_nERPPostT), ...
     num2str(p_bShowNames), p_sRefCh, num2str(p_nSVDModes), num2str(p_nResMult) } );
 if isempty(cAns), return, end
 
-p_nLowPass = max([0 str2num(cAns{1})]);
-p_nHighPass = max([0 str2num(cAns{2})]);
-p_cNormMethod = cAns{3};
-p_bComputeERP = max([0 str2num(cAns{4})]);
-p_nERPPreT = max([0 str2num(cAns{5})]);
-p_nERPPostT = max([0 str2num(cAns{6})]);
-p_bShowNames = max([0 str2num(cAns{7})]);
-p_sRefCh = cAns{8};
-p_nSVDModes = str2num(cAns{9});
-p_nResMult = str2num(cAns{10});
+p_cNormMethod = cAns{1};
+p_bComputeERP = max([0 str2num(cAns{2})]);
+p_nERPPreT = max([0 str2num(cAns{3})]);
+p_nERPPostT = max([0 str2num(cAns{4})]);
+p_bShowNames = max([0 str2num(cAns{5})]);
+p_sRefCh = cAns{6};
+p_nSVDModes = str2num(cAns{7});
+p_nResMult = str2num(cAns{8});
 
 %% Load spatial coordinates of electrodes
 % Get fiducials image
@@ -162,8 +155,14 @@ vRange = nStart:nEnd;
 
 %% Assign electrode signals to correct location in mMap
 mMap = [];
-for ch = 1:length(csCh)
-    waitbar(ch/length(csCh), hWaitbar, 'Computing signal matrix...');
+ch = 1;
+while ch < length(csCh)
+    if ishandle(hWaitbar)
+        waitbar(ch/length(csCh), hWaitbar, 'Computing signal matrix...');
+    else
+        Spiky.main.sp_disp('EEG_Spatial_Map canceled.');
+        return;
+    end
 
     % Get electrode index (based on channel name first, description second)
     iCh = strcmp(['elec_' csCh{ch}], csElecCoords);
@@ -179,19 +178,24 @@ for ch = 1:length(csCh)
     vSig = FV.tData.(csCh{ch});
     vSig = vSig(vRange);
 
-    % Normalize signal to microvolts
-    nGain = 1;
-    if isfield(FV.tGain, csCh{ch})
-        nGain = FV.tGain.(csCh{ch});
-    end
-    vSig = vSig ./ nGain .* 1000000;
-
-    % Bandpass and decimate
+    % Apply filters
     nFs = FV.tData.([csCh{ch} '_KHz']) * 1000;
     vTime = (1:length(vSig)) ./ nFs;
-    [vSig, vTime, nNewFs] = Spiky.main.FilterChannel(vSig, vTime, nFs, p_nLowPass, p_nHighPass, 0, 'decimate', nDecimateFactor);
+    [vSig, vTime, nNewFs] = Spiky.main.GetFilteredChannel(csCh{ch}, vSig, vTime, 'decimate');
     nTimeBegin = FV.tData.([csCh{ch} '_TimeBegin']);
 
+    % Check memory requirements
+    tSize = whos('vSig');
+    nMemReq = tSize.bytes * nWidth * nHeight; % minimum memory required
+    tMem = memory;
+    if nMemReq > tMem.MaxPossibleArrayBytes
+        waitfor(warndlg('Total memory requirements exceeds available memory. Reduce length of data by low-pass filtering all equally channels in Channels -> Select Filters...'))
+        Spiky.main.SetFilterOptions();
+        [FV, ~] = Spiky.main.GetStruct();
+        ch = 1;
+        continue
+    end
+    
     % Time course normalization
     switch p_cNormMethod
         case 'z'
@@ -209,6 +213,7 @@ for ch = 1:length(csCh)
         mMap = nan(nWidth, nHeight, length(vSig));
     end
     mMap(vPos(1), vPos(2), :) = vSig;
+    ch = ch + 1;
 end
 %waitbar(0.5, hWaitbar, 'Substituting zeros with NaNs...');
 %mMap(mMap(:) == 0) = NaN; % huge mem drain: mMap(:) == 0 duplicates matrix
@@ -272,7 +277,10 @@ end
 vERPTime = [];
 if p_bComputeERP
     p_csStimChannel = Spiky.main.SelectChannelNumber(FV.csDigitalChannels, 'Select ERP trigger channel', p_csStimChannel);
-    vUp = FV.tData.([p_csStimChannel '_Up']);
+
+    % Get trigger events in the displayed time range
+    [vUp, ~] = Spiky.main.GetEventPairs(p_csStimChannel, 'range');
+    
     nFs = FV.tData.([p_csStimChannel '_KHz']);
     vStimT = vUp - nTimeBegin;
     
@@ -285,12 +293,15 @@ if p_bComputeERP
     nN = 0;
     for s = 1:length(vUp)
         waitbar(s / length(vUp), hWaitbar);
+        
+        % Check that pre/post pulse window is within displayed time range
         [~, iMin] = min(abs(vTime - vStimT(s)));
         nStart = iMin - nERPPreSamp; % samples
         nEnd = iMin + nERPPostSamp; % samples
         if nStart < 1 || nEnd > length(vTime)
             continue;
         end
+        
         if isempty(mMapAvg)
             mMapAvg = mMap(:, :, nStart:nEnd);
         else
@@ -299,8 +310,10 @@ if p_bComputeERP
         nN = nN + 1;
     end
     if nN == 0
-        warndlg('No trigger pulses detected: Try expanding the time-range in the Spiky UI.')
+        warndlg('No trigger pulses detected: Try expanding time-range in Spiky UI.')
         return;
+    elseif nN <= 5
+        Spiky.main.sp_disp('Fewer than 5 trigger pulses found: Try expanding time-range in Spiky UI.')
     end
     nStart = 1;
     nEnd = size(mMapAvg, 3);
