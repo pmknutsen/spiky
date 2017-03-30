@@ -3580,8 +3580,10 @@ if isfield(FV, 'tFilteredChannels')
     
     %% Check whether to decimate or not
     sDecimate = 'nodecimate';
-    if strcmpi(varargin{end}, 'decimate')
-        sDecimate = 'decimate';
+    if ~isempty(varargin)
+        if strcmpi(varargin{end}, 'decimate')
+            sDecimate = 'decimate';
+        end
     end
     
     %% Filter and decimate
