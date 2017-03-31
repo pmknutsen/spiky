@@ -13,6 +13,7 @@ global Spiky;
 nDecimateFactor = 1.5; % higher means more or original signal preserved
 bInterp = 1; % interpolate
 bMask = 1;
+sUnit = FV.tAmplitudeUnit.sUnit; % default scale unit
 
 % Choose which data acquisition system was used
 %sDAQType = 'axona';
@@ -155,7 +156,7 @@ catch
     nStart = 1;
     nEnd = length(FV.tData.(csCh{1}));
 end
-vRange = nStart:nEnd;
+vTimeRange = nStart:nEnd;
 
 %% Assign electrode signals to correct location in mMap
 mMap = [];
@@ -180,7 +181,7 @@ while ch < length(csCh)
     vPos = mElecCoordsPix(iCh, :);
     
     vSig = FV.tData.(csCh{ch});
-    vSig = vSig(vRange);
+    vSig = vSig(vTimeRange);
 
     % Apply filters
     nFs = FV.tData.([csCh{ch} '_KHz']) * 1000;
@@ -207,9 +208,11 @@ while ch < length(csCh)
         case 'z'
             % Z standardization
             vSig = (vSig - mean(vSig)) ./ std(vSig);
+            sUnit = 'Z';
         case 'percent'
             % Percent signal change
             vSig = (vSig ./ mean(vSig)) .* 100; % vSig now has mean of 100
+            sUnit = '%';
         case 'mean'
             % Mean subtraction
             vSig = vSig - mean(vSig);
@@ -269,11 +272,18 @@ if ~isempty(vRef)
         mMap = mMap - mRef;
         clear mRef;
     else
-        % Iterate over samples (slow) rather than risking running out of memory
+        % Subtract reference signal in blocks of samples when data is very large
         nLen = size(mMap, 3);
-        for j = 1:nLen
+        nStep = 1000;
+        for j = 1:nStep:nLen
             waitbar(j/nLen, hWaitbar, 'Subtracting reference signal...');
-            mMap(:, :, j) = mMap(:, :, j) - vRef(j);
+            vEnd = min([j + nStep] - 1, nLen);
+            vR = j:vEnd;
+            mRef = ones(size(mMap, 1), size(mMap, 2), length(vR));
+            for k = 1:length(vR)
+                mRef(:, :, k) = mRef(:, :, k) .* vRef(vR(k));
+            end
+            mMap(:, :, vR) = mMap(:, :, vR) - mRef;
         end
     end
 end
@@ -347,7 +357,7 @@ if p_bComputeERP
         set(hLines(h), 'color', FV.mColors(h, :))
     end
     xlabel(hAx, 'Time (s)')
-    ylabel(hAx, ['Event Related Potential (' FV.tAmplitudeUnit.sUnit ')'])
+    ylabel(hAx, ['Event Related Potential (' sUnit ')'])
     axis(hAx, 'tight')
     set(hAx, 'XGrid', 'on', 'YGrid', 'on')
     Spiky.main.ThemeObject(hAx)
@@ -460,7 +470,7 @@ uicontrol(hFig, 'Style', 'pushbutton', 'units', 'normalized', 'Position', [.15 0
 uicontrol(hFig, 'Style', 'edit', 'units', 'normalized', 'Position', [.2 0 .8 .05], 'tag', 'EEGSpatialMapStatus');
 
 % Build userdata structure
-tD = struct('mMap', mMap, 'i', 1, 'vTime', vTime, 'vRange', vRange, 'mMask', mMask, ...
+tD = struct('mMap', mMap, 'i', 1, 'vTime', vTime, 'vTimeRange', vTimeRange, 'mMask', mMask, ...
     'bComputeERP', p_bComputeERP, 'vERPTime', vERPTime);
 
 % Display initial frame
@@ -553,14 +563,14 @@ iFrame = min([iFrame size(tD.mMap, 3)]);
 if tD.bComputeERP
     % Update time markers in ERP window
     set(findobj('tag', 'EEGSpatialMapERPMarker'), ...
-        'xdata', [tD.vERPTime(tD.vRange(iFrame)) tD.vERPTime(tD.vRange(iFrame))]);
+        'xdata', [tD.vERPTime(tD.vTimeRange(iFrame)) tD.vERPTime(tD.vTimeRange(iFrame))]);
 else
     % Update marker in Spiky window
-    Spiky.main.SetTimeMarker(tD.vTime(tD.vRange(iFrame)));
+    Spiky.main.SetTimeMarker(tD.vTime(tD.vTimeRange(iFrame)));
 end
 
 % Update image
-mImg = tD.mMap(:, :, tD.vRange(iFrame));
+mImg = tD.mMap(:, :, tD.vTimeRange(iFrame));
 if ~isempty(tD.mMask)
     mImg = mImg .* tD.mMask;
 end
@@ -568,7 +578,7 @@ mImg(isnan(mImg)) = 0;
 
 if tD.bComputeERP
     hStat = findobj('tag', 'EEGSpatialMapStatus');
-    hStat.String = sprintf('%.3f s', tD.vERPTime(tD.vRange(iFrame)));
+    hStat.String = sprintf('%.3f s', tD.vERPTime(tD.vTimeRange(iFrame)));
 end
 
 set(hIm, 'cdata', mImg)
