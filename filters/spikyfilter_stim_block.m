@@ -1,10 +1,10 @@
-function [vCont, vTime, nFs] = spiky_filter_stim_block(vCont, vTime, nFs)
+function [vCont, vTime, nFs] = spikyfilter_stim_block(vCont, vTime, nFs)
 % Remove stimulus artefact through blocking. Requires a digital trigger
 % event to be defined.
 % 
 
 global Spiky
-persistent p_sTrigCh p_nStartDelay p_nStopDelay
+persistent p_sTrigCh p_nStartDelay p_nStopDelay p_nSmooth
 
 %% Select trigger channel
 [FV, ~] = Spiky.main.GetStruct();
@@ -13,12 +13,15 @@ if isempty(p_sTrigCh) || isempty(vCont)
     if isempty(p_nStartDelay)
         p_nStartDelay = 0; % ms
         p_nStopDelay = 0; % ms
+        p_nSmooth = 10; % ms
     end
-    csAns = inputdlg({'Onset pad (ms)', 'Offset pad (ms)'}, 'Stimulus block', 1, ...
-        {num2str(p_nStartDelay), num2str(p_nStopDelay)} );
+    csAns = inputdlg({'Onset pad (ms)', 'Offset pad (ms)', 'Smoothing (% of window)'}, ...
+        'Stimulus block', 1, ...
+        {num2str(p_nStartDelay), num2str(p_nStopDelay), num2str(p_nSmooth)} );
     if isempty(csAns), return, end
     p_nStartDelay = str2num(csAns{1});
     p_nStopDelay = str2num(csAns{2});
+    p_nSmooth = max(1, min(100, str2num(csAns{3})));
 end
 if isempty(vCont), return; end
 
@@ -41,6 +44,9 @@ for e = 1:length(vUp)
     if vRangePre(1) > 1
         vCont(vRange) = fliplr(vCont(vRangePre));
     end
+    % Smooth inserted trace through a moving average
+    vSmoothRange = vRangePre(1):(vRange(end)+length(vRangePre));
+    vCont(vSmoothRange) = smooth(vCont(vSmoothRange), length(vRange)*(p_nSmooth/100), 'moving');
 end
 
 return
