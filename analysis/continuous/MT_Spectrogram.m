@@ -32,7 +32,6 @@ nDur = length(vCont) / nFs; % signal duration, s
 
 % Get channel descriptive string
 sDescr = Spiky.main.GetChannelDescription(p_sContCh);
-if isempty(sDescr); sDescr = p_sContCh; end
 
 % Get parameters interactively
 % We don't collect parameters when function in batch-mode (when known)
@@ -195,7 +194,9 @@ end
 %%
 
 % Create output structure
-sPreFix = [sDescr '_MtSpc'];
+sPreFix = [p_sContCh '_MtSpc'];
+sPreFixDescr = [sDescr '_MtSpc'];
+
 tSig(1).(sPreFix) = log10(S)';
 nInt = unique(round(diff(t)*1000)/1000);
 tSig.([sPreFix '_KHz']) = (1/nInt(1)/1000);
@@ -213,6 +214,7 @@ for i = 1:length(cVars)
     tProps(i).Value = eval(cVars{i});
 end
 tSig.([sPreFix '_Properties']) = tProps;
+tSig.Description = sPreFixDescr;
 close(hMsg);
 
 return
