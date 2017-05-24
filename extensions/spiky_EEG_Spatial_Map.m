@@ -1,461 +1,186 @@
-function FV = spiky_EEG_Spatial_Map(FV)
+function FV = spiky_EEG_Spatial_Map(DATA, varargin)
 % Generate a spatial map of EEG/ECoG measurements from an array of point
 % sources.
 % 
-% TODO Show anatomical coordinates on axes in millimeters 
-%      Display when STIM is on in ERP mode
-%      Move normalization methods to ./filters?
-% 
+% Usage:
+%   spiky_EEG_Spatial_Map(FV)
+%   spiky_EEG_Spatial_Map(ERP, FS, PRET, POSTT, COORDS, SKULL, CH, RES, COL)
+%    where:  
+%       ERP      matrix of ERPs, [time x channel]
+%       FS       sample rate (Hz)
+%       PRET     pre-stimulus delay (s)
+%       POSTT    post-stimulus delay (s)
+%       COORDS   matrix of [x y] electrode coordinates (mm; OPTIONAL)
+%       SKULL    matrix of [x y] coordinates of skull boundary (mm; OPTIONAL)
+%       CH       names of electrodes (cells with strings; OPTIONAL)
+%       RES      interpolation resolution (mm)
+%       COL      is the colormap to use (e.g. 'fireice', 'jet')
+%       METHOD   interpolation method; see inpaint_nans (default 2)
+%
+%       Note: OPTIONAL parameters cannot be omitted! Provide the empty
+%       vector [] instead if they are omitted.
+%
+% Sub-functions:
+%   InterpolateERPFrame()
+%   GetParametersUI()
+%   GetSpatialCoords()
+%   GetElectrodes()
+%   GetTimeRange()
+%   GetReferenceSignal()
+%   GetERPs()
+%   DisplayERPs()
+%   GetTimeBegin()
+%   GetElectrodeCoords()
+%   GetData()
+%   UpdateFrame()
+%
+global Spiky
+persistent p_tParms
 
-global Spiky;
-
-% Hard-coded variables
-nDecimateFactor = 1.5; % higher means more or original signal preserved
-bInterp = 1; % interpolate
-bMask = 1;
-sUnit = FV.tAmplitudeUnit.sUnit; % default scale unit
-
-% Choose which data acquisition system was used
-%sDAQType = 'axona';
-sDAQType = 'openephys';
-
-persistent p_bComputeERP p_nERPPreT p_nERPPostT p_csStimChannel p_bShowNames p_cNormMethod p_sRefCh p_sFidPath p_nSVDModes p_nResMult
-
-% Default parameters
-if isempty(p_cNormMethod), p_cNormMethod = 'z'; end % normalization method (z, percent or mean)
-if isempty(p_bComputeERP), p_bComputeERP = 1; end % compute ERP, 0/1 = no/yes
-if isempty(p_nERPPreT), p_nERPPreT = 0.2; end % s
-if isempty(p_nERPPostT), p_nERPPostT = 1; end % s
-if isempty(p_bShowNames), p_bShowNames = 1; end % show electrode names, 0/1 = no/yes
-if isempty(p_sRefCh), p_sRefCh = 'all'; end % reference channel
-if isempty(p_nSVDModes), p_nSVDModes = 0; end % SVD modes to denoise with (< 1 = no denoising)
-if isempty(p_nResMult), p_nResMult = 1; end % resolution multiplier
-
-cPrompt = {'Normalization method (z, percent, mean)', ...
-    'Compute ERP (1=yes)', ...
-    'ERP baseline period (s)', ...
-    'ERP post-stimulus period (s)', ...
-    'Show electrode names (1=yes)', ...
-    'Reference channel (string; ''all'')', ... };
-    'SVD denoising modes', ...
-    'Resolution multiplier' };
-cAns = inputdlg(cPrompt, 'EEG Spatial Map', 1, { ...
-    p_cNormMethod, num2str(p_bComputeERP), ...
-    num2str(p_nERPPreT), num2str(p_nERPPostT), ...
-    num2str(p_bShowNames), p_sRefCh, num2str(p_nSVDModes), num2str(p_nResMult) } );
-if isempty(cAns), return, end
-
-p_cNormMethod = cAns{1};
-p_bComputeERP = max([0 str2num(cAns{2})]);
-p_nERPPreT = max([0 str2num(cAns{3})]);
-p_nERPPostT = max([0 str2num(cAns{4})]);
-p_bShowNames = max([0 str2num(cAns{5})]);
-p_sRefCh = cAns{6};
-p_nSVDModes = str2num(cAns{7});
-p_nResMult = str2num(cAns{8});
-
-%% Load spatial coordinates of electrodes
-% Get fiducials image
-[sFile, p_sFidPath] = uigetfile({'*.mat';'*.*'}, 'Select electrode coordinate file', p_sFidPath);
-if sFile == 0, return; end
-load(fullfile(p_sFidPath, sFile), 'tData')
-
-hWaitbar = waitbar(0, '');
-centerfig(hWaitbar, Spiky.main.GetGUIHandle())
-
-%% Initialize coordinates matrix
-waitbar(0.1, hWaitbar, 'Initialize coordinate system');
-csElecCoords = fieldnames(tData);
-if strcmpi(sDAQType, 'axona')
-    iCh = regexpi(csElecCoords, '^elec_EGF_\d*$'); % Axona
-else
-    iCh = regexpi(csElecCoords, '^elec_CH\d*$'); % Open Ephys
-    if isempty(cell2mat(iCh))
-        iCh = regexpi(csElecCoords, '^elec_\d*$'); % Open Ephys, alternative syntax
-    end
-end
-if isempty(cell2mat(iCh))
-    warndlg('No matching electrodes: Check labels created in "Get_Fiducials".')
-    return;
-end
-
-vRem = [];
-for cs = 1:length(iCh)
-    if isempty(iCh{cs})
-        vRem(end + 1) = cs;
-    end
-end
-csElecCoords(vRem) = [];
-csElecCoords = sort(csElecCoords);
-mElecCoords = [];
-for cs = 1:length(csElecCoords)
-    mElecCoords(end+1, :) = tData.(csElecCoords{cs});
-end
-
-%% Normalize coordinates to mm relative to bregma
-waitbar(0.2, hWaitbar);
-mElecCoordsRel = mElecCoords - repmat(tData.refs_bregma, size(mElecCoords, 1), 1);
-mElecCoordsRelMM = mElecCoordsRel .* tData.calibration_mmpix;
-
-% Get skull contours (in mm and pixel coordinates)
-mSkull = tData.cont_skull;
-mSkullRel = mSkull - repmat(tData.refs_bregma, size(mSkull, 1), 1);
-mSkullRelMM = mSkullRel .* tData.calibration_mmpix;
-
-% Get matrix size to nearest 100 um
-nWidthMM = max(abs(mSkullRelMM(:, 1))) * 2;
-nHeightMM = max(abs(mSkullRelMM(:, 2)))  * 2;
-nWidthMM = round(nWidthMM * p_nResMult) / p_nResMult;
-nHeightMM = round(nHeightMM * p_nResMult) / p_nResMult;
-
-nWidth = nWidthMM * p_nResMult + 1;
-nHeight = nHeightMM * p_nResMult + 1;
-
-% Bregma coordinates (pixels; in the middle)
-vBregmaPos = round([nWidth / 2 nHeight / 2]);
-mSkullRelPix = ceil(mSkullRelMM * p_nResMult) + repmat(vBregmaPos, size(mSkullRelMM, 1), 1);
-
-% Electrode positions in pixel coordinates
-mElecCoordsPix = ceil(mElecCoordsRelMM * p_nResMult) + repmat(vBregmaPos, size(mElecCoordsRelMM, 1), 1);
-
-%% Get list of electrodes
-csCh = fieldnames(FV.tData);
-if strcmpi(sDAQType, 'axona')
-    iCh = regexpi(csCh, '^EGF_\d*$'); % Axona
-else
-    iCh = regexpi(csCh, '^CH\d*$'); % Open Ephys
-end
-for i = fliplr(1:length(iCh))
-    if isempty(iCh{i}), csCh(i) = []; end
-end
-csCh = sort(csCh);
-
-% Get channel descriptions
-csChDescr = csCh;
-for c = 1:length(csCh)
-    if isfield(FV, 'tChannelDescriptions')
-        nIndx = strcmp(csCh{c}, {FV.tChannelDescriptions.sChannel});
-        if ~isempty(FV.tChannelDescriptions(nIndx))
-            csChDescr{c} = FV.tChannelDescriptions(nIndx).sDescription;
-        end
-    end
-end
-
-%% Get the start and end points of the timeseries that will be analyzes
-% This defaults to the current displayed range in the Spiky UI. If the
-% UI is closed, not available etc, then the range will default to the
-% entire timeseries range.
-try
-    nTimeBegin = FV.tData.([csCh{1} '_TimeBegin']);
-    vSig = FV.tData.(csCh{1});
-    vTime = (1:length(vSig)) ./ (FV.tData.([csCh{1} '_KHz']) * 1000);
-    vXLim = Spiky.main.GetXLim() - nTimeBegin;
-    [~, nStart] = min(abs(vTime - vXLim(1))); % samples
-    [~, nEnd] = min(abs(vTime - vXLim(2))); % samples
-catch
-    nStart = 1;
-    nEnd = length(FV.tData.(csCh{1}));
-end
-vTimeRange = nStart:nEnd;
-
-%% Assign electrode signals to correct location in mMap
-mMap = [];
-ch = 1;
-while ch < length(csCh)
-    if ishandle(hWaitbar)
-        waitbar(ch/length(csCh), hWaitbar, 'Computing signal matrix...');
+if ~isstruct(DATA)
+    % Pre-process data if ERPs are passed directly to function
+    % Required parameters if calling function from outside Spiky
+    mERPs = DATA;
+    nFs = varargin{1};
+    p_tParms.nERPPreT = varargin{2};
+    p_tParms.nERPPostT = varargin{3};
+    mCoords = varargin{4};
+    mSkullMM = varargin{5};
+    csChDescr = varargin{6};
+    p_tParms.nRes = varargin{7}; % interpolation pixel resolution (mm)
+    sColMap = varargin{8}; % colormap
+    p_tParms.bShowNames = 1;
+    if length(varargin) == 9
+        p_tParms.nInterpMethod = varargin{9};
     else
-        Spiky.main.sp_disp('EEG_Spatial_Map canceled.');
-        return;
+        p_tParms.nInterpMethod = 2;
     end
-
-    % Get electrode index (based on channel name first, description second)
-    iCh = strcmp(['elec_' csCh{ch}], csElecCoords);
-    if ~any(iCh)
-        iCh = strcmp(['elec_' csChDescr{ch}], csElecCoords);
-    end
-    if ~any(iCh)
-        disp(['elec_' csCh{ch} ' is missing!'])
-        continue
-    end
-    vPos = mElecCoordsPix(iCh, :);
     
-    vSig = FV.tData.(csCh{ch});
-    vSig = vSig(vTimeRange);
-
-    % Apply filters
-    nFs = FV.tData.([csCh{ch} '_KHz']) * 1000;
-    vTime = (1:length(vSig)) ./ nFs;
-    [vSig, vTime, nNewFs] = Spiky.main.GetFilteredChannel(csCh{ch}, vSig, vTime, 'decimate');
-    nTimeBegin = FV.tData.([csCh{ch} '_TimeBegin']);
-
-    % Check memory requirements
-    if ispc
-        tSize = whos('vSig');
-        nMemReq = tSize.bytes * nWidth * nHeight; % minimum memory required
-        tMem = memory;
-        if nMemReq > tMem.MaxPossibleArrayBytes
-            waitfor(warndlg('Total memory requirements exceeds available memory. Reduce length of data by low-pass filtering all equally channels in Channels -> Select Filters...'))
-            Spiky.main.SetFilterOptions();
-            [FV, ~] = Spiky.main.GetStruct();
-            ch = 1;
-            continue
+    % Check that sample rate makes sense
+    nExpLen = (p_tParms.nERPPreT * nFs) + (p_tParms.nERPPostT * nFs);
+    if size(mERPs, 1) ~= nExpLen
+        error('Sample rate and/or pre/post delay is inconsistent with data length')
+    end
+    
+    % Load spatial coordinates of electrodes and skull
+    if isempty(mCoords)
+        [mCoords, ~, mSkullMM] = GetSpatialCoords();
+        if size(mCoords, 1) ~= size(mERPs, 2)
+            error('Number of marked electrodes not the same as number of ERP channels')
         end
     end
     
-    % Time course normalization
-    switch p_cNormMethod
-        case 'z'
-            % Z standardization
-            vSig = (vSig - mean(vSig)) ./ std(vSig);
-            sUnit = 'Z';
-        case 'percent'
-            % Percent signal change
-            vSig = (vSig ./ mean(vSig)) .* 100; % vSig now has mean of 100
-            sUnit = '%';
-        case 'mean'
-            % Mean subtraction
-            vSig = vSig - mean(vSig);
-    end
+else
+    FV = DATA;
+    sColMap = 'fireice';
     
-    if isempty(mMap)
-        mMap = nan(nWidth, nHeight, length(vSig));
+    %% Default parameters
+    if isempty(p_tParms)
+        p_tParms.cNormMethod = 'z'; % normalization method (z, percent or mean)
+        p_tParms.bComputeERP = 1; % compute ERP, 0/1 = no/yes
+        p_tParms.nERPPreT = 0.05; % s
+        p_tParms.nERPPostT = 0.4; % s
+        p_tParms.bShowNames = 1; % show electrode names, 0/1 = no/yes
+        p_tParms.sRefCh = 'all'; % reference channel
+        p_tParms.nSVDModes = 0; % SVD modes to denoise with (< 1 = no denoising)
+        p_tParms.nRes = 0.1; % interpolation pixel resolution (mm)
+        p_tParms.nInterpMethod = 2; % interpolation method
     end
-    mMap(vPos(1), vPos(2), :) = vSig;
-    ch = ch + 1;
-end
-%waitbar(0.5, hWaitbar, 'Substituting zeros with NaNs...');
-%mMap(mMap(:) == 0) = NaN; % huge mem drain: mMap(:) == 0 duplicates matrix
 
-if isempty(mMap)
-    warndlg('Data matrix is empty: Check labels and electrode data.')
-    return;
-end
+    % Get parameters from UI
+    p_tParms = GetParametersUI(p_tParms);
+    
+    % Load spatial coordinates of electrodes and skull
+    [mElecMM, csElecCoords, mSkullMM] = GetSpatialCoords();
+    
+    % Get electrode names
+    [csCh, csChDescr] = GetElectrodes(FV);
+    
+    % Get time-range to analyze
+    vTimeRange = GetTimeRange(FV);
+    
+    % Get electrode coordinates
+    mCoords = GetElectrodeCoords(csCh, csChDescr, csElecCoords, mElecMM);
+    
+    % Get data
+    [mChData, vTime, nFs] = GetData(FV, csCh, p_tParms, vTimeRange);
 
-%% Compute reference signal
-waitbar(0, hWaitbar, 'Computing reference signal...');
-switch lower(p_sRefCh)
-    case 'all'
-        % Subtract average of all channels
-        mSigs = [];
-        for e = 1:size(mElecCoordsPix, 1)
-            waitbar(e / size(mElecCoordsPix, 1), hWaitbar, 'Subtracting reference signal...');
-            mSigs(:, end+1) = squeeze(mMap(mElecCoordsPix(e, 1), mElecCoordsPix(e, 2), :));
-        end
-        vRef = nanmean(mSigs, 2);
-    case 'none'
-        vRef = [];
-    otherwise
-        % Subtract a reference channel from all other channels
-        vRef = [];
+    % Subtract reference signal
+    vRef = GetReferenceSignal(mChData, p_tParms);
+    if ~isempty(vRef)
+        mChData = mChData - repmat(vRef, 1, size(mChData, 2));
+    end
 
-        iMatch = find(strcmpi(['elec_' p_sRefCh], csElecCoords));
-        if isempty(iMatch)
-            Spiky.main.sp_disp(['Unknown name for reference channel elec_' p_sRefCh]);
-        else
-            % Subtract a reference channel from all other channels
-            vPos = mElecCoordsPix(strcmp(['elec_' csCh{ch}], csElecCoords), :);
-            
-            vRef = squeeze(mMap(mElecCoordsPix(iMatch, 1), mElecCoordsPix(iMatch, 2), :));
-        end
+    % Compute Event Related Potentials
+    if p_tParms.bComputeERP
+        mERPs = GetERPs(FV, p_tParms, mChData, vTime, nFs);
+    end
+
+    %% Denoise frames by SVD
+    % TODO Move into display function
+    %if p_nSVDModes > 0
+    %    waitbar(0.5, hWaitbar, 'SVD denoising...');
+    %    [mMap, ~] = svdmoviefilt(mMap, p_nSVDModes);
+    %end
 end
 
-%% Subtract reference signal from all channels
-if ~isempty(vRef)
-    waitbar(0, hWaitbar, 'Subtracting reference signal...');
-    if size(mMap, 3) < 50000
-        mRef = zeros(size(mMap));
-        for j = 1:size(mElecCoordsPix, 1)
-            waitbar(j/size(mElecCoordsPix, 1), hWaitbar, 'Subtracting reference signal...');
-            mRef(mElecCoordsPix(j, 1), mElecCoordsPix(j, 2), :) = vRef;
-        end
-        mMap = mMap - mRef;
-        clear mRef;
-    else
-        % Subtract reference signal in blocks of samples when data is very large
-        nLen = size(mMap, 3);
-        nStep = 1000;
-        for j = 1:nStep:nLen
-            waitbar(j/nLen, hWaitbar, 'Subtracting reference signal...');
-            vEnd = min([j + nStep] - 1, nLen);
-            vR = j:vEnd;
-            mRef = ones(size(mMap, 1), size(mMap, 2), length(vR));
-            for k = 1:length(vR)
-                mRef(:, :, k) = mRef(:, :, k) .* vRef(vR(k));
-            end
-            mMap(:, :, vR) = mMap(:, :, vR) - mRef;
-        end
-    end
+% Plot ERPs
+vERPTime = DisplayERPs(mERPs, p_tParms, nFs, csChDescr);
+
+%% Save data (used for debugging direct analysis option)
+if 1
+    nERPPreT = p_tParms.nERPPreT;
+    nERPPostT = p_tParms.nERPPostT;
+    nRes = p_tParms.nRes;
+    save('eeg_spatial_map_vars.mat', 'mERPs', 'nFs', 'nERPPreT', 'nERPPostT', 'mCoords', 'mSkullMM', 'csChDescr', 'nRes', 'sColMap');
+    % Run with;
+    %load('eeg_spatial_map_vars.mat')
+    %spiky_EEG_Spatial_Map(mERPs, nFs, nERPPreT, nERPPostT, mCoords, mSkullMM, csChDescr, nRes, sColMap)
 end
-%%
-
-%% Compute Event Related Potentials
-vERPTime = [];
-if p_bComputeERP
-    p_csStimChannel = Spiky.main.SelectChannelNumber(FV.csDigitalChannels, 'Select ERP trigger channel', p_csStimChannel);
-
-    % Get trigger events in the displayed time range
-    [vUp, ~] = Spiky.main.GetEventPairs(p_csStimChannel, 'range');
-    
-    nFs = FV.tData.([p_csStimChannel '_KHz']);
-    vStimT = vUp - nTimeBegin;
-    
-    nERPPreSamp = round(p_nERPPreT * nNewFs);
-    nERPPostSamp = round(p_nERPPostT * nNewFs);
-
-    waitbar(0, hWaitbar, 'Computing event related potentials...');
-    
-    mMapAvg = [];
-    nN = 0;
-    for s = 1:length(vUp)
-        waitbar(s / length(vUp), hWaitbar);
-        
-        % Check that pre/post pulse window is within displayed time range
-        [~, iMin] = min(abs(vTime - vStimT(s)));
-        nStart = iMin - nERPPreSamp; % samples
-        nEnd = iMin + nERPPostSamp; % samples
-        if nStart < 1 || nEnd > length(vTime)
-            continue;
-        end
-        
-        if isempty(mMapAvg)
-            mMapAvg = mMap(:, :, nStart:nEnd);
-        else
-            mMapAvg = (mMapAvg + mMap(:, :, nStart:nEnd));
-        end
-        nN = nN + 1;
-    end
-    if nN == 0
-        warndlg('No trigger pulses detected: Try expanding time-range in Spiky UI.')
-        return;
-    elseif nN <= 5
-        Spiky.main.sp_disp('Fewer than 5 trigger pulses found: Try expanding time-range in Spiky UI.')
-    end
-    nStart = 1;
-    nEnd = size(mMapAvg, 3);
-    mMapAvg = mMapAvg ./ nN;
-    
-    % Plot all ERPs on all channels
-    mERPSigs = zeros(size(mMapAvg, 3), length(csCh));
-    for ch = 1:length(csCh)
-        % Get electrode index (based on channel name first, description second)
-        iCh = strcmp(['elec_' csCh{ch}], csElecCoords);
-        if ~any(iCh)
-            iCh = strcmp(['elec_' csChDescr{ch}], csElecCoords);
-        end
-        vPos = mElecCoordsPix(iCh, :);
-        mERPSigs(:, ch) = squeeze(mMapAvg(vPos(1), vPos(2), :));
-    end
-    hFig = figure;
-    
-    Spiky.main.ThemeObject(hFig)
-    vERPTime = (1:(nERPPreSamp+nERPPostSamp) + 1)' - (nERPPreSamp + 1);
-    vERPTime = repmat(vERPTime, 1, size(mERPSigs, 2)) ./ (nNewFs); % s
-    hAx = axes;
-    hLines = plot(hAx, vERPTime, mERPSigs);
-    for h = 1:length(hLines)
-        set(hLines(h), 'color', FV.mColors(h, :))
-    end
-    xlabel(hAx, 'Time (s)')
-    ylabel(hAx, ['Event Related Potential (' sUnit ')'])
-    axis(hAx, 'tight')
-    set(hAx, 'XGrid', 'on', 'YGrid', 'on')
-    Spiky.main.ThemeObject(hAx)
-
-    hLeg = legend(csCh);
-    Spiky.main.ThemeObject(hLeg)
-    
-    hTit = title(sprintf('ERP, n = %d', nN));
-    Spiky.main.ThemeObject(hTit)
-    
-    % Time marker
-    hold(hAx, 'on')
-    hMarker = plot(hAx, [nan nan], [floor(min(mERPSigs(:))) ceil(max(mERPSigs(:)))]);
-    set(hMarker, 'linewidth', 2, 'tag', 'EEGSpatialMapERPMarker', 'color', 'r')
-
-    mMap = mMapAvg;
-    clear mMapAvg
-end
-
-%% Interpolate matrices
-waitbar(0, hWaitbar, 'Interpolating matrices...');
-if bInterp
-    nFrames = size(mMap, 3);
-    for i = 1:nFrames
-        waitbar(i / nFrames, hWaitbar);
-        mImg = mMap(:, :, i);
-        mMap(:, :, i) = inpaint_nans(mImg, 2);
-    end
-end
-
-%% Denoise frames by SVD
-if p_nSVDModes > 0
-    waitbar(0.5, hWaitbar, 'SVD denoising...');
-    [mMap, ~] = svdmoviefilt(mMap, p_nSVDModes);
-end
-
-close(hWaitbar)
 
 %% Play spatial map
 hFig = figure;
-Spiky.main.ThemeObject(hFig)
-colormap(fireice)
 hAx = axes;
-hIm = imagesc(mMap(:, :, 1), 'parent', hAx, 'tag', 'EEGSpatialMapImg');
+
+[mImg, vX_lookup, vY_lookup] = InterpolateERPFrame(mERPs(1, :), mCoords, p_tParms.nRes, p_tParms.nInterpMethod);
+hIm = imagesc(vY_lookup, vX_lookup, mImg, 'parent', hAx, 'tag', 'EEGSpatialMapImg');
 hold(hAx, 'on')
-Spiky.main.ThemeObject(hAx)
 
-mSkull = tData.cont_skull;
-mSkullRel = mSkull - repmat(tData.refs_bregma, size(mSkull, 1), 1);
-
-%mSkullRelPix
-mSkullRelMM = mSkullRel .* tData.calibration_mmpix;
-%mElecCoordsRelMM
-%mElecCoordsPix
-
-if bInterp
-    hLabels = plot(mElecCoordsPix(:, 2), mElecCoordsPix(:, 1), 'wo');
+if ~isempty(mSkullMM)
+    hSkull = plot(hAx, mSkullMM(:, 2), mSkullMM(:, 1), 'w--');
 end
+hLabels = plot(hAx, mCoords(:, 2), mCoords(:, 1), 'go');
 
 % Text labels
-if p_bShowNames
-    csElec = char();
-    for c = 1:length(csElecCoords)
-        csElec(c, 1:length(csElecCoords{c})) = char(csElecCoords{c});
-    end
-    hTxt = text(mElecCoordsPix(:, 2) - 1.2, mElecCoordsPix(:, 1), csElec(:, 6:end));
+if p_tParms.bShowNames && ~isempty(csChDescr)
+    hTxt = text(mCoords(:, 2) - 1.2, mCoords(:, 1), csChDescr, 'parent', hAx);
     set(hTxt, 'FontSize', 8, 'interpreter', 'none', 'HorizontalAlignment', 'center', 'color', 'w');
 end
 
-hSkull = plot(mSkullRelPix(:, 2), mSkullRelPix(:, 1), 'w--');
-
-%% Compute appropriate clim's from data
-% TODO Does give appropriate values
-mMax = max(mMap, [], 3);
-mMin = min(mMap, [], 3);
-nStd = std(mMap(:));
+% Compute appropriate clim's from data
+mMax = max(mERPs, [], 1);
+mMin = min(mERPs, [], 1);
+nStd = std(mERPs(:));
 mMin(abs(mMin) < nStd*2) = [];
 mMax(abs(mMax) < nStd*2) = [];
 cCLim = [mean(mMin(:)) mean(mMax(:))] .* 2.5;
-nMax = max(abs(cCLim));
+nMax = min(abs(cCLim));
 hAx.CLim = [-nMax nMax];
 
-% Compute clim from the average min/max
-
-hCol = colorbar;
-Spiky.main.ThemeObject(hCol);
-hCol.Label.String = FV.tAmplitudeUnit.sUnit;
+hCol = colorbar(hAx);
+axes(hAx)
 axis image
 hAx.View = [-90 -90];
-hAx.XLim = [min(mSkullRelPix(:, 2))-.5 max(mSkullRelPix(:, 2))+.5];
-hAx.YLim = [min(mSkullRelPix(:, 1))-.5 max(mSkullRelPix(:, 1))+.5];
-hTit = title('Anterior');
-if bMask
-    mMask = poly2mask(mSkullRelPix(:, 2), mSkullRelPix(:, 1), nWidth, nHeight);
-else
-    mMask = [];
+if ~isempty(mSkullMM)
+    hAx.XLim = [min(mSkullMM(:, 2))-.5 max(mSkullMM(:, 2))+.5];
+    hAx.YLim = [min(mSkullMM(:, 1))-.5 max(mSkullMM(:, 1))+.5];
 end
-Spiky.main.ThemeObject(hTit, 'fontsize', 12)
+hTit = title(hAx, 'Anterior');
+
+if ~isempty(Spiky)
+    Spiky.main.ThemeObject([hFig hAx hCol hTit])
+end
+colormap(hFig, eval(sprintf('%s(1024)', sColMap)))
 
 % Navigation buttons
 set(hFig, 'units', 'normalized')
@@ -470,44 +195,28 @@ uicontrol(hFig, 'Style', 'pushbutton', 'units', 'normalized', 'Position', [.15 0
 uicontrol(hFig, 'Style', 'edit', 'units', 'normalized', 'Position', [.2 0 .8 .05], 'tag', 'EEGSpatialMapStatus');
 
 % Build userdata structure
-tD = struct('mMap', mMap, 'i', 1, 'vTime', vTime, 'vTimeRange', vTimeRange, 'mMask', mMask, ...
-    'bComputeERP', p_bComputeERP, 'vERPTime', vERPTime);
+tD = struct('mERP', mERPs, 'i', 1, 'mSkullMM', mSkullMM, ...
+    'nRes', p_tParms.nRes, 'vERPTime', vERPTime, 'mCoords', mCoords, ...
+    'nInterpMethod', p_tParms.nInterpMethod );
 
 % Display initial frame
 set(hFig, 'userdata', tD, 'KeyPressFcn', @UpdateFrame, 'tag', 'EEGSpatialMap')
 UpdateFrame(1);
 
-
 %%
+
 return
 
 
-function cmap = fireice(m)
-% FIREICE
-if ~nargin
-    m = 64;
-end
-clrs = [0.75 1 1; 0 1 1; 0 0 1;...
-    0 0 0; 1 0 0; 1 1 0; 1 1 0.75];
-y = -3:3;
-if mod(m,2)
-    delta = min(1,6/(m-1));
-    half = (m-1)/2;
-    yi = delta*(-half:half)';
-else
-    delta = min(1,6/m);
-    half = m/2;
-    yi = delta*nonzeros(-half:half);
-end
-cmap = interp2(1:3,y,clrs,1:3,yi);
-return
-
-
-% AUX function for changing the displayed frame
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function UpdateFrame(varargin)
+% AUX function for changing the displayed frame
+%
 % Input:
 %   UpdateFrame(F) where F is a valid frame number, or handle of control
 %   button.
+%
+% TODO: Split function into subfunctions; e.g GetFrameNumber()
 %
 %
 
@@ -528,58 +237,71 @@ if isnumeric(varargin{1})
     % Frame number is provided
     iFrame = varargin{1};
 elseif isobject(varargin{1})
-    % Change framenumber depending on button pressed
-    hBut = varargin{1};
-    if ~ishandle(hBut), return; end
-    switch hBut.String
-        case '>'
-            % Play continuously forward, until last frame
-            while 1
-                UpdateFrame(iFrame);
+    if strcmp(get(varargin{1}, 'type'), 'axes')
+        % ERP axis was clicked
+        mCurrPnt = get(varargin{1}, 'CurrentPoint');
+        vX = mCurrPnt(1, 1);
+        hLines = findobj(varargin{1}, 'type', 'line');
+        vXX = get(hLines(end), 'xdata');
+        [~, iFrame] = min(abs(vXX - vX));
+    elseif strcmp(get(varargin{1}, 'type'), 'uicontrol')
+        % Change framenumber depending on button pressed
+        hBut = varargin{1};
+        if ~ishandle(hBut), return; end
+        switch hBut.String
+            case '>'
+                % Play continuously forward, until last frame
+                while 1
+                    UpdateFrame(iFrame);
+                    iFrame = iFrame + 1;
+                    if hBut.Value == 0, break; end
+                end
+            case '<'
+                % Play continuously bachwards, until first frame
+                while 1
+                    UpdateFrame(iFrame);
+                    iFrame = iFrame - 1;
+                    if hBut.Value == 0, break; end
+                end
+            case '>>'
+                % Increment frame
                 iFrame = iFrame + 1;
-                if hBut.Value == 0, break; end
-            end
-        case '<'
-            % Play continuously bachwards, until first frame
-            while 1
-                UpdateFrame(iFrame);
+            case '<<'
+                % Decrement frame
                 iFrame = iFrame - 1;
-                if hBut.Value == 0, break; end
-            end
-        case '>>'
-            % Increment frame
-            iFrame = iFrame + 1;
-        case '<<'
-            % Decrement frame
-            iFrame = iFrame - 1;
+        end
     end
 end
 
 % Validate frame number
 iFrame = max([1 iFrame]);
-iFrame = min([iFrame size(tD.mMap, 3)]);
+iFrame = min([iFrame size(tD.mERP, 1)]);
 
-% Update time marker
-if tD.bComputeERP
-    % Update time markers in ERP window
-    set(findobj('tag', 'EEGSpatialMapERPMarker'), ...
-        'xdata', [tD.vERPTime(tD.vTimeRange(iFrame)) tD.vERPTime(tD.vTimeRange(iFrame))]);
-else
-    % Update marker in Spiky window
-    Spiky.main.SetTimeMarker(tD.vTime(tD.vTimeRange(iFrame)));
+% Update time markers in ERP window
+set(findobj('tag', 'EEGSpatialMapERPMarker'), ...
+    'xdata', [tD.vERPTime(iFrame) tD.vERPTime(iFrame)]);
+
+%% Compute frame
+[mImg, vX_lookup, vY_lookup] = InterpolateERPFrame(tD.mERP(iFrame, :), tD.mCoords, tD.nRes, tD.nInterpMethod);
+
+%% Compute mask
+if ~isfield(tD, 'mMask')
+    % Convert mm to pixels
+    vX = tD.mSkullMM(:, 1);
+    vY = tD.mSkullMM(:, 2);
+    vYpx = interp1(vX_lookup, 1:length(vX_lookup), vX, 'linear', 'extrap');
+    vXpx = interp1(vY_lookup, 1:length(vY_lookup), vY, 'linear', 'extrap');
+    mMask = poly2mask(vXpx, vYpx, size(mImg, 1), size(mImg, 2));
+    tD.mMask = mMask;
 end
 
-% Update image
-mImg = tD.mMap(:, :, tD.vTimeRange(iFrame));
-if ~isempty(tD.mMask)
-    mImg = mImg .* tD.mMask;
-end
+% Mask image
+mImg = mImg .* tD.mMask;
 mImg(isnan(mImg)) = 0;
+mImg(mImg == 0) = nan;
 
-if tD.bComputeERP
-    hStat = findobj('tag', 'EEGSpatialMapStatus');
-    hStat.String = sprintf('%.3f s', tD.vERPTime(tD.vTimeRange(iFrame)));
-end
+hStat = findobj('tag', 'EEGSpatialMapStatus');
+hStat(1).String = sprintf('%.3f s', tD.vERPTime(iFrame));
 
 set(hIm, 'cdata', mImg)
 drawnow
@@ -589,26 +311,363 @@ tD.nCurrentFrame = iFrame;
 if ishandle(hFig)
     set(hFig, 'userdata', tD);
 end
+return
 
-return;
 
-sChar = get(hFig, 'CurrentCharacter');
-if ~isempty(sChar)
-    switch double(sChar)
-        case 113 % 'q'
-            disp('quit...')
-        case 31
-            figure(hFig)
-            set(hFig, 'CurrentCharacter', char(0))
-        case 30
-            iFrame = iFrame + 1;
-        case 28
-            iFrame = iFrame - 1;
-            set(hFig, 'CurrentCharacter', char(0))
-        case 29
-            iFrame = iFrame + 1;
-            set(hFig, 'CurrentCharacter', char(0))
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [mERP_i, vX_lookup, vY_lookup] = InterpolateERPFrame(mERP, mCoords, nRes, nInterpMethod)
+% Interpolate spatial ERP signal
+%
+% Usage: InterpolateERPFrame(D, C, R), where
+%   D is a time X channel data matrix
+%   C is a matrix of the spatial coordinates of electrodes (mm)
+%   R is the pixel resolution of the interpolated signal (mm)
+%
+nSlack = 5;
+mRange = [min(mCoords) - nSlack; max(mCoords) + nSlack];
+vX_lookup = mRange(1, 1):nRes:mRange(2, 1);
+vY_lookup = mRange(1, 2):nRes:mRange(2, 2);
+mERP_i = nan(length(vX_lookup), length(vY_lookup));
+for i = 1:length(mERP)
+    vCoords = mCoords(i, :);
+    [~, iMinX] = min(abs(vCoords(1) - vX_lookup));
+    [~, iMinY] = min(abs(vCoords(2) - vY_lookup));
+    mERP_i(iMinX, iMinY) = mERP(i);
+end
+mERP_i = inpaint_nans(mERP_i, nInterpMethod);
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function tParms = GetParametersUI(tParms)
+% Open UI to enter analysis parameters
+%
+cPrompt = {'Normalization method (z, percent, mean)', ...
+    'Compute ERP (1=yes)', ...
+    'ERP baseline period (s)', ...
+    'ERP post-stimulus period (s)', ...
+    'Show electrode names (1=yes)', ...
+    'Reference channel (string; ''all'')', ... };
+    'SVD denoising modes', ...
+    'Interpolation resolution (mm)', ...
+    'Interpolation method (1-5)' };
+cAns = inputdlg(cPrompt, 'EEG Spatial Map', 1, { ...
+    tParms.cNormMethod, num2str(tParms.bComputeERP), ...
+    num2str(tParms.nERPPreT), num2str(tParms.nERPPostT), ...
+    num2str(tParms.bShowNames), tParms.sRefCh, ...
+    num2str(tParms.nSVDModes), num2str(tParms.nRes), ...
+    num2str(tParms.nInterMethod) } );
+if isempty(cAns), return, end
+tParms.cNormMethod = cAns{1};
+tParms.bComputeERP = max([0 str2num(cAns{2})]);
+tParms.nERPPreT = max([0 str2num(cAns{3})]);
+tParms.nERPPostT = max([0 str2num(cAns{4})]);
+tParms.bShowNames = max([0 str2num(cAns{5})]);
+tParms.sRefCh = cAns{6};
+tParms.nSVDModes = str2num(cAns{7});
+tParms.nRes = str2num(cAns{8});
+tParms.nInterMethod = str2num(cAns{9});
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [mElecMM, csElecCoords, mSkullMM] = GetSpatialCoords(varargin)
+% Load spatial coordinates of electrodes from disk
+%
+% Usage:
+%   GetSpatialCoords(FILE)  Load known file
+%   GetSpatialCoords()      Select a file manually
+%
+if nargin == 1
+    sFile = varargin{1};
+    load(sFile, 'tData')
+else
+    persistent p_sFidPath
+    [sFile, p_sFidPath] = uigetfile({'*.mat';'*.*'}, 'Select electrode coordinate file', p_sFidPath);
+    if sFile == 0, return; end
+    load(fullfile(p_sFidPath, sFile), 'tData')
+end
+csElecCoords = fieldnames(tData);
+iCh = regexpi(csElecCoords, '^elec_CH\d*$');
+if isempty(cell2mat(iCh))
+    iCh = regexpi(csElecCoords, '^elec_\d*$');
+end
+if isempty(cell2mat(iCh))
+    warndlg('No matching electrodes: Check labels created in "Get_Fiducials".')
+    return;
+end
+vRem = [];
+for cs = 1:length(iCh)
+    if isempty(iCh{cs})
+        vRem(end + 1) = cs;
     end
 end
+csElecCoords(vRem) = [];
+csElecCoords = sort(csElecCoords);
+mElecCoords = [];
+for cs = 1:length(csElecCoords)
+    mElecCoords(end+1, :) = tData.(csElecCoords{cs});
+end
+%% Normalize coordinates to mm relative to bregma
+mElecCoordsRel = mElecCoords - repmat(tData.refs_bregma, size(mElecCoords, 1), 1);
+mElecMM = mElecCoordsRel .* tData.calibration_mmpix;
 
+% Get skull contours (in mm and pixel coordinates)
+mSkull = tData.cont_skull;
+mSkullRel = mSkull - repmat(tData.refs_bregma, size(mSkull, 1), 1);
+mSkullMM = mSkullRel .* tData.calibration_mmpix;
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function cmap = fireice(m)
+% FIREICE colormap
+if ~nargin
+    m = 64;
+end
+clrs = [0.75 1 1; 0 1 1; 0 0 1; 0 0 0; 1 0 0; 1 1 0; 1 1 0.75];
+y = -3:3;
+if mod(m,2)
+    delta = min(1,6/(m-1));
+    half = (m-1)/2;
+    yi = delta*(-half:half)';
+else
+    delta = min(1,6/m);
+    half = m/2;
+    yi = delta*nonzeros(-half:half);
+end
+cmap = interp2(1:3,y,clrs,1:3,yi);
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [csCh, csChDescr] = GetElectrodes(FV)
+% Get list of electrodes
+%
+csCh = fieldnames(FV.tData);
+iCh = regexpi(csCh, '^CH\d*$');
+
+for i = fliplr(1:length(iCh))
+    if isempty(iCh{i}), csCh(i) = []; end
+end
+csCh = sort(csCh);
+
+% Get channel descriptions
+csChDescr = csCh;
+for c = 1:length(csCh)
+    if isfield(FV, 'tChannelDescriptions')
+        nIndx = strcmp(csCh{c}, {FV.tChannelDescriptions.sChannel});
+        if ~isempty(FV.tChannelDescriptions(nIndx))
+            csChDescr{c} = FV.tChannelDescriptions(nIndx).sDescription;
+        end
+    end
+end
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function vTimeRange = GetTimeRange(FV)
+% Get the start and end points of the timeseries that will be analyzed
+% This defaults to the current displayed range in the Spiky UI. If the
+% UI is closed, not available etc, then the range will default to the
+% entire timeseries range.
+%
+global Spiky
+try
+    [nTimeBegin, sCh] = GetTimeBegin(FV);
+    vSig = FV.tData.(sCh);
+    vTime = (1:length(vSig)) ./ (FV.tData.([sCh '_KHz']) * 1000);
+    vXLim = Spiky.main.GetXLim() - nTimeBegin;
+    [~, nStart] = min(abs(vTime - vXLim(1))); % samples
+    [~, nEnd] = min(abs(vTime - vXLim(2))); % samples
+catch
+    nStart = 1;
+    nEnd = length(FV.tData.(sCh));
+end
+vTimeRange = nStart:nEnd;
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [nTimeBegin, sCh] = GetTimeBegin(FV)
+% Get begin time (first timepoint)
+%
+csFields = fieldnames(FV.tData);
+iTB = find(~cellfun(@isempty, strfind(csFields', 'TimeBegin')));
+nTimeBegin = FV.tData.([csFields{iTB(1)}]);
+sCh = csFields{iTB(1)}(1:end-10);
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function vRef = GetReferenceSignal(mChData, p_tParms)
+% Compute reference signal
+%
+switch lower(p_tParms.sRefCh)
+    case 'all'
+        % Subtract average of all channels
+        vRef = nanmean(mChData, 2);
+    case 'none'
+        vRef = [];
+    otherwise
+        % Subtract a reference channel from all other channels
+        vRef = [];
+
+        iMatch = find(strcmpi(['elec_' p_sRefCh], csElecCoords));
+        if isempty(iMatch)
+            Spiky.main.sp_disp(['Unknown name for reference channel elec_' p_sRefCh]);
+        else
+            % Subtract a reference channel from all other channels
+            vRef = mChData(:, iMatch); % TODO Needs to be tested
+        end
+end
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function vERPTime = DisplayERPs(mERPs, p_tParms, nFs, csCh)
+% Display event related potentials as traces
+%
+global Spiky
+hFig = figure;
+
+nERPPreSamp = round(p_tParms.nERPPreT * nFs);
+nERPPostSamp = round(p_tParms.nERPPostT * nFs);
+
+%vERPTime = (1:(nERPPreSamp+nERPPostSamp) + 1)' - (nERPPreSamp + 1);
+%vERPTime = repmat(vERPTime, 1, size(mERPs, 2)) ./ (nFs); % s
+vERPTime = linspace(-p_tParms.nERPPreT, p_tParms.nERPPostT, size(mERPs, 1))';
+vERPTime = repmat(vERPTime, 1, size(mERPs, 2));
+
+hAx = axes;
+hLines = plot(hAx, vERPTime, mERPs);
+xlabel(hAx, 'Time (s)')
+ylabel(hAx, ['Event Related Potential'])
+axis(hAx, 'tight')
+set(hAx, 'XGrid', 'on', 'YGrid', 'on')
+hLeg = legend(csCh);
+hTit = title('ERP');
+
+if ~isempty(Spiky)
+    Spiky.main.ThemeObject([hFig hAx hLeg hTit])
+end
+
+% Time marker
+hold(hAx, 'on')
+hMarker = plot(hAx, [nan nan], [floor(min(mERPs(:))) ceil(max(mERPs(:)))]);
+set(hMarker, 'linewidth', 2, 'tag', 'EEGSpatialMapERPMarker', 'color', 'r')
+
+% Enable axis click trigger
+set(hAx, 'ButtonDownFcn', @UpdateFrame)
+
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function mERPs = GetERPs(FV, p_tParms, mChData, vTime, nFs)
+% Compute event related potentials
+%
+%
+global Spiky
+if isempty(Spiky)
+    error('Spiky not available')
+end
+persistent p_csStimChannel
+p_csStimChannel = Spiky.main.SelectChannelNumber(FV.csDigitalChannels, 'Select ERP trigger channel', p_csStimChannel);
+
+% Get trigger events in the displayed time range
+[vUp, ~] = Spiky.main.GetEventPairs(p_csStimChannel, 'range');
+
+[nTimeBegin, ~] = GetTimeBegin(FV);
+
+vStimT = vUp - nTimeBegin;
+nERPPreSamp = round(p_tParms.nERPPreT * nFs);
+nERPPostSamp = round(p_tParms.nERPPostT * nFs);
+
+mERPs = [];
+nN = 0;
+for s = 1:length(vUp)
+    % Check that pre/post pulse window is within displayed time range
+    [~, iMin] = min(abs(vTime - vStimT(s)));
+    nStart = iMin - nERPPreSamp; % samples
+    nEnd = iMin + nERPPostSamp; % samples
+    if nStart < 1 || nEnd > length(vTime)
+        continue;
+    end
+    
+    if isempty(mERPs)
+        mERPs = mChData(nStart:nEnd, :);
+    else
+        mERPs = mERPs + mChData(nStart:nEnd, :);
+    end
+    nN = nN + 1;
+end
+if nN == 0
+    warndlg('No trigger pulses detected: Try expanding time-range in Spiky UI.')
+    return;
+elseif nN <= 5
+    Spiky.main.sp_disp('Fewer than 5 trigger pulses found: Try expanding time-range in Spiky UI.')
+end
+nStart = 1;
+nEnd = size(mERPs, 1);
+mERPs = mERPs ./ nN;
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function mCoords = GetElectrodeCoords(csCh, csChDescr, csElecCoords, mElecMM)
+% Get coordinates of electrodes (returns a subset of input, in millimeters)
+%
+for ch = 1:length(csCh)
+    % Get electrode index (based on channel name first, description second)
+    iCh = strcmp(['elec_' csCh{ch}], csElecCoords);
+    if ~any(iCh)
+        iCh = strcmp(['elec_' csChDescr{ch}], csElecCoords);
+    end
+    if ~any(iCh)
+        disp(['elec_' csCh{ch} ' is missing!'])
+        continue
+    end
+    mCoords(ch, :) = mElecMM(iCh, :);
+end
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [mChData, vTime, nFs] = GetData(FV, csCh, p_tParms, vTimeRange)
+% Get data
+%
+global Spiky
+hWaitbar = waitbar(0, '');
+mChData = [];
+for ch = 1:length(csCh)
+    waitbar(ch/length(csCh), hWaitbar, 'Computing signal matrix...');
+
+    vSig = FV.tData.(csCh{ch});
+    vSig = vSig(vTimeRange);
+
+    % Apply filters
+    nFs = FV.tData.([csCh{ch} '_KHz']) * 1000;
+    vTime = (1:length(vSig)) ./ nFs;
+    if ~isempty(Spiky)
+        [vSig, vTime, nFs] = Spiky.main.GetFilteredChannel(csCh{ch}, vSig, vTime, 'decimate');
+    end
+    
+    % Time course normalization
+    switch p_tParms.cNormMethod
+        case 'z'
+            % Z standardization
+            vSig = (vSig - mean(vSig)) ./ std(vSig);
+            sUnit = 'Z';
+        case 'percent'
+            % Percent signal change
+            vSig = (vSig ./ mean(vSig)) .* 100; % vSig now has mean of 100
+            sUnit = '%';
+        case 'mean'
+            % Mean subtraction
+            vSig = vSig - mean(vSig);
+    end
+    mChData(:, ch) = vSig;
+end
+close(hWaitbar)
 return
