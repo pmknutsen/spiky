@@ -790,7 +790,7 @@ persistent p_bAlwaysUseDuplicate
 if isempty(p_bAlwaysUseDuplicate)
     p_bAlwaysUseDuplicate = 0;
 end
-if ~IsDataLoaded, return, end
+%if ~IsDataLoaded, return, end % returns true when loading SPB files
 [FV, ~] = GetStruct();
 tData = FV.tData; % original raw data and paths
 sDirectory = FV.sDirectory;
@@ -1746,6 +1746,7 @@ for i = 1:length(FV.csDisplayChannels)
             if isfield(FV.tData, [sCh '_Scale'])
                 vY = FV.tData.([sCh '_Scale']);
             end
+            clear('nContTrace')
             
             % Insert the min/max values of the entire matrix into displayed
             % segment so that colormap is scaled identically regardless of
@@ -1773,7 +1774,7 @@ for i = 1:length(FV.csDisplayChannels)
         uimenu(hMenu, 'Label', 'Digitize Crossing', 'Callback', @DigitizeChannelCrossing, 'Tag', sCh);
         uimenu(hMenu, 'Label', '&Properties', 'Separator', 'on', 'Callback', @ChannelProperties, 'Tag', sCh);
         uimenu(hMenu, 'Label', 'Delete Channel', 'Callback', {@DeleteChannel, sCh}, 'Tag', sCh, 'Separator', 'on');
-        set(hLin, 'uicontextmenu', hMenu)
+        set(hLin, 'uicontextmenu', hMenu, 'tag', sCh)
     end
     
     % Set axis labels
@@ -1790,12 +1791,17 @@ for i = 1:length(FV.csDisplayChannels)
         sTit = sprintf('%s', strrep(sYLabel, '_', ' '));
         nRot = 90;
         if length(sTit) < 4, nRot = 0; end
+        if exist('nContTrace', 'var')
+            vColor = FV.mColors(nContTrace, :);
+        else
+            vColor = [1 1 1];
+        end
         hLabel = text(-.03, 0.5, sTit, ...
             'rotation', nRot, ...
             'horizontalalign', 'center', ...
             'parent', hSubplots(end), ...
             'units', 'normalized', 'fontsize', 12, ...
-            'color', FV.mColors(nContTrace, :), ...
+            'color', vColor, ...
             'userdata', sUnit, ...
             'ButtonDownFcn', @ChangeChannel, ...
             'units', 'normalized', ...
@@ -1803,7 +1809,7 @@ for i = 1:length(FV.csDisplayChannels)
     end
     set(hLabel, 'Interpreter', 'tex')
     ThemeObject(hSubplots(end))
-        
+    
     if IsMergeMode()
         if isempty(FV.vXlim), axis(hSubplots(end), 'tight')
         else set(hSubplots(end), 'xlim', FV.vXlim); end
@@ -2388,15 +2394,19 @@ function CopyChannelToFig(varargin)
 % 
 [FV, hWin] = GetStruct();
 sCh = get(gcbo, 'Tag');
+
 if ~isfield(FV.tData, sCh); return; end
 
 nBegin = FV.tData.([sCh '_TimeBegin']); % sampling start, sec
 nEnd = FV.tData.([sCh '_TimeEnd']); % sampling end, sec
 nFs = FV.tData.([sCh '_KHz']) * 1000; % sampling frequency Hz
+vCont = FV.tData.(sCh);
 vTime = (nBegin+1/nFs):(1/nFs):(nBegin+length(vCont)/nFs); % absolute time, sec
 if strcmp(get(findobj(hWin, 'Tag', 'ShowNormalTime'), 'checked'), 'on')
     vTime = vTime - nBegin;
 end
+[vCont, vTime, nFs] = GetFilteredChannel(sCh, vCont, vTime, 'decimate');
+
 hFig = figure;
 ThemeObject(hFig)
 hAx = axes();
@@ -2421,6 +2431,13 @@ ThemeObject(hAx)
 hTit = title(['Channel ' sCh], 'interpreter', 'none');
 ThemeObject(hTit)
 axis tight
+set(hAx, 'position', [.07 .1 .9 .85])
+grid(hAx, 'on')
+% Set correct color on line
+hLine = findobj(hWin, 'type', 'line', 'tag', sCh);
+if ishandle(hLine)
+    set(hLin, 'color', get(hLine, 'color'))
+end
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2504,7 +2521,8 @@ vOrigLims = get(gca, 'xlim');
 [FV, ~] = GetStruct();
 vCurrLim = get(gca, 'xlim');
 FV.vXlim = vCurrLim; % pan left by 25%
-SetStruct(FV); ViewTrialData
+SetStruct(FV);
+ViewTrialData();
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2621,6 +2639,7 @@ function csSelected = SelectChannels(varargin)
 % 
 if ~IsDataLoaded, return, end
 [FV, ~] = GetStruct();
+persistent p_iSelected
 
 % If a channel was specific in varargin{1}, then toggle this in csDisplayChannels,
 % i.e. remove if its there or insert if its not already displayed
@@ -2668,11 +2687,17 @@ end
 [csDisplayChannels, iOrder] = sort(csDisplayChannels);
 csChannelDescriptions = csChannelDescriptions(iOrder);
 
-iSelected = SelectChannelsUI(csDisplayChannels, csChannelDescriptions);
+if ~isempty(p_iSelected)
+    iSelected = SelectChannelsUI(csDisplayChannels, csChannelDescriptions, p_iSelected);
+else
+    iSelected = SelectChannelsUI(csDisplayChannels, csChannelDescriptions);
+end
 if iSelected == 0
     csSelectedDescr = {};
     csSelected = {};
     return
+else
+    p_iSelected = iSelected;
 end
 csSelectedDescr = csChannelDescriptions(iSelected);
 csSelected = csDisplayChannels(iSelected);
@@ -2696,15 +2721,17 @@ function iSelected = SelectChannelsUI(csCh, varargin)
 % need a UI to select from a series of channels/strings/options.
 % 
 % Usage:
-%   S = SelectChannelsUI(S, CS), where S is a cell of channel names, CS
-%   are optional descriptions of the channels, and I is a vector of checked
-%   indices in S.
+%   S = SelectChannelsUI(S)
+%   S = SelectChannelsUI(S, CS)
+%   S = SelectChannelsUI(S, CS, I)
+%
+%   where S is a vectors of cells of channel names, CS are optional descriptions
+%   of the channels, and I is a vector of checked indices in S.
 %
 %   If the UI is closed without making a selection, a zero is returned
 %   instead of a vector of indices in I.
 %
-global STAT
-persistent p_STAT
+global STAT % used in callback functions
 
 if isempty(csCh)
     iSelected = 0;
@@ -2714,7 +2741,7 @@ elseif length(csCh) == 1
     return
 end
 
-if nargin == 2
+if nargin > 1
     csChDescr = varargin{1};
 else
     csChDescr = {};
@@ -2753,11 +2780,14 @@ for nCh = 1:length(csCh)
         'Position', [(nCol * nColW)+15 (nRow+1.5)*nRowH+5 nColW 20], ...
         'HorizontalAlignment', 'left', 'value', nVal);
 end
-if ~isempty(p_STAT)
+
+% Pre-select channels
+if nargin > 2
+    iSelected = varargin{2};
     hChecks = findobj(gcf, 'style', 'checkbox');
     for c = 1:length(hChecks)
-        if c <= length(p_STAT)
-            set(hChecks(c), 'value', p_STAT{c})
+        if c <= length(iSelected)
+            set(hChecks(c), 'value', iSelected(c))
         end
     end
 end
@@ -2771,8 +2801,7 @@ set(findobj(hFig, 'style', 'checkbox'), 'backgroundcolor', get(hFig, 'color'))
 centerfig(hFig)
 uiwait(hFig)
 
-p_STAT = STAT(2:end);
-iSelected = flipud(logical(cell2mat(p_STAT)));
+iSelected = flipud(logical(cell2mat(STAT(2:end))));
 
 return
 
@@ -2852,8 +2881,6 @@ function OpenFile(varargin)
 % OpenFile() is called from the GUI (File->Open or the Open button in the
 % toolbar)
 % 
-% TODO Ignore first input when empty
-% 
 % Usage:
 %   OpenFile([], -1)    Load previous file in current list
 %   OpenFile([], 0)     Load next file in current list
@@ -2868,6 +2895,9 @@ global g_hSpike_Viewer g_bBatchMode;
 persistent p_bNeverApply;
 
 % Remove inputs if function was called from GUI
+if isempty(varargin)
+    varargin = {[] []};
+end
 if ishandle(varargin{1})
     varargin = {[] []};
 end
@@ -3543,9 +3573,6 @@ if nargout > 1
     varargout{2} = nFs;
 end
 
-%% Adjust gain
-vCont = AdjustChannelGain(vCont, sCh);
-
 %% Apply selected built-in filters
 nHighPass = nan; nLowPass = nan;
 csFiltersPre = {}; csFiltersPost = {};
@@ -3605,6 +3632,9 @@ if isfield(FV, 'tFilteredChannels')
     end
     
 end
+
+%% Adjust gain
+vCont = AdjustChannelGain(vCont, sCh);
 
 %% Apply user-defined filter/function
 vCont = ChannelCalculator(vCont, sCh);
@@ -7230,7 +7260,7 @@ return
 function ExportChannelSettings(varargin)
 % Export channel configurations to .mat file for later import. This feature
 % is useful for datasets with a large number of channels. Data saved to
-% file include: descriptions, gain, display status
+% file include: descriptions, gain, display status and filters
 % 
 % Usage: ExportChannelSettings()
 % 
@@ -7238,7 +7268,7 @@ function ExportChannelSettings(varargin)
 if ~IsDataLoaded, return, end
 
 tExport = struct();
-csFields = {'csDisplayChannels', 'tGain', 'tChannelDescriptions', 'tYlim'};
+csFields = {'csDisplayChannels', 'tGain', 'tChannelDescriptions', 'tYlim', 'tFilteredChannels'};
 for f = 1:length(csFields)
     if isfield(FV, csFields{f})
         tExport.(csFields{f}) = FV.(csFields{f});
@@ -7248,7 +7278,7 @@ end
 [~, sFile, ~] = fileparts(FV.sLoadedTrial);
 sFile = sprintf('%s%s%s_ChannelSettings.mat', FV.sDirectory, filesep, sFile);
 save(sFile, 'tExport');
-sp_disp('Exported channel settings');
+sp_disp(sprintf('Exported channel settings to %s', sFile));
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -7256,12 +7286,24 @@ function ImportChannelSettings(varargin)
 % Import channel settings from previously exported settings.
 %
 % Usage: ImportChannelSettings()
+%        ImportChannelSettings(S) where S is the path of a settings file
 % 
 [FV, ~] = GetStruct();
 if ~IsDataLoaded, return, end
 
-[sFile, sPath] = uigetfile('*.mat', 'Pick an M-file');
-load(fullfile(sPath, sFile), 'tExport')
+if isempty(varargin)
+    [sFile, sPath] = uigetfile('*.mat', 'Pick an M-file');
+    sFile = fullfile(sPath, sFile);
+else
+    sFile = varargin{1};
+end
+if exist(sFile, 'file')
+    load(sFile, 'tExport')
+else
+    warndlg('Invalid file: File does not exist.', 'Spiky');
+    return
+end
+
 if ~exist('tExport', 'var')
     warndlg('Invalid file: File does not contain channel settings.', 'Spiky');
     return
@@ -7387,6 +7429,13 @@ if ~bIsGain
 end
 
 vCont = vCont ./ nGain; % divide by gain; result is now VOLTS at the source/electrode
+
+% Check if data has special unit (e.g. 'Hz')
+if isfield(FV.tData, [sCh '_Unit'])
+    if ~strcmpi(FV.tData.([sCh '_Unit']), 'V')
+        return
+    end
+end
 
 % Scale to microvolts (or optionally to V or mV)
 vCont = vCont .* FV.tAmplitudeUnit.nFactor;
@@ -7608,7 +7657,12 @@ if isfield(FV, 'sLoadedTrial') % a trial is loaded
     if ~isempty(sFilename) % we have a filename
         if exist(sFilename, 'file') % file exists
             global tInfo
-            tInfo = daqread(sFilename, 'info');
+            try
+                tInfo = daqread(sFilename, 'info');
+            catch
+                warndlg('The loaded file is not a DAQ file.', 'Spiky')
+                return
+            end
             assignin('base', 'tInfo', tInfo); % copy tInfo to base workspace
             openvar('tInfo')
             return
@@ -8079,10 +8133,11 @@ if ~g_bBatchMode
     BatchRedo([], sprintf('RunScript(''%s'')', sFile));
 end
 
-FV.ScriptError = '';
 eval(['FV = ' sFile(1:end-2) '(FV);'])
-if ~isempty(FV.ScriptError)
-    sp_disp(sprintf('In %s: %s', sFile(1:end-2), FV.ScriptError))
+if isfield(FV, 'ScriptError')
+    if ~isempty(FV.ScriptError)
+        sp_disp(sprintf('In %s: %s', sFile(1:end-2), FV.ScriptError))
+    end
 end
 
 SetStruct(FV)
@@ -8244,6 +8299,22 @@ end
 FV.tGain.(cFields{1}) = 1;
 FV.csChannels = unique([FV.csChannels cFields{1}]);
 FV.csDisplayChannels = unique([FV.csDisplayChannels cFields{1}]);
+
+% Add new channel description, if set
+if isfield(tSig, 'Description')
+    iCh = [];
+    if isfield(FV, 'tChannelDescriptions')
+        iCh = find(strcmp({FV.tChannelDescriptions(:).sChannel}, cFields{1}));
+    end
+    if isempty(iCh)
+        iCh = length(FV.tChannelDescriptions) + 1;
+    else
+        iCh = iCh(1);
+    end
+    FV.tChannelDescriptions(iCh).sChannel = cFields{1};
+    FV.tChannelDescriptions(iCh).sDescription = tSig.Description;
+end
+
 SetStruct(FV)
 ViewTrialData()
 
