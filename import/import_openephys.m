@@ -54,7 +54,13 @@ csFiles(iRem) = [];
 
 %% Initialize
 FV = Spiky.main.SetFVDefaults();
-FV.sDirectory = pwd;
+
+[sPathPart, ~, ~] = fileparts(sFile);
+if isempty(sPathPart)
+    FV.sDirectory = pwd;
+else
+    FV.sDirectory = sPathPart;
+end
 FV.tData = struct([]);
 FV.sLoadedTrial = fullfile(FV.sDirectory, sFile);
 
@@ -66,8 +72,9 @@ for c = 1:length(csCh)
         break;
     end
     waitbar(c/length(csCh), hWait)
-    if exist(csFiles{c}, 'file')
-        [vData, vTime, tInfo] = load_open_ephys_data_faster(csFiles{c});
+    sLoadFile = fullfile(FV.sDirectory, csFiles{c});
+    if exist(sLoadFile, 'file')
+        [vData, vTime, tInfo] = load_open_ephys_data_faster(sLoadFile);
         vData = single(vData);
         sCh = csCh{c};
         sTime = tInfo.header.date_created(end-5:end);
@@ -96,9 +103,9 @@ if nExpNumber > 1
 else
     sEventsFile = 'all_channels.events';
 end
+sEventsFile = fullfile(FV.sDirectory, sEventsFile);
 
 %% Read events
-tInfo.recNum
 if exist(sEventsFile, 'file')
     [vCh, vTime, tInfo] = load_open_ephys_data_faster(sEventsFile);
     for ch = unique(vCh)'
